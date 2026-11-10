@@ -513,7 +513,7 @@ Worker.prototype.setModel = function(obj, clips, look){
   // obj: the worker built in Blender (shirt, hi-vis vest and hard hat already rigged to the skeleton)
   const holder = new THREE.Group(); holder.add(obj);
   const B = {}; obj.traverse(n => { if (n.isBone) B[n.name.replace(/^.*[:|]/, '')] = n; });
-  obj.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; n.frustumCulled = false; } });
+  obj.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; n.frustumCulled = false; n.geometry.computeBoundingBox(); } });   // the file's own bounds are not reliable
   // face the character to +Z (up × (right − left)), scale, feet on the floor, hips centred
   holder.updateMatrixWorld(true);
   const a = new V3(), b = new V3(); B.LeftUpLeg.getWorldPosition(a); B.RightUpLeg.getWorldPosition(b);
