@@ -123,9 +123,9 @@ box(50, 0.06, 32, M.concrete, 0, 0.03, -1);                 // yard  x -25..25, 
 box(160, 0.04, 7, M.asphalt, 0, 0.02, 19);                  // road
 for (let x = -78; x < 80; x += 6) box(3, 0.02, 0.18, M.white, x, 0.05, 19);
 for (const x of [-16, 16]) box(7, 0.05, 2.2, M.asphalt, x, 0.03, 15.6);   // driveways
-box(14.5, 0.03, 8, M.epoxy, -1.75, 0.07, -1);               // shed floor
+box(14.6, 0.03, 9.6, M.epoxy, -2.25, 0.07, -0.8);           // shed floor
 function floorLine(x0, z0, x1, z1, m=M.line){ const L = Math.hypot(x1-x0, z1-z0); const b = box(L, 0.02, 0.14, m, (x0+x1)/2, 0.085, (z0+z1)/2); b.rotation.y = -Math.atan2(z1-z0, x1-x0); b.castShadow = false; }
-floorLine(-9, 3.6, 5.5, 3.6); floorLine(-9, -5.6, 5.5, -5.6);
+floorLine(-9.4, 4.0, 4.5, 4.0);
 for (const [x0, x1] of [[-19.5, -12.5], [12.5, 19.5]]) { floorLine(x0, 6.5, x1, 6.5); floorLine(x0, 6.5, x0, 14.5); floorLine(x1, 6.5, x1, 14.5); }   // truck bays
 floorLine(4.5, 4, 12.6, 4); floorLine(4.5, 6.2, 12.6, 6.2);   // shipping lane
 
@@ -139,12 +139,95 @@ function tree(x, z, s=1){
 for (let x = -34; x <= 34; x += 3.4) { tree(x + rnd(), -21 - rnd()*3, 0.9 + rnd()*0.5); tree(x + rnd(), 26 + rnd()*3, 0.8 + rnd()*0.5); }
 for (let z = -18; z <= 14; z += 3.6) { tree(-29 - rnd()*2, z, 0.9 + rnd()*0.4); tree(29 + rnd()*2, z, 0.9 + rnd()*0.4); }
 
-// ---------------- shed (open frame so the line is visible from above) ----------------
-for (const x of [-9, -2, 5.5]) for (const z of [-5, 3]) { box(0.35, 4.4, 0.35, M.roofBeam, x, 2.2, z); box(0.7, 0.08, 0.7, M.roofBeam, x, 0.1, z); }
-for (const z of [-5, 3]) box(14.85, 0.35, 0.3, M.roofBeam, -1.75, 4.3, z);
-for (const x of [-9, -2, 5.5]) box(0.3, 0.35, 8.3, M.roofBeam, x, 4.3, -1);
-for (const z of [-5, 3]) { const s = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 0.8), new THREE.MeshBasicMaterial({map: labelTex(['LINHA 1'], 512, 96, '#1f4fb8', '#fff', 64)}));
-  s.position.set(-5.5, 3.8, z + (z > 0 ? 0.17 : -0.17)); if (z < 0) s.rotation.y = Math.PI; scene.add(s); }
+// ---------------- barracão (blue steel frame, gable roof with skylights) ----------------
+function stripeTex(w, h, base, line, step, extra){
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  g.fillStyle = base; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x += step) { g.fillStyle = line; g.fillRect(x, 0, Math.max(2, step*0.28), h); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x + step*0.5, 0, 2, h); }
+  if (extra) extra(g, w, h);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t;
+}
+const SH = {x0:-9, x1:4.5, zB:-5, zF:3.4, eave:4.4, ridge:5.9, ov:0.6};
+SH.zR = (SH.zB + SH.zF) / 2; SH.xc = (SH.x0 + SH.x1) / 2;
+const ROOF = new THREE.Group(); scene.add(ROOF);   // fades out when you zoom in, so the line stays visible
+const roofMats = [];
+const fadeMat = m => { m.transparent = true; roofMats.push(m); return m; };
+{
+  const blueSteel = M.blue, half = (SH.zF - SH.zB) / 2, a = Math.atan2(SH.ridge - SH.eave, half);
+  const run = half + SH.ov, L = run / Math.cos(a), W = SH.x1 - SH.x0 + 2*SH.ov, lift = 0.22;
+  // columns + portal frames
+  for (const x of [SH.x0, SH.xc, SH.x1]) {
+    for (const z of [SH.zB, SH.zF]) { box(0.36, SH.eave, 0.36, blueSteel, x, SH.eave/2, z); box(0.7, 0.08, 0.7, blueSteel, x, 0.1, z); }
+    const rl = half / Math.cos(a);
+    box(0.24, 0.32, rl, blueSteel, x, (SH.eave + SH.ridge)/2, SH.zR + half/2).rotation.x = a;
+    box(0.24, 0.32, rl, blueSteel, x, (SH.eave + SH.ridge)/2, SH.zR - half/2).rotation.x = -a;
+  }
+  for (const z of [SH.zB, SH.zF]) box(SH.x1 - SH.x0 + 0.36, 0.34, 0.28, blueSteel, SH.xc, SH.eave - 0.1, z);
+  box(SH.x1 - SH.x0 + 0.36, 0.26, 0.26, blueSteel, SH.xc, SH.ridge - 0.05, SH.zR);
+  // back wall (metal cladding) — the camera looks from the front, so it never hides the line
+  const clad = mat(0xffffff, 0.25, 0.6, {map: stripeTex(512, 256, '#d5dae0', '#b7bec7', 24)}); clad.map.wrapS = THREE.RepeatWrapping; clad.map.repeat.set(5, 1);
+  box(SH.x1 - SH.x0 + 0.36, SH.eave - 0.7, 0.12, clad, SH.xc, 0.7 + (SH.eave - 0.7)/2, SH.zB - 0.24);
+  box(SH.x1 - SH.x0 + 0.36, 0.7, 0.16, blueSteel, SH.xc, 0.35, SH.zB - 0.24);
+  // roof sheets with skylights
+  const roofTex = stripeTex(1024, 512, '#c7ccd2', '#aab1ba', 18, (g, w, h) => {
+    for (let i = 0; i < 6; i++) { const x = 60 + i * (w - 120) / 6 + 14; g.fillStyle = '#eef6fc'; g.fillRect(x, h*0.28, (w - 120)/6 - 28, h*0.36); g.strokeStyle = '#9aa3ad'; g.lineWidth = 6; g.strokeRect(x, h*0.28, (w - 120)/6 - 28, h*0.36); }
+  });
+  const roofMat = fadeMat(mat(0xffffff, 0.35, 0.5, {map: roofTex})), purlinM = fadeMat(mat(0x8e98a4, 0.4, 0.5));
+  for (const sgn of [1, -1]) {
+    const r = add(new THREE.Mesh(new THREE.BoxGeometry(W, L, 0.08), roofMat), SH.xc, (SH.ridge + SH.eave - SH.ov*Math.tan(a))/2 + lift, SH.zR + sgn*run/2, ROOF);
+    r.rotation.x = sgn > 0 ? -Math.PI/2 + a : -Math.PI/2 - a;
+    for (let k = 1; k <= 4; k++) { const f = k / 5; box(SH.x1 - SH.x0, 0.12, 0.12, purlinM, SH.xc, SH.ridge - (SH.ridge - SH.eave)*f + 0.12, SH.zR + sgn*half*f, ROOF); }
+  }
+  const trim = fadeMat(mat(0x1f4fb8, 0.2, 0.5)), cap = fadeMat(mat(0x9aa3ad, 0.4, 0.5));
+  const yE = SH.eave - SH.ov*Math.tan(a) + lift;
+  for (const sgn of [1, -1]) box(W, 0.22, 0.14, trim, SH.xc, yE, SH.zR + sgn*run, ROOF);
+  box(W, 0.12, 0.5, cap, SH.xc, SH.ridge + lift + 0.04, SH.zR, ROOF);
+  for (const x of [SH.x0 - SH.ov, SH.x1 + SH.ov]) for (const sgn of [1, -1]) {
+    const b = box(0.14, 0.22, L, trim, x, (SH.ridge + yE - lift)/2 + lift, SH.zR + sgn*run/2, ROOF); b.rotation.x = sgn > 0 ? a : -a;
+  }
+  // gable triangles
+  const tri = new THREE.Shape(); tri.moveTo(SH.zB, SH.eave); tri.lineTo(SH.zF, SH.eave); tri.lineTo(SH.zR, SH.ridge); tri.closePath();
+  const tg = new THREE.ExtrudeGeometry(tri, {depth:0.1, bevelEnabled:false}); tg.rotateY(-Math.PI/2);
+  const triMat = fadeMat(mat(0xd5dae0, 0.25, 0.6));
+  for (const x of [SH.x0, SH.x1 + 0.1]) add(new THREE.Mesh(tg, triMat), x, 0, 0, ROOF);
+}
+for (const z of [SH.zF, SH.zB - 0.3]) { const s = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 0.8), new THREE.MeshBasicMaterial({map: labelTex(['LINHA 1'], 512, 96, '#1f4fb8', '#fff', 64)}));
+  s.position.set(-5.5, 3.75, z + (z > 0 ? 0.16 : -0.02)); if (z < 0) s.rotation.y = Math.PI; scene.add(s); }
+let roofOp = -1;
+function updateRoof(){
+  const d = camera.position.distanceTo(controls.target), t = Math.max(0, Math.min(1, (d - 40) / 10));
+  if (Math.abs(t - roofOp) < 0.005) return; roofOp = t;
+  ROOF.visible = t > 0.01; roofMats.forEach(m => { m.opacity = t; m.depthWrite = t > 0.95; });
+  ROOF.traverse(o => { if (o.isMesh) o.castShadow = t > 0.6; });
+}
+
+// ---------------- yard: wall, front fence + gates, guardhouse ----------------
+{
+  const wallM = mat(0xe9e6df, 0, 0.9), capM = mat(0xb9bec6, 0, 0.8);
+  const wall = (x0, z0, x1, z1) => { const L = Math.hypot(x1-x0, z1-z0), ang = -Math.atan2(z1-z0, x1-x0);
+    const b = box(L, 1.3, 0.25, wallM, (x0+x1)/2, 0.65, (z0+z1)/2); b.rotation.y = ang; const c = box(L + 0.1, 0.1, 0.36, capM, (x0+x1)/2, 1.35, (z0+z1)/2); c.rotation.y = ang;
+    for (let t = 0; t <= L; t += 4) box(0.4, 1.45, 0.4, capM, x0 + (x1-x0)*t/L, 0.72, z0 + (z1-z0)*t/L); };
+  wall(-25, -17, 25, -17); wall(-25, -17, -25, 15); wall(25, -17, 25, 15);
+  // front: blue metal fence with two open truck gates
+  const fenceM = mat(0x2463e6, 0.3, 0.45);
+  const fence = (x0, x1) => { const z = 15, L = x1 - x0; box(L, 0.08, 0.08, fenceM, (x0+x1)/2, 1.5, z); box(L, 0.08, 0.08, fenceM, (x0+x1)/2, 0.25, z);
+    for (let x = x0; x <= x1 + 0.01; x += 0.35) box(0.05, 1.3, 0.05, fenceM, x, 0.85, z).castShadow = false;
+    for (let x = x0; x <= x1 + 0.01; x += 3) box(0.16, 1.7, 0.16, fenceM, x, 0.85, z); };
+  fence(-25, -20.2); fence(-11.8, 11.8); fence(20.2, 25);
+  for (const gx of [-16, 16]) for (const x of [gx - 4.2, gx + 4.2]) { box(0.45, 2.2, 0.45, fenceM, x, 1.1, 15); box(0.6, 0.15, 0.6, M.yellow, x, 2.25, 15); }
+  // guardhouse next to the right gate
+  const hx = 22.3, hz = 12.6;
+  box(2.6, 2.4, 2.2, M.wall, hx, 1.2, hz); box(3.0, 0.22, 2.6, M.blue, hx, 2.5, hz);
+  box(2.0, 0.8, 0.05, M.glass, hx, 1.6, hz + 1.11); box(0.05, 0.8, 1.4, M.glass, hx - 1.31, 1.6, hz);
+  box(0.9, 1.9, 0.05, M.blue, hx + 0.6, 0.95, hz - 1.11);
+  // sidewalk along the road
+  box(160, 0.1, 1.4, M.concrete, 0, 0.05, 15.9);
+  // light poles
+  for (const [x, z] of [[-24, -16], [24, -16], [-24, 14], [-12, 14], [12, 14], [0, -16]]) {
+    const sx = x > 0 ? -1 : 1;
+    cylY(0.08, 4.2, M.dark, x, 2.1, z, 8); box(0.8, 0.12, 0.3, M.dark, x + sx*0.35, 4.2, z); box(0.5, 0.06, 0.24, M.white, x + sx*0.5, 4.13, z).castShadow = false;
+  }
+}
 
 // ---------------- office ----------------
 {
@@ -155,6 +238,26 @@ for (const z of [-5, 3]) { const s = new THREE.Mesh(new THREE.PlaneGeometry(4.6,
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.3), new THREE.MeshBasicMaterial({map: labelTex(['PARECIS TELHA', 'telhas galvanizadas'], 1024, 224, '#ffbe0b', '#1d2433', 110)}));
   sign.position.set(ox, 4.25, oz + 1.2); sign.rotation.x = -0.35; scene.add(sign);
   box(0.12, 1.2, 0.12, M.dark, ox - 2.6, 3.9, oz + 1.2); box(0.12, 1.2, 0.12, M.dark, ox + 2.6, 3.9, oz + 1.2);
+  box(7.0, 0.35, 0.06, M.blue, ox, 2.65, oz + 2.53); box(1.0, 0.5, 0.8, M.gray, ox + 2.2, 3.75, oz - 1.2); box(1.0, 0.5, 0.8, M.gray, ox + 0.8, 3.75, oz - 1.4);
+  for (const x of [ox - 4.2, ox + 4.2]) { box(1.2, 0.3, 1.2, M.green, x, 0.2, oz + 3.2); tree(x, oz + 3.2, 0.55); }
+}
+// ---------------- parking + cars ----------------
+{
+  const px0 = 15.5, px1 = 24, pz0 = -4.2, pz1 = 1.8;
+  box(px1 - px0, 0.03, pz1 - pz0, M.asphalt, (px0+px1)/2, 0.075, (pz0+pz1)/2).castShadow = false;
+  for (let x = px0 + 0.1; x <= px1; x += 2.1) box(0.1, 0.02, 2.4, M.white, x, 0.1, pz0 + 1.3).castShadow = false;
+  const car = (x, z, color) => { const g = new THREE.Group(); g.position.set(x, 0, z); scene.add(g); const c = mat(color, 0.3, 0.35);
+    box(1.6, 0.55, 2.9, c, 0, 0.55, 0, g); box(1.4, 0.45, 1.5, c, 0, 1.05, -0.1, g); box(1.42, 0.32, 1.3, M.glass, 0, 1.05, -0.1, g);
+    for (const [wx, wz] of [[-0.75, 0.95], [0.75, 0.95], [-0.75, -0.95], [0.75, -0.95]]) { const w = cylZ(0.3, 0.2, M.rubber, wx, 0.3, wz, 12, g); w.rotation.y = Math.PI/2; } };
+  car(px0 + 1.15, pz0 + 1.4, 0xffffff); car(px0 + 3.25, pz0 + 1.4, 0xe53935); car(px0 + 7.45, pz0 + 1.4, 0x2463e6);
+}
+// ---------------- water tower ----------------
+{
+  const tx = 22.8, tz = -14.6, legM = mat(0x5b6370, 0.5, 0.5), tank = mat(0xf2f4f6, 0.2, 0.5);
+  for (const [dx, dz] of [[-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9], [0.9, 0.9]]) box(0.16, 5.5, 0.16, legM, tx + dx, 2.75, tz + dz);
+  for (const y of [1.6, 3.4]) { box(1.9, 0.08, 0.08, legM, tx, y, tz - 0.9); box(1.9, 0.08, 0.08, legM, tx, y, tz + 0.9); box(0.08, 0.08, 1.9, legM, tx - 0.9, y, tz); box(0.08, 0.08, 1.9, legM, tx + 0.9, y, tz); }
+  cylY(1.45, 2.2, tank, tx, 6.6, tz, 24); add(new THREE.Mesh(new THREE.ConeGeometry(1.55, 0.8, 24), M.blue), tx, 8.1, tz);
+  box(3.0, 0.08, 3.0, legM, tx, 5.5, tz);
 }
 
 // ---------------- locked plots (to buy later) ----------------
@@ -543,7 +646,7 @@ function loop(now){
   updateTrucks();
   [CT, ST, FA, FB].forEach(m => m.update(dt)); updateLift(fkA, dt); updateLift(fkB, dt);
   workers.forEach(m => m.update(dt));
-  updatePops(real);
+  updatePops(real); updateRoof();
   uiT += real; if (uiT > 0.15) { uiT = 0; updateUI(); }
   controls.update(); renderer.render(scene, camera);
   requestAnimationFrame(loop);
