@@ -579,9 +579,13 @@ op.speed = 1.8;
 if (THREE.FBXLoader && location.protocol !== 'file:') {
   const mgr = new THREE.LoadingManager(); mgr.setURLModifier(u => /\.(png|jpe?g|tga|bmp)$/i.test(u) ? 'personagens/paleta.png' : u);
   const ld = new THREE.FBXLoader(mgr);
-  [[op, 'personagens/trabalhador.fbx', {vest:0xff7a1a, pants:0x2b4f9e, helmet:0xf4f4f4, hide:['beard'], height:1.76, helmetK:1.08, helmetDy:0, helmetDz:0.01}],
-   [helper, 'personagens/trabalhador.fbx', {vest:0xc6f21a, pants:0x4f5a44, helmet:0xf2b705, hide:[], height:1.8, helmetK:1.08, helmetDy:0, helmetDz:0.01}]
-  ].forEach(([w, url, look]) => ld.load(url, obj => { try { w.setModel(obj, look); } catch(e){ console.warn('modelo', url, e); } }, undefined, e => console.warn('não carregou', url, e)));
+  const looks = [[op, {vest:0xff7a1a, pants:0x2b4f9e, helmet:0xf4f4f4, hide:['beard'], height:1.76, helmetK:1.08, helmetDy:0, helmetDz:0.01}],
+   [helper, {vest:0xc6f21a, pants:0x4f5a44, helmet:0xf2b705, hide:[], height:1.8, helmetK:1.08, helmetDy:0, helmetDz:0.01}]];
+  // the FBX travels as base64 text so it can be served anywhere
+  fetch('personagens/trabalhador.txt').then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(t => {
+    const bin = atob(t.trim()), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    looks.forEach(([w, look]) => { try { w.setModel(ld.parse(u8.buffer, 'personagens/'), look); } catch(e){ console.warn('modelo', e); } });
+  }).catch(e => console.warn('personagens não carregaram', e));
 }
 
 // ---------------- roof sheets ----------------
