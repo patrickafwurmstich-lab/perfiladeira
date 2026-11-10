@@ -254,7 +254,8 @@ function makeTruck(cabColor){
   return {g, bed};
 }
 function makeForklift(color){
-  const g = new THREE.Group(); scene.add(g);
+  const g0 = new THREE.Group(); scene.add(g0);
+  const g = new THREE.Group(); g0.add(g);           // placeholder visuals until the Blender model arrives
   const body = mat(color, 0.15, 0.45);
   box(1.6, 0.7, 1.15, body, -0.1, 0.6, 0, g); box(0.5, 0.75, 1.15, M.dark, -0.75, 0.75, 0, g);     // body + counterweight
   for (const [x, z] of [[0.45, 0.62], [0.45, -0.62], [-0.6, 0.62], [-0.6, -0.62]]) cylZ(0.28, 0.24, M.rubber, x, 0.28, z, 14, g);
@@ -264,10 +265,29 @@ function makeForklift(color){
   box(0.32, 0.45, 0.4, mat(0x2b4f9e), -0.3, 1.45, 0, g); add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), mat(0xe0ac7e)), -0.28, 1.83, 0, g);
   add(new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 6, 0, Math.PI*2, 0, Math.PI/2), M.yellow), -0.28, 1.88, 0, g);
   for (const s of [-1, 1]) box(0.09, 2.2, 0.09, M.dark, 0.85, 1.2, s*0.38, g);     // mast
-  const lift = new THREE.Group(); g.add(lift);
+  const lift = new THREE.Group(); g0.add(lift);
   box(0.08, 0.6, 0.95, M.dark, 0.92, 0.35, 0, lift);
   for (const s of [-1, 1]) box(1.1, 0.05, 0.12, M.steel, 1.5, 0.04, s*0.28, lift);
-  return {g, lift, liftY:0};
+  return {g:g0, vis:g, lift, liftY:0};
+}
+function loadB64(file, onModel){
+  if (!THREE.GLTFLoader || location.protocol === 'file:') return;
+  const urls = ['personagens/' + file, '../personagens/' + file];
+  const next = i => { if (i >= urls.length) return;
+    fetch(urls[i]).then(r => { if (!r.ok) throw 0; return r.text(); }).then(t => {
+      const bin = atob(t.trim()), u8 = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+      new THREE.GLTFLoader().parse(u8.buffer, '', gl => onModel(gl), () => next(i + 1));
+    }).catch(() => next(i + 1)); };
+  next(0);
+}
+function useForkliftModel(fk, file){
+  loadB64(file, gl => {
+    const m = gl.scene; m.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+    const garfo = m.getObjectByName('Garfo'); if (!garfo) return;
+    fk.g.remove(fk.vis); fk.g.add(m);
+    [...fk.lift.children].filter(c => c.userData.cargo).forEach(c => garfo.add(c));   // keep whatever it is carrying
+    fk.g.remove(fk.lift); fk.lift = garfo; garfo.position.y = fk.liftY;
+  });
 }
 
 // path follower: points [x, z, reverse?]
@@ -297,6 +317,7 @@ const FA = new Mover(fkA.g, 2.6, 3.2), FB = new Mover(fkB.g, 2.6, 3.2);
 const HOME_A = [-11, 4.5], HOME_B = [8, 1.6];
 FA.place(HOME_A[0], HOME_A[1], H_NZ); FB.place(HOME_B[0], HOME_B[1], H_NZ);
 const FORK_REACH = 1.45;
+useForkliftModel(fkA, 'empilhadeira_a.txt?v=1'); useForkliftModel(fkB, 'empilhadeira_b.txt?v=1');
 
 // ---------------- workers from the simulator (Blender models) ----------------
 const workers = [];
@@ -348,9 +369,9 @@ const go = (mv, pts) => ({start(){ mv.go(pts); }, done:() => !mv.busy});
 const lift = (fk, y) => ({start(){ liftTo(fk, y); }, done:() => liftDone(fk)});
 const wait = s => ({done:t => t >= s});
 const act = fn => ({start: fn});
-function pickUp(fk, obj){ fk.lift.attach(obj); }
+function pickUp(fk, obj){ fk.lift.attach(obj); obj.userData.cargo = true; }
 function drop(obj, x, y, z, snapYaw){
-  scene.attach(obj); obj.position.set(x, y, z);
+  scene.attach(obj); obj.userData.cargo = false; obj.position.set(x, y, z);
   if (snapYaw) obj.rotation.set(0, Math.round(obj.rotation.y / (Math.PI/2)) * (Math.PI/2), 0);
 }
 
@@ -405,7 +426,7 @@ function planB(){
       lift(fkB, PALLET_TOP - 0.04), go(FB, [[sx, 2.6], [sx, SLOT_Z - FORK_REACH]]),
       act(() => { S.slots[filled] = null; pickUp(fkB, st); }), lift(fkB, 0.3),
       go(FB, [[sx, 2.6, true], [13.6, 2.6], [13.6, spot.z]]), lift(fkB, spot.y + 0.05), go(FB, [[spot.x - FORK_REACH, spot.z]]),
-      act(() => { shipTruck.bed.attach(st); st.position.set(-2.0 + k*1.75, 0.08, 0); st.rotation.set(0, 0, 0); S.stLoad.push(st); }), lift(fkB, 0.3),
+      act(() => { st.userData.cargo = false; shipTruck.bed.attach(st); st.position.set(-2.0 + k*1.75, 0.08, 0); st.rotation.set(0, 0, 0); S.stLoad.push(st); }), lift(fkB, 0.3),
       go(FB, [[13.6, spot.z, true], [13.6, 2.6]]), lift(fkB, 0), go(FB, [HOME_B])
     ]);
   }
