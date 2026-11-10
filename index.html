@@ -534,6 +534,11 @@ Worker.prototype.setModel = function(obj, look){
   let bx = vis(); holder.scale.setScalar(look.height / (bx.max.y - bx.min.y)); holder.updateMatrixWorld(true);
   bx = vis(); const hp = new V3(); B.Hips.getWorldPosition(hp);
   holder.position.set(-hp.x, -bx.min.y, -hp.z); holder.updateMatrixWorld(true);
+  this.mixer = new THREE.AnimationMixer(obj); this.acts = {};
+  for (const n of ['Idle','Walk','Carry','Radio','Look']) { const c = obj.animations.find(c => c.name === n) || obj.animations.find(c => c.name.includes(n)); if (c) this.acts[n] = this.mixer.clipAction(c); }
+  // pose the rig in its idle animation first, so the hat is fitted to the head as it really moves
+  if (this.acts.Idle) { this.acts.Idle.play(); this.mixer.update(0); this.acts.Idle.stop(); }
+  holder.updateMatrixWorld(true);
   // hard hat on the head bone
   const fb = new THREE.Box3(), tv = new V3();
   meshes.forEach(m => {
@@ -542,7 +547,7 @@ Worker.prototype.setModel = function(obj, look){
     if (hi < 0 || !si) return;
     for (let i = 0; i < ps.count; i++) {
       let w = 0; for (let j = 0; j < 4; j++) if (si.array[i*4 + j] === hi) w += sw.array[i*4 + j];
-      if (w > 0.5) fb.expandByPoint(tv.fromBufferAttribute(ps, i).applyMatrix4(m.matrixWorld));
+      if (w > 0.5) { m.boneTransform(i, tv); fb.expandByPoint(tv.applyMatrix4(m.matrixWorld)); }
     }
   });
   if (fb.isEmpty()) { B.Head.getWorldPosition(tv); fb.setFromCenterAndSize(tv.add(new V3(0, 0.12, 0)), new V3(0.24, 0.26, 0.24)); }
@@ -558,8 +563,6 @@ Worker.prototype.setModel = function(obj, look){
   const radio = new THREE.Group(); box(0.05, 0.13, 0.035, M.yellow, 0, 0, 0, radio); box(0.012, 0.09, 0.012, M.dark, 0.012, 0.1, 0, radio);
   const hand = new V3(); B.RightHand.getWorldPosition(hand); attachAt(B.RightHand, radio, hand); radio.visible = false;
   this.helmet = helmet; this.radio = radio; this.bones = B; this.holder = holder; this.model = obj;
-  this.mixer = new THREE.AnimationMixer(obj); this.acts = {};
-  for (const n of ['Idle','Walk','Carry','Radio','Look']) { const c = obj.animations.find(c => c.name === n) || obj.animations.find(c => c.name.includes(n)); if (c) this.acts[n] = this.mixer.clipAction(c); }
   this.cur = null; this.body.visible = false; this.root.add(holder);
 };
 Worker.prototype.updateModel = function(dt, moving){
