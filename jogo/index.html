@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Parecis Telha 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap">
+<style>
+/* Full-screen idle-game view: 3D yard fills the screen, a chunky HUD floats on top. Single bright theme (it's a game scene). */
+:root{
+  --ink:#1d2433; --pill:#ffffff; --gold:#ffb000; --green:#22b45a; --shadow:0 4px 0 rgba(0,0,0,.18);
+  --f:"Baloo 2","Trebuchet MS",system-ui,sans-serif; color-scheme:light;
+}
+html,body{height:100%;margin:0}
+body{background:#8fd16b;overflow:hidden;font-family:var(--f);color:var(--ink);-webkit-user-select:none;user-select:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.hud{position:fixed;top:max(10px,env(safe-area-inset-top));left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right));
+  display:flex;gap:8px;align-items:center;pointer-events:none;flex-wrap:wrap}
+.pill{pointer-events:auto;background:var(--pill);border-radius:999px;padding:4px 14px 4px 6px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow);
+  font-weight:800;font-size:20px;line-height:1}
+.pill i{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--gold);color:#fff;font-style:normal;font-size:16px;font-weight:800}
+.pill.green i{background:var(--green)}
+.pill small{font-size:12px;font-weight:700;color:#6b7385;display:block;margin-top:-2px}
+.sp{flex:1}
+.btn{pointer-events:auto;border:0;background:#fff;color:var(--ink);font:800 16px var(--f);min-width:44px;height:44px;border-radius:14px;box-shadow:var(--shadow);cursor:pointer;padding:0 10px}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.btn:focus-visible{outline:3px solid var(--gold)}
+.hint{position:fixed;left:50%;bottom:max(12px,env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(29,36,51,.78);color:#fff;
+  font:600 13px var(--f);padding:6px 14px;border-radius:999px;pointer-events:none;white-space:nowrap;transition:opacity .6s}
+.pop{position:fixed;pointer-events:none;font:800 22px var(--f);color:#fff;text-shadow:0 2px 0 #1c7a3c,0 0 6px rgba(0,0,0,.35);transform:translate(-50%,-50%);white-space:nowrap}
+.status{position:fixed;left:max(16px,env(safe-area-inset-left));top:calc(max(10px,env(safe-area-inset-top)) + 54px);pointer-events:none;
+  background:rgba(255,255,255,.9);border-radius:12px;padding:6px 10px;font:700 13px var(--f);box-shadow:var(--shadow);line-height:1.35}
+.status b{font-weight:800}
+.err{position:fixed;inset:auto 16px 60px 16px;background:#fff;border-radius:12px;padding:12px;font:600 14px var(--f);box-shadow:var(--shadow)}
+@media (max-width:520px){ .pill{font-size:17px} .status{font-size:12px} }
+</style>
+</head>
+<body>
+
+
+<canvas id="c" aria-label="Fábrica de telhas vista de cima"></canvas>
+<div class="hud">
+  <div class="pill"><i>R$</i><span id="money">0</span></div>
+  <div class="pill green"><i>▦</i><span><span id="sheets">0</span><small>telhas feitas</small></span></div>
+  <div class="sp"></div>
+  <button class="btn" id="btnSpeed" title="Velocidade do tempo">1×</button>
+  <button class="btn" id="btnHome" title="Centralizar a câmera">⌖</button>
+</div>
+<div class="status" id="status" aria-live="polite"></div>
+<div class="hint" id="hint">Arraste para andar · pinça ou roda do mouse para zoom</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+(function(){
+const $ = id => document.getElementById(id);
+const V3 = THREE.Vector3;
+const fmtMoney = n => Math.round(n).toLocaleString('pt-BR');
+const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+// ---------------- renderer / camera ----------------
+const canvas = $('c');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({canvas, antialias:true}); }
+catch(e){ const d = document.createElement('div'); d.className = 'err'; d.textContent = 'Seu navegador não conseguiu iniciar o 3D (WebGL).'; document.body.appendChild(d); return; }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9fd8ff);
+scene.fog = new THREE.Fog(0x9fd8ff, 70, 140);
+const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 300);
+const CAM_OFF = new V3(16, 34, 26), CAM_HOME = new V3(0, 0, 0);
+camera.position.copy(CAM_HOME).add(CAM_OFF);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.target.copy(CAM_HOME); controls.enableRotate = false; controls.screenSpacePanning = false; controls.enableDamping = true;
+controls.minDistance = 14; controls.maxDistance = 75;
+controls.mouseButtons = {LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN};
+controls.touches = {ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN};
+controls.addEventListener('change', () => {   // keep the view over the yard
+  const t = controls.target, cx = Math.max(-26, Math.min(26, t.x)), cz = Math.max(-18, Math.min(20, t.z));
+  if (cx !== t.x || cz !== t.z) { camera.position.x += cx - t.x; camera.position.z += cz - t.z; t.x = cx; t.z = cz; }
+  $('hint').style.opacity = 0;
+});
+controls.update();
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x7fae6a, 0.75));
+const sun = new THREE.DirectionalLight(0xfff4e0, 0.95);
+sun.position.set(18, 40, 22); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, {left:-38, right:38, top:30, bottom:-30, near:5, far:110});
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04;
+sun.target.position.set(0, 0, 0); scene.add(sun, sun.target);
+
+// ---------------- helpers ----------------
+const mat = (color, metal=0.05, rough=0.7, extra={}) => new THREE.MeshStandardMaterial(Object.assign({color, metalness:metal, roughness:rough}, extra));
+let ROOT = scene;
+function add(mesh, x, y, z, parent){ mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; (parent || ROOT).add(mesh); return mesh; }
+const box = (w,h,d,m,x,y,z,p) => add(new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m), x,y,z,p);
+function cylZ(r,len,m,x,y,z,seg=20,p){ const g = new THREE.CylinderGeometry(r,r,len,seg); g.rotateX(Math.PI/2); return add(new THREE.Mesh(g,m), x,y,z,p); }
+function cylY(r,len,m,x,y,z,seg=20,p){ return add(new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,seg), m), x,y,z,p); }
+function labelTex(lines, w=512, h=256, bg='#1d2433', fg='#ffffff', size=64){
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+  lines.forEach((t, i) => { g.font = (i ? '700 ' + Math.round(size*0.62) : '800 ' + size) + 'px "Baloo 2", sans-serif'; g.fillText(t, w/2, h/2 + (i - (lines.length-1)/2) * size * 0.95); });
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t;
+}
+
+const M = {
+  grass: mat(0x86c95e, 0, 1), concrete: mat(0xd9dbdf, 0, 0.95), asphalt: mat(0x50555e, 0, 0.95), epoxy: mat(0xb7c3c9, 0, 0.85),
+  line: mat(0xffc400, 0, 0.8), white: mat(0xffffff, 0, 0.8), blue: mat(0x2463e6, 0.15, 0.5), yellow: mat(0xffbe0b, 0.1, 0.5),
+  steel: mat(0xb8c0ca, 0.7, 0.35), sheet: mat(0xbfc7d1, 0.45, 0.38, {side:THREE.DoubleSide}), dark: mat(0x22252b, 0.3, 0.6),
+  gray: mat(0xc3c7cd, 0.05, 0.6), core: mat(0x3a3e45, 0.5, 0.5), wood: mat(0xb88a52, 0, 0.9), red: mat(0xe53935, 0, 0.5),
+  green: mat(0x22b45a, 0, 0.5), glass: mat(0x2c3e50, 0.3, 0.2), trunk: mat(0x8a5a32, 0, 0.9), leaf: mat(0x4caf50, 0, 0.9),
+  leaf2: mat(0x3d9b46, 0, 0.9), roofBeam: mat(0x1f4fb8, 0.2, 0.5), orange: mat(0xff7a1a, 0.1, 0.5), rubber: mat(0x1b1d22, 0, 0.9),
+  wall: mat(0xf2efe8, 0, 0.9)
+};
+
+// ---------------- ground, yard, road ----------------
+const grass = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), M.grass); grass.rotation.x = -Math.PI/2; grass.receiveShadow = true; scene.add(grass);
+box(50, 0.06, 32, M.concrete, 0, 0.03, -1);                 // yard  x -25..25, z -17..15
+box(160, 0.04, 7, M.asphalt, 0, 0.02, 19);                  // road
+for (let x = -78; x < 80; x += 6) box(3, 0.02, 0.18, M.white, x, 0.05, 19);
+for (const x of [-16, 16]) box(7, 0.05, 2.2, M.asphalt, x, 0.03, 15.6);   // driveways
+box(14.5, 0.03, 8, M.epoxy, -1.75, 0.07, -1);               // shed floor
+function floorLine(x0, z0, x1, z1, m=M.line){ const L = Math.hypot(x1-x0, z1-z0); const b = box(L, 0.02, 0.14, m, (x0+x1)/2, 0.085, (z0+z1)/2); b.rotation.y = -Math.atan2(z1-z0, x1-x0); b.castShadow = false; }
+floorLine(-9, 3.6, 5.5, 3.6); floorLine(-9, -5.6, 5.5, -5.6);
+for (const [x0, x1] of [[-19.5, -12.5], [12.5, 19.5]]) { floorLine(x0, 6.5, x1, 6.5); floorLine(x0, 6.5, x0, 14.5); floorLine(x1, 6.5, x1, 14.5); }   // truck bays
+floorLine(4.5, 4, 12.6, 4); floorLine(4.5, 6.2, 12.6, 6.2);   // shipping lane
+
+// trees round the yard
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+function tree(x, z, s=1){
+  cylY(0.18*s, 1.2*s, M.trunk, x, 0.6*s, z, 8);
+  const g = new THREE.IcosahedronGeometry(1.1*s, 0); const m = add(new THREE.Mesh(g, rnd() > 0.5 ? M.leaf : M.leaf2), x, 1.9*s, z);
+  m.rotation.set(rnd(), rnd(), rnd());
+}
+for (let x = -34; x <= 34; x += 3.4) { tree(x + rnd(), -21 - rnd()*3, 0.9 + rnd()*0.5); tree(x + rnd(), 26 + rnd()*3, 0.8 + rnd()*0.5); }
+for (let z = -18; z <= 14; z += 3.6) { tree(-29 - rnd()*2, z, 0.9 + rnd()*0.4); tree(29 + rnd()*2, z, 0.9 + rnd()*0.4); }
+
+// ---------------- shed (open frame so the line is visible from above) ----------------
+for (const x of [-9, -2, 5.5]) for (const z of [-5, 3]) { box(0.35, 5.2, 0.35, M.roofBeam, x, 2.6, z); box(0.7, 0.08, 0.7, M.roofBeam, x, 0.1, z); }
+for (const z of [-5, 3]) box(14.85, 0.35, 0.3, M.roofBeam, -1.75, 5.1, z);
+for (const x of [-9, -2, 5.5]) box(0.3, 0.35, 8.3, M.roofBeam, x, 5.1, -1);
+for (const z of [-5, 3]) { const s = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 0.8), new THREE.MeshBasicMaterial({map: labelTex(['LINHA 1'], 512, 96, '#1f4fb8', '#fff', 64)}));
+  s.position.set(-5.5, 4.6, z + (z > 0 ? 0.17 : -0.17)); if (z < 0) s.rotation.y = Math.PI; scene.add(s); }
+
+// ---------------- office ----------------
+{
+  const ox = 19.5, oz = -9;
+  box(7, 3.2, 5, M.wall, ox, 1.6, oz); box(7.4, 0.3, 5.4, M.blue, ox, 3.35, oz);
+  for (const dx of [-2.2, 0, 2.2]) box(1.4, 1.1, 0.05, M.glass, ox + dx, 1.9, oz + 2.52);
+  box(1.1, 2.1, 0.06, M.blue, ox - 2.9, 1.05, oz + 2.53);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.3), new THREE.MeshBasicMaterial({map: labelTex(['PARECIS TELHA', 'telhas galvanizadas'], 1024, 224, '#ffbe0b', '#1d2433', 110)}));
+  sign.position.set(ox, 4.25, oz + 1.2); sign.rotation.x = -0.35; scene.add(sign);
+  box(0.12, 1.2, 0.12, M.dark, ox - 2.6, 3.9, oz + 1.2); box(0.12, 1.2, 0.12, M.dark, ox + 2.6, 3.9, oz + 1.2);
+}
+
+// ---------------- locked plots (to buy later) ----------------
+function lockedPlot(cx, cz, w, d, title, price){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({color:0x1d2433, transparent:true, opacity:0.14})); m.rotation.x = -Math.PI/2; m.position.set(cx, 0.08, cz); scene.add(m);
+  const dash = M.white; const seg = 1.0;
+  for (let x = cx - w/2; x < cx + w/2 - 0.1; x += seg*2) { box(seg, 0.02, 0.12, dash, x + seg/2, 0.09, cz - d/2).castShadow = false; box(seg, 0.02, 0.12, dash, x + seg/2, 0.09, cz + d/2).castShadow = false; }
+  for (let z = cz - d/2; z < cz + d/2 - 0.1; z += seg*2) { box(0.12, 0.02, seg, dash, cx - w/2, 0.09, z + seg/2).castShadow = false; box(0.12, 0.02, seg, dash, cx + w/2, 0.09, z + seg/2).castShadow = false; }
+  const lab = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2.0), new THREE.MeshBasicMaterial({map: labelTex(['🔒 ' + title, 'R$ ' + price], 640, 246, '#ffffff', '#1d2433', 84), transparent:true}));
+  lab.rotation.x = -Math.PI/2; lab.position.set(cx, 0.1, cz); scene.add(lab);
+}
+lockedPlot(-3, -12.5, 17, 6, 'LINHA 2', '65.000');
+lockedPlot(-17.5, -12.5, 8, 6, 'ESTOQUE 2', '25.000');
+lockedPlot(9.5, -12.5, 9, 6, 'GALPÃO 2', '120.000');
+
+// ================= PRODUCTION LINE (machine-local coords, same as the simulator) =================
+const W = 1.0, A = 0.028, PER = 0.2, R0 = 0.55, RC = 0.2, COIL_TOTAL = 30, LP = 1.3, STACK_N = 8, NEST = 0.012;
+const E = new THREE.Vector2(0, 0.98), C = new THREE.Vector2(-1.45, 1.0);
+const X_CUT = 4.15, TABLE_Y = 0.97, TX0 = 4.25, TX1 = 7.6, NST = 7, ST_X0 = 0.35, ST_DX = 0.47;
+const rib = z => A * Math.tanh(3 * Math.sin(2 * Math.PI * z / PER)) / Math.tanh(3);
+const LINE = new THREE.Group(); LINE.position.set(-4.5, 0, -1); scene.add(LINE);
+const toWorld = (x, y, z) => new V3(x, y, z).add(LINE.position);
+ROOT = LINE;
+box(4.6, 0.22, 0.85, M.blue, 2.0, 0.66, 0); box(4.4, 0.12, 0.3, M.blue, 2.0, 0.28, 0);
+for (const x of [0.1, 1.4, 2.7, 3.9]) for (const s of [-1, 1]) box(0.18, 0.6, 0.16, M.blue, x, 0.3, s*0.32);
+for (const s of [-1, 1]) box(3.7, 0.22, 0.04, M.yellow, 1.75, 0.92, s*0.66);
+const rollers = [];
+for (let i = 0; i < NST; i++) {
+  const x = ST_X0 + i*ST_DX;
+  for (const s of [-1, 1]) box(0.1, 0.62, 0.08, M.blue, x, 1.1, s*0.6);
+  box(0.08, 0.06, 1.28, M.blue, x, 1.4, 0);
+  for (const [y, sg] of [[0.89, 1], [1.07, -1]]) { const g = new THREE.Group(); g.position.set(x, y, 0); LINE.add(g); cylZ(0.06, 1.04, M.steel, 0, 0, 0, 16, g); for (let k = 0; k < 5; k++) cylZ(0.06 + A*0.9*(i+1)/NST, 0.05, M.steel, 0, 0, -0.5 + 0.2*(k + 0.25), 16, g); rollers.push({g, sg}); }
+}
+const SEG = 0.1, NSEG = Math.round(X_CUT / SEG), NY = 24, lastStand = ST_X0 + (NST-1)*ST_DX;
+const segs = [];
+for (let k = 0; k < NSEG; k++) {
+  const pos = [], idx = [];
+  [k*SEG, (k+1)*SEG].forEach(x => { let a = Math.min(1, Math.max(0, x / lastStand)); a = a*a*(3-2*a); for (let j = 0; j <= NY; j++) { const z = -W/2 + W*j/NY; pos.push(x, E.y + rib(z)*a, z); } });
+  for (let j = 0; j < NY; j++) idx.push(j, j+1, NY+2+j, j, NY+2+j, NY+1+j);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, M.sheet); m.castShadow = true; LINE.add(m); segs.push({m, x1:(k+1)*SEG});
+}
+for (const s of [-1, 1]) {
+  const sh = new THREE.Shape(); sh.moveTo(-0.4, 0); sh.lineTo(0.4, 0); sh.lineTo(0.08, 1.0); sh.lineTo(-0.08, 1.0); sh.closePath();
+  const g = new THREE.ExtrudeGeometry(sh, {depth:0.12, bevelEnabled:false}); g.translate(0, 0, -0.06); add(new THREE.Mesh(g, M.blue), C.x, 0, s*0.72);
+  cylZ(0.11, 0.16, M.yellow, C.x, C.y, s*0.72, 16);
+}
+const coreGeo = new THREE.CylinderGeometry(RC, RC, W + 0.02, 24); coreGeo.rotateX(Math.PI/2);
+const cc = document.createElement('canvas'); cc.width = cc.height = 128; { const g = cc.getContext('2d'); g.fillStyle = '#aab3bd'; g.fillRect(0,0,128,128); for (let r = 64; r > 6; r -= 2) { g.strokeStyle = r % 4 ? '#96a0aa' : '#c3cad2'; g.beginPath(); g.arc(64,64,r,0,7); g.stroke(); } }
+const capTex = new THREE.CanvasTexture(cc); capTex.encoding = THREE.sRGBEncoding;
+const coilMats = [M.sheet, mat(0xffffff, 0.3, 0.45, {map:capTex}), mat(0xffffff, 0.3, 0.45, {map:capTex})];
+const coilGeo = new THREE.CylinderGeometry(1, 1, W, 40); coilGeo.rotateX(Math.PI/2);
+const decCore = add(new THREE.Mesh(coreGeo, M.core), C.x, C.y, 0);
+const decCoil = add(new THREE.Mesh(coilGeo, coilMats), C.x, C.y, 0);
+function makeCoil(){ const g = new THREE.Group(); const c = add(new THREE.Mesh(coilGeo, coilMats), 0, 0, 0, g); c.scale.set(R0, R0, 1); add(new THREE.Mesh(coreGeo, M.core), 0, 0, 0, g); return g; }
+const feedGeo = new THREE.PlaneGeometry(1, W); feedGeo.rotateX(-Math.PI/2); feedGeo.translate(-0.5, 0, 0);
+const feed = add(new THREE.Mesh(feedGeo, M.sheet), E.x, E.y, 0);
+function tangentPoint(R){ const d = C.clone().sub(E), dl = d.length(); const ang = Math.atan2(d.y, d.x) + Math.asin(Math.min(1, R/dl)); const tl = Math.sqrt(Math.max(dl*dl - R*R, 0)); return new THREE.Vector2(E.x + Math.cos(ang)*tl, E.y + Math.sin(ang)*tl); }
+const GX = 3.95;
+for (const s of [-1, 1]) box(0.2, 1.5, 0.16, M.blue, GX, 1.05, s*0.72);
+box(0.42, 0.22, 1.7, M.blue, GX, 1.86, 0); cylY(0.13, 0.32, M.yellow, GX, 2.12, 0, 6);
+const holder = box(0.16, 0.16, 1.4, M.yellow, GX, 1.3, 0);
+box(0.12, 0.6, 0.12, M.gray, 3.45, 0.75, 0.82); box(0.42, 0.5, 0.18, M.gray, 3.45, 1.18, 0.86);
+const lampG = cylZ(0.03, 0.02, M.green.clone(), 3.35, 1.1, 0.955, 12), lampR = cylZ(0.03, 0.02, M.red.clone(), 3.55, 1.1, 0.955, 12);
+for (const s of [-1, 1]) box(TX1-TX0, 0.08, 0.08, M.blue, (TX0+TX1)/2, TABLE_Y-0.04, s*0.58);
+for (let k = 0; k < 9; k++) cylZ(0.03, 1.12, M.steel, TX0 + 0.15 + k*0.38, TABLE_Y-0.04, 0, 10);
+for (const x of [TX0+0.1, TX1-0.1]) for (const s of [-1, 1]) box(0.1, TABLE_Y-0.08, 0.1, M.blue, x, (TABLE_Y-0.08)/2, s*0.58);
+function panelGeometry(len){
+  const pos = [], idx = [];
+  [-len, 0].forEach(x => { for (let j = 0; j <= NY; j++) { const z = -W/2 + W*j/NY; pos.push(x, rib(z), z); } });
+  for (let j = 0; j < NY; j++) idx.push(j, j+1, NY+2+j, j, NY+2+j, NY+1+j);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+}
+const PANEL_GEO = panelGeometry(LP);
+ROOT = scene;
+const L_CORE = tangentPoint(RC).sub(E).length();
+
+// ---------------- coil rack + shipping pallets ----------------
+const RACK_X = -13.5, RACK_Z = [-4.5, -2.7, -0.9], RACK_Y = 0.62;
+for (const z of RACK_Z) for (const dx of [-0.3, 0.3]) box(0.22, 0.16, 1.15, M.wood, RACK_X + dx, 0.08, z);
+box(0.12, 0.05, 5.4, M.dark, RACK_X - 0.6, 0.03, -2.7);
+const SLOT_X = [5.5, 7.5, 9.5, 11.5], SLOT_Z = 5.1, PALLET_TOP = 0.15;
+for (const x of SLOT_X) { for (const dz of [-0.45, 0, 0.45]) box(1.5, 0.1, 0.12, M.wood, x, 0.05, SLOT_Z + dz); box(1.5, 0.04, 1.15, M.wood, x, 0.12, SLOT_Z); }
+
+// ---------------- vehicles ----------------
+function makeTruck(cabColor){
+  const g = new THREE.Group(); scene.add(g);
+  const cab = mat(cabColor, 0.2, 0.45);
+  box(7.2, 0.35, 1.2, M.dark, 0, 0.75, 0, g);                       // chassis
+  box(1.6, 1.9, 2.3, cab, 2.75, 1.75, 0, g); box(0.7, 1.0, 2.3, cab, 3.75, 1.2, 0, g);   // cab + hood
+  box(0.05, 0.75, 2.0, M.glass, 3.56, 2.15, 0, g); for (const s of [-1, 1]) box(0.9, 0.6, 0.05, M.glass, 2.8, 2.2, s*1.16, g);
+  for (const s of [-1, 1]) box(0.08, 0.18, 0.4, M.white, 4.1, 1.1, s*0.8, g);
+  const bed = new THREE.Group(); bed.position.set(-0.65, 1.0, 0); g.add(bed);
+  box(5.6, 0.12, 2.4, mat(0x6d737d, 0.4, 0.5), 0, 0, 0, bed);
+  for (const s of [-1, 1]) box(5.6, 0.14, 0.06, M.yellow, 0, 0.12, s*1.18, bed);
+  for (const x of [-2.6, -1.5, 2.7]) for (const s of [-1, 1]) cylZ(0.48, 0.36, M.rubber, x, 0.48, s*1.0, 16, g);
+  return {g, bed};
+}
+function makeForklift(color){
+  const g = new THREE.Group(); scene.add(g);
+  const body = mat(color, 0.15, 0.45);
+  box(1.6, 0.7, 1.15, body, -0.1, 0.6, 0, g); box(0.5, 0.75, 1.15, M.dark, -0.75, 0.75, 0, g);     // body + counterweight
+  for (const [x, z] of [[0.45, 0.62], [0.45, -0.62], [-0.6, 0.62], [-0.6, -0.62]]) cylZ(0.28, 0.24, M.rubber, x, 0.28, z, 14, g);
+  for (const s of [-1, 1]) { box(0.08, 1.6, 0.08, M.dark, -0.55, 1.55, s*0.5, g); box(0.08, 1.6, 0.08, M.dark, 0.35, 1.55, s*0.5, g); }
+  box(1.05, 0.06, 1.1, M.dark, -0.1, 2.35, 0, g);                    // overhead guard
+  box(0.4, 0.35, 0.5, M.dark, -0.35, 1.1, 0, g);                     // seat
+  box(0.32, 0.45, 0.4, mat(0x2b4f9e), -0.3, 1.45, 0, g); add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), mat(0xe0ac7e)), -0.28, 1.83, 0, g);
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 6, 0, Math.PI*2, 0, Math.PI/2), M.yellow), -0.28, 1.88, 0, g);
+  for (const s of [-1, 1]) box(0.09, 2.2, 0.09, M.dark, 0.85, 1.2, s*0.38, g);     // mast
+  const lift = new THREE.Group(); g.add(lift);
+  box(0.08, 0.6, 0.95, M.dark, 0.92, 0.35, 0, lift);
+  for (const s of [-1, 1]) box(1.1, 0.05, 0.12, M.steel, 1.5, 0.04, s*0.28, lift);
+  return {g, lift, liftY:0};
+}
+
+// path follower: points [x, z, reverse?]
+class Mover {
+  constructor(obj, speed, turn){ this.o = obj; this.speed = speed; this.turn = turn; this.path = []; this.h = 0; this.cb = null; }
+  get pos(){ return this.o.position; }
+  place(x, z, h){ this.o.position.set(x, 0, z); this.h = h; this.o.rotation.y = h; }
+  go(pts, cb){ this.path = pts.map(p => ({x:p[0], z:p[1], rev:!!p[2]})); this.cb = cb || null; }
+  get busy(){ return this.path.length > 0; }
+  update(dt){
+    if (!this.path.length) return;
+    const p = this.path[0], dx = p.x - this.pos.x, dz = p.z - this.pos.z, L = Math.hypot(dx, dz);
+    if (L < 0.02) { this.path.shift(); if (!this.path.length && this.cb) { const cb = this.cb; this.cb = null; cb(); } return; }
+    let want = Math.atan2(-dz, dx); if (p.rev) want += Math.PI;
+    const da = angDiff(want, this.h); this.h += Math.sign(da) * Math.min(Math.abs(da), this.turn*dt); this.o.rotation.y = this.h;
+    const slow = Math.abs(da) > 0.9 ? 0.25 : 1;
+    const s = Math.min(L, this.speed * slow * dt); this.pos.x += dx/L*s; this.pos.z += dz/L*s;
+  }
+}
+const H_PX = 0, H_NX = Math.PI, H_NZ = Math.PI/2, H_PZ = -Math.PI/2;   // headings for a model facing +x
+
+const coilTruck = makeTruck(0xe53935), shipTruck = makeTruck(0x2463e6);
+const CT = new Mover(coilTruck.g, 6, 1.6), ST = new Mover(shipTruck.g, 6, 1.6);
+CT.place(-70, 19, H_PX); ST.place(70, 19, H_NX);
+const fkA = makeForklift(0xffbe0b), fkB = makeForklift(0xff7a1a);
+const FA = new Mover(fkA.g, 2.6, 3.2), FB = new Mover(fkB.g, 2.6, 3.2);
+const HOME_A = [-11, 4.5], HOME_B = [8, 1.6];
+FA.place(HOME_A[0], HOME_A[1], H_NZ); FB.place(HOME_B[0], HOME_B[1], H_NZ);
+const FORK_REACH = 1.45;
+
+// ---------------- workers from the simulator (Blender models) ----------------
+const workers = [];
+function loadWorker(file, x, z, h, clip){
+  if (!THREE.GLTFLoader || location.protocol === 'file:') return;
+  const tryUrls = ['personagens/' + file, '../personagens/' + file];
+  const next = i => { if (i >= tryUrls.length) return;
+    fetch(tryUrls[i]).then(r => { if (!r.ok) throw 0; return r.text(); }).then(t => {
+      const bin = atob(t.trim()), u8 = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+      new THREE.GLTFLoader().parse(u8.buffer, '', gl => {
+        const o = gl.scene; o.traverse(n => { if (n.isMesh) { n.castShadow = true; n.frustumCulled = false; } });
+        const holder = new THREE.Group(); holder.add(o); scene.add(holder);
+        const B = {}; o.traverse(n => { if (n.isBone) B[n.name] = n; });
+        holder.updateMatrixWorld(true); const a = new V3(), b = new V3(); B.LeftUpLeg.getWorldPosition(a); B.RightUpLeg.getWorldPosition(b);
+        const f = new V3(0, 1, 0).cross(b.sub(a)); o.rotation.y = -Math.atan2(f.x, f.z);
+        holder.position.set(x, 0.07, z); holder.rotation.y = h;
+        const mixer = new THREE.AnimationMixer(o); const c = gl.animations.find(c => c.name === clip) || gl.animations[0]; if (c) mixer.clipAction(c).play();
+        workers.push(mixer);
+      }, () => next(i + 1));
+    }).catch(() => next(i + 1)); };
+  next(0);
+}
+const opPos = toWorld(3.45, 0, 1.35);
+loadWorker('operador.txt?v=8', opPos.x, opPos.z, Math.PI, 'Look');
+loadWorker('ajudante.txt?v=8', -11.3, 7.5, Math.PI * 0.75, 'Radio');
+
+// ================= GAME STATE =================
+const S = { money:5000, sheets:0, coilLen:COIL_TOTAL, decHas:'coil', v:0, spin:0, roll:0, segReveal:X_CUT, feedFrac:1,
+  current:null, sliding:[], stack:[], ready:null, blade:0, rack:[null, null, null], slots:[null, null, null, null],
+  ctCoils:[], ctState:'away', stState:'away', stLoad:[], speedMul:1 };
+// start with two coils on the rack
+for (let i = 0; i < 2; i++) { const c = makeCoil(); c.position.set(RACK_X, RACK_Y, RACK_Z[i]); scene.add(c); S.rack[i] = c; }
+
+// ---------------- sequences (one per actor) ----------------
+function runSeq(steps){ return {steps, i:0, started:false, t:0}; }
+function tickSeq(sq, dt){
+  if (!sq) return true;
+  const s = sq.steps[sq.i]; if (!s) return true;
+  if (!sq.started) { sq.started = true; sq.t = 0; s.start && s.start(); }
+  sq.t += dt; s.update && s.update(dt, sq.t);
+  if (sq.t > 0.03 && (!s.done || s.done(sq.t))) { s.end && s.end(); sq.i++; sq.started = false; }
+  return sq.i >= sq.steps.length;
+}
+// lift helper
+function liftTo(fk, y){ fk.target = y; }
+function liftDone(fk){ return Math.abs(fk.liftY - (fk.target ?? fk.liftY)) < 0.005; }
+function updateLift(fk, dt){ if (fk.target == null) return; const d = fk.target - fk.liftY, s = Math.min(Math.abs(d), 0.8*dt); fk.liftY += Math.sign(d)*s; fk.lift.position.y = fk.liftY; }
+const go = (mv, pts) => ({start(){ mv.go(pts); }, done:() => !mv.busy});
+const lift = (fk, y) => ({start(){ liftTo(fk, y); }, done:() => liftDone(fk)});
+const wait = s => ({done:t => t >= s});
+const act = fn => ({start: fn});
+function pickUp(fk, obj){ fk.lift.attach(obj); }
+function drop(obj, x, y, z, snapYaw){
+  scene.attach(obj); obj.position.set(x, y, z);
+  if (snapYaw) obj.rotation.set(0, Math.round(obj.rotation.y / (Math.PI/2)) * (Math.PI/2), 0);
+}
+
+// forklift A: coils
+let seqA = null, seqB = null;
+function planA(){
+  // 1) feed the decoiler
+  const rackIdx = S.rack.findIndex(c => c);
+  if (S.decHas !== 'coil' && rackIdx >= 0 && !S.feeding) {
+    S.feeding = true; const z = RACK_Z[rackIdx], dec = toWorld(C.x, C.y, 0); let coil = null;
+    const ax = dec.x - FORK_REACH;
+    return runSeq([
+      lift(fkA, 0), go(FA, [[-10.5, FA.pos.z], [-10.5, z], [RACK_X + FORK_REACH, z]]),
+      act(() => { coil = S.rack[rackIdx]; S.rack[rackIdx] = null; pickUp(fkA, coil); }), lift(fkA, 0.12),
+      go(FA, [[-10.5, z, true], [-10.5, dec.z]]), lift(fkA, dec.y - RACK_Y + 0.02), go(FA, [[ax, dec.z]]),
+      act(() => { scene.remove(coil); S.decHas = 'coil'; S.coilLen = COIL_TOTAL; S.segReveal = 0; S.feedFrac = 0; S.feeding = false; }),
+      go(FA, [[-10.5, dec.z, true]]), lift(fkA, 0), go(FA, [[-10.5, HOME_A[1]], HOME_A])
+    ]);
+  }
+  // 2) unload the coil truck into the rack
+  const free = S.rack.findIndex(c => !c);
+  if (S.ctState === 'docked' && S.ctCoils.length && free >= 0) {
+    const coil = S.ctCoils[S.ctCoils.length - 1], wp = coil.getWorldPosition(new V3()), z = RACK_Z[free];
+    return runSeq([
+      lift(fkA, wp.y - RACK_Y + 0.0), go(FA, [[-19.6, FA.pos.z < 6 ? 5.5 : FA.pos.z], [-19.6, wp.z], [wp.x - FORK_REACH, wp.z]]),
+      act(() => { S.ctCoils.pop(); pickUp(fkA, coil); }), lift(fkA, wp.y - RACK_Y + 0.12),
+      go(FA, [[-19.6, wp.z, true], [-19.6, 5.5], [-10.5, 5.5]]), lift(fkA, 0.04), go(FA, [[-10.5, z], [RACK_X + FORK_REACH, z]]),
+      act(() => { drop(coil, RACK_X, RACK_Y, z, true); S.rack[free] = coil; }), lift(fkA, 0),
+      go(FA, [[-10.5, z, true], [-10.5, HOME_A[1]], HOME_A])
+    ]);
+  }
+  return null;
+}
+// forklift B: sheet stacks
+function planB(){
+  const free = S.slots.findIndex(s => !s);
+  if (S.ready && free >= 0) {
+    const st = S.ready, wp = st.position.clone(), sx = SLOT_X[free];
+    return runSeq([
+      lift(fkB, wp.y - 0.06), go(FB, [[wp.x, 2.6], [wp.x, wp.z + FORK_REACH]]),
+      act(() => { S.ready = null; pickUp(fkB, st); }), lift(fkB, wp.y + 0.1),
+      go(FB, [[wp.x, 2.6, true], [sx, 2.6]]), go(FB, [[sx, SLOT_Z - FORK_REACH]]), lift(fkB, PALLET_TOP + 0.02),
+      act(() => { drop(st, sx, PALLET_TOP, SLOT_Z, true); S.slots[free] = st; }), lift(fkB, 0),
+      go(FB, [[sx, 2.6, true], HOME_B])
+    ]);
+  }
+  const filled = S.slots.findIndex(s => s);
+  if (S.stState === 'docked' && S.stLoad.length < 3 && filled >= 0) {
+    const st = S.slots[filled], sx = SLOT_X[filled], k = S.stLoad.length;
+    const spot = shipTruck.bed.localToWorld(new V3(-2.0 + k*1.75, 0.08, 0));
+    return runSeq([
+      lift(fkB, PALLET_TOP - 0.04), go(FB, [[sx, 2.6], [sx, SLOT_Z - FORK_REACH]]),
+      act(() => { S.slots[filled] = null; pickUp(fkB, st); }), lift(fkB, 0.3),
+      go(FB, [[sx, 2.6, true], [13.6, 2.6], [13.6, spot.z]]), lift(fkB, spot.y + 0.05), go(FB, [[spot.x - FORK_REACH, spot.z]]),
+      act(() => { shipTruck.bed.attach(st); st.position.set(-2.0 + k*1.75, 0.08, 0); st.rotation.set(0, 0, 0); S.stLoad.push(st); }), lift(fkB, 0.3),
+      go(FB, [[13.6, spot.z, true], [13.6, 2.6]]), lift(fkB, 0), go(FB, [HOME_B])
+    ]);
+  }
+  return null;
+}
+
+// trucks
+function updateTrucks(){
+  const rackCount = S.rack.filter(Boolean).length + (S.decHas === 'coil' ? 0 : 0);
+  if (S.ctState === 'away' && rackCount <= 1) {
+    S.ctState = 'coming'; CT.place(-70, 19, H_PX);
+    for (let i = 0; i < 2; i++) { const c = makeCoil(); coilTruck.bed.add(c); c.position.set(-1.6 + i*1.7, 0.06 + R0, 0); c.rotation.y = Math.PI/2; S.ctCoils.push(c); }
+    CT.go([[-19.5, 19], [-16, 16.2], [-16, 10]], () => { S.ctState = 'docked'; });
+  }
+  if (S.ctState === 'docked' && !S.ctCoils.length && !FA.busy && !seqA) {
+    S.ctState = 'leaving'; CT.go([[-16, 16.5, true], [-12, 19], [75, 19]], () => { S.ctState = 'away'; });
+    pop(CT.pos.clone().setY(3), '-R$ 2.400 bobinas', '#ffd2d2');
+    S.money -= 2400;
+  }
+  const filled = S.slots.filter(Boolean).length;
+  if (S.stState === 'away' && filled >= 3) {
+    S.stState = 'coming'; ST.place(70, 19, H_NX);
+    ST.go([[19.5, 19], [16, 16.2], [16, 10]], () => { S.stState = 'docked'; });
+  }
+  if (S.stState === 'docked' && S.stLoad.length >= 3 && !seqB) {
+    S.stState = 'leaving';
+    const value = S.stLoad.length * STACK_N * 140;
+    ST.go([[16, 16.5, true], [12, 19], [-75, 19]], () => {
+      S.stState = 'away'; S.stLoad.forEach(st => shipTruck.bed.remove(st)); S.stLoad = [];
+    });
+    setTimeout(() => { S.money += value; pop(ST.pos.clone().setY(3.5), '+R$ ' + fmtMoney(value)); }, 900);
+  }
+}
+
+// ---------------- machine ----------------
+function newPanel(){ const m = new THREE.Mesh(PANEL_GEO, M.sheet); m.castShadow = true; m.position.set(X_CUT, E.y, 0); m.scale.x = 0.0001; LINE.add(m); S.current = {m, len:0}; }
+function finishPanel(){
+  const p = S.current; S.current = null; if (!p) return;
+  if (p.len < LP * 0.98) { LINE.remove(p.m); return; }
+  p.m.scale.x = 1; S.blade = 0.0001; S.sheets++;
+  const k = S.stack.length + S.sliding.length;
+  S.sliding.push({m:p.m, t:0, x0:p.m.position.x, xf:TX1 - 0.12, yf:TABLE_Y + A + 0.004 + k*NEST});
+}
+function canRun(){ return S.decHas === 'coil' && S.coilLen > 0 && S.segReveal >= X_CUT && !S.ready && S.stack.length + S.sliding.length < STACK_N; }
+function stepMachine(dt){
+  const target = canRun() ? 0.45 : 0;
+  S.v += (target - S.v) * Math.min(1, dt*3); if (target === 0 && S.v < 0.003) S.v = 0;
+  const ds = S.v * dt;
+  if (ds > 0 && S.decHas === 'coil') {
+    S.coilLen = Math.max(0, S.coilLen - ds); S.roll += ds;
+    if (!S.current) newPanel();
+    S.current.len += ds;
+    if (S.current.len >= LP) { S.current.len = LP; finishPanel(); }
+    if (S.coilLen <= 0) { finishPanel(); S.decHas = 'core'; }
+  }
+  if (S.decHas === 'coil' && S.segReveal < X_CUT) { S.feedFrac = Math.min(1, S.feedFrac + dt*0.8); if (S.feedFrac >= 1) S.segReveal = Math.min(X_CUT, S.segReveal + dt*1.6); }
+  const R = Math.sqrt(RC*RC + (R0*R0 - RC*RC) * S.coilLen / COIL_TOTAL);
+  decCoil.visible = S.decHas === 'coil' && S.coilLen > 0; decCoil.scale.set(R, R, 1); decCore.visible = S.decHas !== 'none';
+  if (S.coilLen > 0) S.spin += ds / R; decCoil.rotation.z = decCore.rotation.z = S.spin;
+  const T = tangentPoint(R), d = T.clone().sub(E);
+  const len = S.decHas === 'coil' ? d.length() * S.feedFrac : 0;
+  feed.visible = len > 0.02; feed.scale.x = Math.max(len, 0.001); feed.rotation.z = Math.atan2(d.y, d.x) - Math.PI;
+  const strip = S.decHas === 'coil';
+  segs.forEach(s => s.m.visible = strip && s.x1 <= S.segReveal + 1e-6);
+  if (S.current) { S.current.m.position.x = X_CUT + S.current.len; S.current.m.scale.x = Math.max(S.current.len / LP, 0.0001); }
+  rollers.forEach(r => r.g.rotation.z = -r.sg * S.roll / 0.06);
+  if (S.blade > 0) { S.blade += dt; const t = S.blade / 0.3, k = t < 0.4 ? t/0.4 : t < 0.6 ? 1 : Math.max(0, 1 - (t-0.6)/0.4); holder.position.y = 1.3 - 0.2*k; if (t >= 1) S.blade = 0; }
+  for (let i = S.sliding.length - 1; i >= 0; i--) {
+    const s = S.sliding[i]; s.t += dt/0.9; const t = Math.min(1, s.t), e = 1 - Math.pow(1 - t, 3);
+    s.m.position.x = s.x0 + (s.xf - s.x0)*e; s.m.position.y = t < 0.8 ? E.y + 0.01 : E.y + 0.01 + (s.yf - E.y - 0.01)*((t - 0.8)/0.2);
+    if (t >= 1) { s.m.position.y = s.yf; S.stack.push(s.m); S.sliding.splice(i, 1); }
+  }
+  if (!S.ready && S.stack.length >= STACK_N) {      // a full stack becomes one object the forklift can carry
+    const g = new THREE.Group(); const c = toWorld(TX1 - 0.12 - LP/2, TABLE_Y, 0); g.position.copy(c); scene.add(g);
+    S.stack.forEach(m => g.attach(m)); S.stack = []; S.ready = g;
+  }
+  lampG.material.emissive.setHex(S.v > 0.01 ? 0x22b45a : 0); lampR.material.emissive.setHex(S.v > 0.01 ? 0 : 0xe53935);
+}
+
+// ---------------- floating money text ----------------
+const pops = [];
+function pop(worldPos, text, color){
+  const d = document.createElement('div'); d.className = 'pop'; d.textContent = text; if (color) d.style.color = color; document.body.appendChild(d);
+  pops.push({d, p:worldPos, t:0});
+}
+function updatePops(dt){
+  for (let i = pops.length - 1; i >= 0; i--) {
+    const o = pops[i]; o.t += dt; const v = o.p.clone().add(new V3(0, o.t*1.6, 0)).project(camera);
+    o.d.style.left = ((v.x + 1)/2 * innerWidth) + 'px'; o.d.style.top = ((1 - v.y)/2 * innerHeight) + 'px'; o.d.style.opacity = Math.max(0, 1 - o.t/2);
+    if (o.t > 2) { o.d.remove(); pops.splice(i, 1); }
+  }
+}
+
+// ---------------- HUD ----------------
+$('btnSpeed').addEventListener('click', e => { S.speedMul = S.speedMul === 1 ? 2 : S.speedMul === 2 ? 4 : 1; e.currentTarget.textContent = S.speedMul + '×'; });
+$('btnHome').addEventListener('click', () => { controls.target.copy(CAM_HOME); camera.position.copy(CAM_HOME).add(CAM_OFF); controls.update(); });
+let uiT = 0;
+function updateUI(){
+  $('money').textContent = fmtMoney(S.money); $('sheets').textContent = S.sheets;
+  const coilPct = S.decHas === 'coil' ? Math.round(100 * S.coilLen / COIL_TOTAL) : 0;
+  $('status').innerHTML = `Linha 1: <b>${S.v > 0.01 ? 'produzindo' : S.decHas !== 'coil' ? 'esperando bobina' : S.ready ? 'esperando a empilhadeira' : 'preparando'}</b> · bobina ${coilPct}%<br>`
+    + `Estoque de bobinas: <b>${S.rack.filter(Boolean).length}/3</b> · Expedição: <b>${S.slots.filter(Boolean).length}/4</b>`;
+}
+
+// ---------------- loop ----------------
+function resize(){ renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+let last = performance.now();
+function loop(now){
+  const real = Math.min(0.05, (now - last)/1000); last = now; const dt = real * S.speedMul;
+  stepMachine(dt);
+  if (!seqA) seqA = planA(); if (tickSeq(seqA, dt)) seqA = null;
+  if (!seqB) seqB = planB(); if (tickSeq(seqB, dt)) seqB = null;
+  updateTrucks();
+  [CT, ST, FA, FB].forEach(m => m.update(dt)); updateLift(fkA, dt); updateLift(fkB, dt);
+  workers.forEach(m => m.update(dt));
+  updatePops(real);
+  uiT += real; if (uiT > 0.15) { uiT = 0; updateUI(); }
+  controls.update(); renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+updateUI(); requestAnimationFrame(loop);
+window.__jogo = {S, camera, controls, CT, ST, FA, FB};
+})();
+</script>
+
+</body>
+</html>
