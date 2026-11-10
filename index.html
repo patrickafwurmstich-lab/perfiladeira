@@ -675,6 +675,7 @@ function stop(){
 function changeCoil(){
   if (!canSwap()) return;
   sound.start(); setMsg('');
+  state.feedFrac = 0; state.segReveal = 0;   // the old strip has already left the machine: keep it hidden during the swap
   if (cradleCores.length >= CRADLE_X.length) { cradleCores.forEach(m => scene.remove(m)); cradleCores.length = 0; }
   const spot = cradleCores.length;
   const loadCoil = makeFullCoil(); loadCoil.visible = false;
@@ -889,7 +890,7 @@ function step(dt){
   feed.rotation.z = Math.atan2(d.y, d.x) - Math.PI;
   // strip inside the machine
   if (state.swap) segs.forEach(s => s.m.visible = s.x1 <= state.segReveal + 1e-6);
-  else if (state.tail >= 0) { const tx = state.tail - L_CORE; segs.forEach(s => s.m.visible = s.x1 > tx); }
+  else if (state.tail >= 0) { const tx = state.tail - L_CORE; segs.forEach(s => s.m.visible = s.x1 - SEG/2 > tx); }
   // panel emerging
   if (state.current) { const p = state.current; p.m.position.x = X_CUT + p.len; p.m.scale.x = Math.max(p.len / p.LP, 0.0001); }
   rollerGroups.forEach(r => r.g.rotation.z = -r.sgn * state.rollSpin / 0.06);
