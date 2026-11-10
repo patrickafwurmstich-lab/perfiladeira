@@ -523,10 +523,10 @@ Worker.prototype.setModel = function(obj, look){
     else mt = new THREE.MeshStandardMaterial({map:PALETTE, roughness:0.75});
     mt.skinning = !!m.isSkinnedMesh; m.material = mt; m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false;
   });
-  // face the toes to +Z, scale to 1.75 m, feet on the floor, hips centred
+  // face the character to +Z, scale to 1.75 m, feet on the floor, hips centred
   holder.updateMatrixWorld(true);
   const a = new V3(), b = new V3(); B.LeftFoot.getWorldPosition(a); B.LeftToeBase.getWorldPosition(b);
-  holder.rotation.y = -Math.atan2(b.x - a.x, b.z - a.z); holder.updateMatrixWorld(true);
+  holder.rotation.y = Math.PI - Math.atan2(b.x - a.x, b.z - a.z); holder.updateMatrixWorld(true);   // this rig's toe bones point backwards
   const vis = () => { const bx = new THREE.Box3(); meshes.forEach(m => { if (m.visible) bx.expandByObject(m); }); return bx; };
   let bx = vis(); holder.scale.setScalar(look.height / (bx.max.y - bx.min.y)); holder.updateMatrixWorld(true);
   bx = vis(); const hp = new V3(); B.Hips.getWorldPosition(hp);
@@ -540,7 +540,7 @@ Worker.prototype.setModel = function(obj, look){
   const dome = add(new THREE.Mesh(new THREE.SphereGeometry(r, 18, 9, 0, Math.PI*2, 0, Math.PI/2), hm), 0, 0, 0, helmet); dome.scale.y = 0.85;
   const brim = add(new THREE.Mesh(new THREE.CylinderGeometry(r*1.12, r*1.12, r*0.1, 22), hm), 0, 0, r*0.16, helmet); brim.scale.z = 1.15;
   add(new THREE.Mesh(new THREE.BoxGeometry(r*0.22, r*0.18, r*1.9), hm), 0, r*0.8, 0, helmet);
-  attachAt(B.Head, helmet, new V3(fc.x, fb.max.y - r*0.5 + look.helmetDy, fc.z + look.helmetDz));
+  attachAt(B.Head, helmet, new V3(fc.x, fb.max.y - r*0.62 + look.helmetDy, fc.z + look.helmetDz));
   // radio in the right hand (shown while operating the crane)
   const radio = new THREE.Group(); box(0.05, 0.13, 0.035, M.yellow, 0, 0, 0, radio); box(0.012, 0.09, 0.012, M.dark, 0.012, 0.1, 0, radio);
   const hand = new V3(); B.RightHand.getWorldPosition(hand); attachAt(B.RightHand, radio, hand); radio.visible = false;
