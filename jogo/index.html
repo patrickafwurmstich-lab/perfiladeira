@@ -72,7 +72,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9fd8ff);
 scene.fog = new THREE.Fog(0x9fd8ff, 70, 140);
 const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 300);
-const CAM_OFF = new V3(16, 34, 26), CAM_HOME = new V3(0, 0, 0);
+const CAM_OFF = new V3(12, 27, 20), CAM_HOME = new V3(-2, 0, 2);
 camera.position.copy(CAM_HOME).add(CAM_OFF);
 const controls = new THREE.OrbitControls(camera, canvas);
 controls.target.copy(CAM_HOME); controls.enableRotate = false; controls.screenSpacePanning = false; controls.enableDamping = true;
@@ -140,11 +140,11 @@ for (let x = -34; x <= 34; x += 3.4) { tree(x + rnd(), -21 - rnd()*3, 0.9 + rnd(
 for (let z = -18; z <= 14; z += 3.6) { tree(-29 - rnd()*2, z, 0.9 + rnd()*0.4); tree(29 + rnd()*2, z, 0.9 + rnd()*0.4); }
 
 // ---------------- shed (open frame so the line is visible from above) ----------------
-for (const x of [-9, -2, 5.5]) for (const z of [-5, 3]) { box(0.35, 5.2, 0.35, M.roofBeam, x, 2.6, z); box(0.7, 0.08, 0.7, M.roofBeam, x, 0.1, z); }
-for (const z of [-5, 3]) box(14.85, 0.35, 0.3, M.roofBeam, -1.75, 5.1, z);
-for (const x of [-9, -2, 5.5]) box(0.3, 0.35, 8.3, M.roofBeam, x, 5.1, -1);
+for (const x of [-9, -2, 5.5]) for (const z of [-5, 3]) { box(0.35, 4.4, 0.35, M.roofBeam, x, 2.2, z); box(0.7, 0.08, 0.7, M.roofBeam, x, 0.1, z); }
+for (const z of [-5, 3]) box(14.85, 0.35, 0.3, M.roofBeam, -1.75, 4.3, z);
+for (const x of [-9, -2, 5.5]) box(0.3, 0.35, 8.3, M.roofBeam, x, 4.3, -1);
 for (const z of [-5, 3]) { const s = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 0.8), new THREE.MeshBasicMaterial({map: labelTex(['LINHA 1'], 512, 96, '#1f4fb8', '#fff', 64)}));
-  s.position.set(-5.5, 4.6, z + (z > 0 ? 0.17 : -0.17)); if (z < 0) s.rotation.y = Math.PI; scene.add(s); }
+  s.position.set(-5.5, 3.8, z + (z > 0 ? 0.17 : -0.17)); if (z < 0) s.rotation.y = Math.PI; scene.add(s); }
 
 // ---------------- office ----------------
 {
