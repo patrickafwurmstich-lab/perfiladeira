@@ -532,15 +532,15 @@ Worker.prototype.setModel = function(obj, look){
   bx = vis(); const hp = new V3(); B.Hips.getWorldPosition(hp);
   holder.position.set(-hp.x, -bx.min.y, -hp.z); holder.updateMatrixWorld(true);
   // hard hat on the head bone
-  bx = vis(); const head = new V3(); B.Head.getWorldPosition(head);
-  const face = meshes.find(m => /face/i.test(m.name)); const fb = new THREE.Box3().expandByObject(face || meshes[0]);
-  const r = Math.max(0.11, Math.max(fb.max.x - fb.min.x, fb.max.z - fb.min.z) * 0.5 * look.helmetK);
+  const hairM = meshes.find(m => m.visible && /hair/i.test(m.name)) || meshes.find(m => /face/i.test(m.name)) || meshes[0];
+  const fb = new THREE.Box3().expandByObject(hairM), fc = fb.getCenter(new V3());
+  const r = Math.max(0.1, Math.max(fb.max.x - fb.min.x, fb.max.z - fb.min.z) * 0.5 * look.helmetK);
   const hm = new THREE.MeshStandardMaterial({color:look.helmet, roughness:0.35, metalness:0.1});
   const helmet = new THREE.Group();
   const dome = add(new THREE.Mesh(new THREE.SphereGeometry(r, 18, 9, 0, Math.PI*2, 0, Math.PI/2), hm), 0, 0, 0, helmet); dome.scale.y = 0.85;
   const brim = add(new THREE.Mesh(new THREE.CylinderGeometry(r*1.12, r*1.12, r*0.1, 22), hm), 0, 0, r*0.16, helmet); brim.scale.z = 1.15;
   add(new THREE.Mesh(new THREE.BoxGeometry(r*0.22, r*0.18, r*1.9), hm), 0, r*0.8, 0, helmet);
-  attachAt(B.Head, helmet, new V3(head.x, bx.max.y - r*0.62 + look.helmetDy, head.z + look.helmetDz));
+  attachAt(B.Head, helmet, new V3(fc.x, fb.max.y - r*0.5 + look.helmetDy, fc.z + look.helmetDz));
   // radio in the right hand (shown while operating the crane)
   const radio = new THREE.Group(); box(0.05, 0.13, 0.035, M.yellow, 0, 0, 0, radio); box(0.012, 0.09, 0.012, M.dark, 0.012, 0.1, 0, radio);
   const hand = new V3(); B.RightHand.getWorldPosition(hand); attachAt(B.RightHand, radio, hand); radio.visible = false;
@@ -577,8 +577,8 @@ op.speed = 1.8;
 if (THREE.FBXLoader && location.protocol !== 'file:') {
   const mgr = new THREE.LoadingManager(); mgr.setURLModifier(u => /\.(png|jpe?g|tga|bmp)$/i.test(u) ? 'personagens/paleta.png' : u);
   const ld = new THREE.FBXLoader(mgr);
-  [[op, 'personagens/operador.fbx', {vest:0xff7a1a, pants:0x2b4f9e, helmet:0xf4f4f4, hide:['hat'], height:1.7, helmetK:1.25, helmetDy:0, helmetDz:0}],
-   [helper, 'personagens/ajudante.fbx', {vest:0xc6f21a, pants:0x4f5a44, helmet:0xf2b705, hide:[], height:1.78, helmetK:1.25, helmetDy:0, helmetDz:0}]
+  [[op, 'personagens/trabalhador.fbx', {vest:0xff7a1a, pants:0x2b4f9e, helmet:0xf4f4f4, hide:['beard'], height:1.76, helmetK:1.08, helmetDy:0, helmetDz:0.01}],
+   [helper, 'personagens/trabalhador.fbx', {vest:0xc6f21a, pants:0x4f5a44, helmet:0xf2b705, hide:[], height:1.8, helmetK:1.08, helmetDy:0, helmetDz:0.01}]
   ].forEach(([w, url, look]) => ld.load(url, obj => { try { w.setModel(obj, look); } catch(e){ console.warn('modelo', url, e); } }, undefined, e => console.warn('não carregou', url, e)));
 }
 
