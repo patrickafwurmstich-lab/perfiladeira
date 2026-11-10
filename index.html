@@ -514,6 +514,9 @@ Worker.prototype.setModel = function(obj, clips, look){
   const holder = new THREE.Group(); holder.add(obj);
   const B = {}; obj.traverse(n => { if (n.isBone) B[n.name.replace(/^.*[:|]/, '')] = n; });
   obj.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; n.frustumCulled = false; } });
+  if (look.pants) obj.traverse(n => {   // trouser colour (the palette tint made in Blender does not survive the glTF export)
+    if (n.isMesh && /pants/i.test(n.name)) { const t = texLoad(look.pants); t.flipY = false; n.material = n.material.clone(); n.material.map = t; n.material.needsUpdate = true; }
+  });
   // face the character to +Z (up × (right − left)), scale, feet on the floor, hips centred
   holder.updateMatrixWorld(true);
   const a = new V3(), b = new V3(); B.LeftUpLeg.getWorldPosition(a); B.RightUpLeg.getWorldPosition(b);
@@ -560,7 +563,7 @@ op.speed = 1.8;
 if (THREE.GLTFLoader && location.protocol !== 'file:') {
   // the .glb files travel as base64 text so they can be served anywhere
   const ld = new THREE.GLTFLoader();
-  [[op, 'personagens/operador.txt', {height:1.78}], [helper, 'personagens/ajudante.txt', {height:1.8}]].forEach(([w, url, look]) =>
+  [[op, 'personagens/operador.txt', {pants:'personagens/op_calca.png'}], [helper, 'personagens/ajudante.txt', {pants:'personagens/aj_calca.png'}]].forEach(([w, url, look]) =>
     fetch(url).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(t => {
       const bin = atob(t.trim()), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
       ld.parse(u8.buffer, '', g => { try { w.setModel(g.scene, g.animations, look); } catch(e){ console.warn('modelo', url, e); } }, e => console.warn('glb', url, e));
