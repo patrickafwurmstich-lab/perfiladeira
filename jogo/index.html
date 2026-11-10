@@ -70,17 +70,17 @@ renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadow
 renderer.outputEncoding = THREE.sRGBEncoding;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9fd8ff);
-scene.fog = new THREE.Fog(0x9fd8ff, 70, 140);
-const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 300);
-const CAM_OFF = new V3(12, 27, 20), CAM_HOME = new V3(-2, 0, 2);
+scene.fog = new THREE.Fog(0x9fd8ff, 60, 160);
+const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 1200);
+const CAM_OFF = new V3(12, 27, 20), CAM_HOME = new V3(20, 0, -16);
 camera.position.copy(CAM_HOME).add(CAM_OFF);
 const controls = new THREE.OrbitControls(camera, canvas);
 controls.target.copy(CAM_HOME); controls.enableRotate = false; controls.screenSpacePanning = false; controls.enableDamping = true;
-controls.minDistance = 14; controls.maxDistance = 75;
+controls.minDistance = 14; controls.maxDistance = 240;
 controls.mouseButtons = {LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN};
 controls.touches = {ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN};
 controls.addEventListener('change', () => {   // keep the view over the yard
-  const t = controls.target, cx = Math.max(-26, Math.min(26, t.x)), cz = Math.max(-18, Math.min(20, t.z));
+  const t = controls.target, cx = Math.max(-40, Math.min(460, t.x)), cz = Math.max(-56, Math.min(30, t.z));
   if (cx !== t.x || cz !== t.z) { camera.position.x += cx - t.x; camera.position.z += cz - t.z; t.x = cx; t.z = cz; }
   $('hint').style.opacity = 0;
 });
@@ -117,169 +117,200 @@ const M = {
   wall: mat(0xf2efe8, 0, 0.9)
 };
 
-// ---------------- ground, yard, road ----------------
-const grass = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), M.grass); grass.rotation.x = -Math.PI/2; grass.receiveShadow = true; scene.add(grass);
-box(50, 0.06, 32, M.concrete, 0, 0.03, -1);                 // yard  x -25..25, z -17..15
-box(160, 0.04, 7, M.asphalt, 0, 0.02, 19);                  // road
-for (let x = -78; x < 80; x += 6) box(3, 0.02, 0.18, M.white, x, 0.05, 19);
-for (const x of [-16, 16]) box(7, 0.05, 2.2, M.asphalt, x, 0.03, 15.6);   // driveways
-box(14.6, 0.03, 9.6, M.epoxy, -2.25, 0.07, -0.8);           // shed floor
-function floorLine(x0, z0, x1, z1, m=M.line){ const L = Math.hypot(x1-x0, z1-z0); const b = box(L, 0.02, 0.14, m, (x0+x1)/2, 0.085, (z0+z1)/2); b.rotation.y = -Math.atan2(z1-z0, x1-x0); b.castShadow = false; }
-floorLine(-9.4, 4.0, 4.5, 4.0);
-for (const [x0, x1] of [[-19.5, -12.5], [12.5, 19.5]]) { floorLine(x0, 6.5, x1, 6.5); floorLine(x0, 6.5, x0, 14.5); floorLine(x1, 6.5, x1, 14.5); }   // truck bays
-floorLine(4.5, 4, 12.6, 4); floorLine(4.5, 6.2, 12.6, 6.2);   // shipping lane
+// ================= SITE: 3 barracões em fila, corredor do caminhão e faixa da empilhadeira atravessando todos =================
+const SHED_L = 132, SHED_D = 40, SHED_GAP = 12;
+const shedX0 = k => k * (SHED_L + SHED_GAP);
+const X0 = shedX0(0);
+const Z_BACK = -40, Z_FRONT = 0, CORR_Z = -5, LANE_Z = -11, FAIXA_Z = -13;
+const SITE_X1 = shedX0(2) + SHED_L;                 // 420
+const ROAD_Z = 22, GATE_IN_X = -10, GATE_OUT_X = SITE_X1 + 10, FENCE_Z = 13;
+const YARD_X0 = -24, YARD_X1 = SITE_X1 + 24, YARD_Z0 = -52;
+const EAVE = 10, RIDGE = 12.5, RUNWAY_Y = 7.4;
 
-// trees round the yard
-let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-function tree(x, z, s=1){
-  cylY(0.18*s, 1.2*s, M.trunk, x, 0.6*s, z, 8);
-  const g = new THREE.IcosahedronGeometry(1.1*s, 0); const m = add(new THREE.Mesh(g, rnd() > 0.5 ? M.leaf : M.leaf2), x, 1.9*s, z);
-  m.rotation.set(rnd(), rnd(), rnd());
-}
-for (let x = -34; x <= 34; x += 3.4) { tree(x + rnd(), -21 - rnd()*3, 0.9 + rnd()*0.5); tree(x + rnd(), 26 + rnd()*3, 0.8 + rnd()*0.5); }
-for (let z = -18; z <= 14; z += 3.6) { tree(-29 - rnd()*2, z, 0.9 + rnd()*0.4); tree(29 + rnd()*2, z, 0.9 + rnd()*0.4); }
-
-// ---------------- barracão (blue steel frame, gable roof with skylights) ----------------
 function stripeTex(w, h, base, line, step, extra){
   const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
   g.fillStyle = base; g.fillRect(0, 0, w, h);
   for (let x = 0; x < w; x += step) { g.fillStyle = line; g.fillRect(x, 0, Math.max(2, step*0.28), h); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x + step*0.5, 0, 2, h); }
   if (extra) extra(g, w, h);
-  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t;
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
 }
-const SH = {x0:-9, x1:4.5, zB:-5, zF:3.4, eave:4.4, ridge:5.9, ov:0.6};
-SH.zR = (SH.zB + SH.zF) / 2; SH.xc = (SH.x0 + SH.x1) / 2;
-const ROOF = new THREE.Group(); scene.add(ROOF);   // fades out when you zoom in, so the line stays visible
+function floorLine(x0, z0, x1, z1, m=M.line, w=0.16){ const L = Math.hypot(x1-x0, z1-z0); const b = box(L, 0.02, w, m, (x0+x1)/2, 0.115, (z0+z1)/2); b.rotation.y = -Math.atan2(z1-z0, x1-x0); b.castShadow = false; return b; }
+function floorLabel(lines, x, z, w, h, bg='#ffffff', fg='#1d2433', size=84, opacity=1){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({map: labelTex(lines, Math.round(256*w/h), 256, bg, fg, size), transparent: opacity < 1, opacity}));
+  m.rotation.x = -Math.PI/2; m.position.set(x, 0.13, z); scene.add(m); return m;
+}
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+function tree(x, z, s=1){
+  cylY(0.18*s, 1.2*s, M.trunk, x, 0.6*s, z, 8);
+  const m = add(new THREE.Mesh(new THREE.IcosahedronGeometry(1.1*s, 0), rnd() > 0.5 ? M.leaf : M.leaf2), x, 1.9*s, z); m.rotation.set(rnd(), rnd(), rnd());
+}
+
+// ---------------- ground, road, yard ----------------
+const grass = new THREE.Mesh(new THREE.PlaneGeometry(1600, 700), M.grass); grass.rotation.x = -Math.PI/2; grass.position.set(SITE_X1/2, 0, 0); grass.receiveShadow = true; scene.add(grass);
+box(YARD_X1 - YARD_X0, 0.06, FENCE_Z - YARD_Z0, M.concrete, (YARD_X0 + YARD_X1)/2, 0.03, (FENCE_Z + YARD_Z0)/2).castShadow = false;
+box(1600, 0.04, 8, M.asphalt, SITE_X1/2, 0.02, ROAD_Z).castShadow = false;
+for (let x = -560; x < 980; x += 8) box(3.4, 0.02, 0.2, M.white, x, 0.05, ROAD_Z).castShadow = false;
+box(1600, 0.1, 1.8, M.concrete, SITE_X1/2, 0.05, ROAD_Z - 5).castShadow = false;
+for (const gx of [GATE_IN_X, GATE_OUT_X]) box(12, 0.03, 30, M.asphalt, gx, 0.09, (CORR_Z + 4 + ROAD_Z)/2 - 2).castShadow = false;   // driveways
+// corridor (truck) + lane (forklift) run through all three sheds
+const CORR_X0 = GATE_IN_X - 6, CORR_X1 = GATE_OUT_X + 6;
+box(CORR_X1 - CORR_X0, 0.03, 8, M.asphalt, (CORR_X0 + CORR_X1)/2, 0.1, CORR_Z).castShadow = false;
+floorLine(CORR_X0, CORR_Z - 4, CORR_X1, CORR_Z - 4, M.white); floorLine(CORR_X0, CORR_Z + 4, CORR_X1, CORR_Z + 4, M.white);
+for (let x = CORR_X0 + 2; x < CORR_X1; x += 6) floorLine(x, CORR_Z, x + 3, CORR_Z, M.line, 0.14);
+box(SITE_X1, 0.025, 4, mat(0x9aa9b4, 0, 0.85), SITE_X1/2, 0.105, LANE_Z).castShadow = false;
+floorLine(0, FAIXA_Z, SITE_X1, FAIXA_Z, M.line, 0.22);
+for (let x = 2; x < SITE_X1; x += 10) { const a = floorLine(x, LANE_Z, x + 1.6, LANE_Z, M.white, 0.5); }
+
+// ---------------- barracão ----------------
+const ROOF = new THREE.Group(); scene.add(ROOF);   // some quando você aproxima o zoom, para ver as máquinas
 const roofMats = [];
 const fadeMat = m => { m.transparent = true; roofMats.push(m); return m; };
-{
-  const blueSteel = M.blue, half = (SH.zF - SH.zB) / 2, a = Math.atan2(SH.ridge - SH.eave, half);
-  const run = half + SH.ov, L = run / Math.cos(a), W = SH.x1 - SH.x0 + 2*SH.ov, lift = 0.22;
-  // columns + portal frames
-  for (const x of [SH.x0, SH.xc, SH.x1]) {
-    for (const z of [SH.zB, SH.zF]) { box(0.36, SH.eave, 0.36, blueSteel, x, SH.eave/2, z); box(0.7, 0.08, 0.7, blueSteel, x, 0.1, z); }
-    const rl = half / Math.cos(a);
-    box(0.24, 0.32, rl, blueSteel, x, (SH.eave + SH.ridge)/2, SH.zR + half/2).rotation.x = a;
-    box(0.24, 0.32, rl, blueSteel, x, (SH.eave + SH.ridge)/2, SH.zR - half/2).rotation.x = -a;
+const steelBlue = M.blue, runwayM = mat(0x5b6370, 0.5, 0.5);
+const clad = mat(0xffffff, 0.25, 0.6, {map: stripeTex(512, 256, '#d5dae0', '#b7bec7', 24)}); clad.map.repeat.set(SHED_L/6, 1);
+const cladEnd = mat(0xffffff, 0.25, 0.6, {map: stripeTex(512, 256, '#d5dae0', '#b7bec7', 24)}); cladEnd.map.repeat.set(27/6, 1);
+const cladHead = mat(0xffffff, 0.25, 0.6, {map: stripeTex(512, 256, '#d5dae0', '#b7bec7', 24)}); cladHead.map.repeat.set(13/6, 0.4);
+const roofTex = stripeTex(1024, 512, '#c7ccd2', '#aab1ba', 16, (g, w, h) => {
+  for (let i = 0; i < 2; i++) { const x = 80 + i * w/2; g.fillStyle = '#eef6fc'; g.fillRect(x, h*0.3, w/2 - 160, h*0.34); g.strokeStyle = '#9aa3ad'; g.lineWidth = 8; g.strokeRect(x, h*0.3, w/2 - 160, h*0.34); }
+});
+roofTex.repeat.set(SHED_L/12, 1);
+const roofMat = fadeMat(mat(0xffffff, 0.35, 0.5, {map: roofTex})), purlinM = fadeMat(mat(0x8e98a4, 0.4, 0.5));
+const trimM = fadeMat(mat(0x1f4fb8, 0.2, 0.5)), capM = fadeMat(mat(0x9aa3ad, 0.4, 0.5)), triM = fadeMat(mat(0xd5dae0, 0.25, 0.6));
+
+function buildShed(x0){
+  const xc = x0 + SHED_L/2, zc = (Z_BACK + Z_FRONT)/2, half = SHED_D/2, a = Math.atan2(RIDGE - EAVE, half), rl = half / Math.cos(a);
+  box(SHED_L, 0.04, SHED_D, M.epoxy, xc, 0.08, zc).castShadow = false;
+  for (let x = x0; x <= x0 + SHED_L + 0.01; x += 12) {
+    for (const z of [Z_BACK, Z_FRONT]) {
+      box(0.7, EAVE, 0.7, steelBlue, x, EAVE/2, z); box(1.3, 0.1, 1.3, steelBlue, x, 0.13, z);
+      box(0.5, 0.5, 1.1, steelBlue, x, RUNWAY_Y - 0.6, z + (z < 0 ? 0.75 : -0.75));    // console da viga de rolamento
+    }
+    box(0.45, 0.6, rl, steelBlue, x, (EAVE + RIDGE)/2, zc + half/2).rotation.x = a;
+    box(0.45, 0.6, rl, steelBlue, x, (EAVE + RIDGE)/2, zc - half/2).rotation.x = -a;
   }
-  for (const z of [SH.zB, SH.zF]) box(SH.x1 - SH.x0 + 0.36, 0.34, 0.28, blueSteel, SH.xc, SH.eave - 0.1, z);
-  box(SH.x1 - SH.x0 + 0.36, 0.26, 0.26, blueSteel, SH.xc, SH.ridge - 0.05, SH.zR);
-  // back wall (metal cladding) — the camera looks from the front, so it never hides the line
-  const clad = mat(0xffffff, 0.25, 0.6, {map: stripeTex(512, 256, '#d5dae0', '#b7bec7', 24)}); clad.map.wrapS = THREE.RepeatWrapping; clad.map.repeat.set(5, 1);
-  box(SH.x1 - SH.x0 + 0.36, SH.eave - 0.7, 0.12, clad, SH.xc, 0.7 + (SH.eave - 0.7)/2, SH.zB - 0.24);
-  box(SH.x1 - SH.x0 + 0.36, 0.7, 0.16, blueSteel, SH.xc, 0.35, SH.zB - 0.24);
-  // roof sheets with skylights
-  const roofTex = stripeTex(1024, 512, '#c7ccd2', '#aab1ba', 18, (g, w, h) => {
-    for (let i = 0; i < 6; i++) { const x = 60 + i * (w - 120) / 6 + 14; g.fillStyle = '#eef6fc'; g.fillRect(x, h*0.28, (w - 120)/6 - 28, h*0.36); g.strokeStyle = '#9aa3ad'; g.lineWidth = 6; g.strokeRect(x, h*0.28, (w - 120)/6 - 28, h*0.36); }
-  });
-  const roofMat = fadeMat(mat(0xffffff, 0.35, 0.5, {map: roofTex})), purlinM = fadeMat(mat(0x8e98a4, 0.4, 0.5));
+  for (const z of [Z_BACK, Z_FRONT]) box(SHED_L + 0.7, 0.6, 0.5, steelBlue, xc, EAVE - 0.2, z);
+  box(SHED_L + 0.7, 0.45, 0.45, steelBlue, xc, RIDGE - 0.1, zc);
+  // vigas de rolamento da ponte (as duas laterais, ponta a ponta)
+  for (const z of [Z_BACK + 1.0, Z_FRONT - 1.0]) { box(SHED_L, 0.7, 0.5, runwayM, xc, RUNWAY_Y, z); box(SHED_L, 0.1, 0.16, M.dark, xc, RUNWAY_Y + 0.4, z); }
+  // parede do fundo + paredes das pontas (com a abertura do corredor e da faixa)
+  box(SHED_L, EAVE - 1, 0.2, clad, xc, 1 + (EAVE - 1)/2, Z_BACK - 0.45); box(SHED_L, 1, 0.3, steelBlue, xc, 0.5, Z_BACK - 0.45);
+  for (const x of [x0, x0 + SHED_L]) {
+    const dx = x === x0 ? -0.45 : 0.45;
+    box(0.2, EAVE - 1, 27, cladEnd, x + dx, 1 + (EAVE - 1)/2, (Z_BACK + FAIXA_Z)/2); box(0.3, 1, 27, steelBlue, x + dx, 0.5, (Z_BACK + FAIXA_Z)/2);
+    box(0.2, EAVE - 6.5, 13, cladHead, x + dx, 6.5 + (EAVE - 6.5)/2, (FAIXA_Z + Z_FRONT)/2);
+    box(0.5, 0.4, 13.4, M.yellow, x + dx, 6.3, (FAIXA_Z + Z_FRONT)/2);
+  }
+  // telhado
+  const ov = 0.8, run = half + ov, L = run / Math.cos(a), W = SHED_L + 1.4, lift = 0.4;
   for (const sgn of [1, -1]) {
-    const r = add(new THREE.Mesh(new THREE.BoxGeometry(W, L, 0.08), roofMat), SH.xc, (SH.ridge + SH.eave - SH.ov*Math.tan(a))/2 + lift, SH.zR + sgn*run/2, ROOF);
+    const r = add(new THREE.Mesh(new THREE.BoxGeometry(W, L, 0.12), roofMat), xc, (RIDGE + EAVE - ov*Math.tan(a))/2 + lift, zc + sgn*run/2, ROOF);
     r.rotation.x = sgn > 0 ? -Math.PI/2 + a : -Math.PI/2 - a;
-    for (let k = 1; k <= 4; k++) { const f = k / 5; box(SH.x1 - SH.x0, 0.12, 0.12, purlinM, SH.xc, SH.ridge - (SH.ridge - SH.eave)*f + 0.12, SH.zR + sgn*half*f, ROOF); }
+    for (let k = 1; k <= 5; k++) { const f = k / 6; box(SHED_L, 0.2, 0.2, purlinM, xc, RIDGE - (RIDGE - EAVE)*f + 0.2, zc + sgn*half*f, ROOF); }
   }
-  const trim = fadeMat(mat(0x1f4fb8, 0.2, 0.5)), cap = fadeMat(mat(0x9aa3ad, 0.4, 0.5));
-  const yE = SH.eave - SH.ov*Math.tan(a) + lift;
-  for (const sgn of [1, -1]) box(W, 0.22, 0.14, trim, SH.xc, yE, SH.zR + sgn*run, ROOF);
-  box(W, 0.12, 0.5, cap, SH.xc, SH.ridge + lift + 0.04, SH.zR, ROOF);
-  for (const x of [SH.x0 - SH.ov, SH.x1 + SH.ov]) for (const sgn of [1, -1]) {
-    const b = box(0.14, 0.22, L, trim, x, (SH.ridge + yE - lift)/2 + lift, SH.zR + sgn*run/2, ROOF); b.rotation.x = sgn > 0 ? a : -a;
+  const yE = EAVE - ov*Math.tan(a) + lift;
+  for (const sgn of [1, -1]) box(W, 0.35, 0.2, trimM, xc, yE, zc + sgn*run, ROOF);
+  box(W, 0.18, 0.9, capM, xc, RIDGE + lift + 0.06, zc, ROOF);
+  for (const x of [x0 - 0.7, x0 + SHED_L + 0.7]) for (const sgn of [1, -1]) {
+    const b = box(0.2, 0.35, L, trimM, x, (RIDGE + yE - lift)/2 + lift, zc + sgn*run/2, ROOF); b.rotation.x = sgn > 0 ? a : -a;
   }
-  // gable triangles
-  const tri = new THREE.Shape(); tri.moveTo(SH.zB, SH.eave); tri.lineTo(SH.zF, SH.eave); tri.lineTo(SH.zR, SH.ridge); tri.closePath();
-  const tg = new THREE.ExtrudeGeometry(tri, {depth:0.1, bevelEnabled:false}); tg.rotateY(-Math.PI/2);
-  const triMat = fadeMat(mat(0xd5dae0, 0.25, 0.6));
-  for (const x of [SH.x0, SH.x1 + 0.1]) add(new THREE.Mesh(tg, triMat), x, 0, 0, ROOF);
+  const tri = new THREE.Shape(); tri.moveTo(Z_BACK, EAVE); tri.lineTo(Z_FRONT, EAVE); tri.lineTo(zc, RIDGE); tri.closePath();
+  const tg = new THREE.ExtrudeGeometry(tri, {depth:0.15, bevelEnabled:false}); tg.rotateY(-Math.PI/2);
+  for (const x of [x0 - 0.3, x0 + SHED_L + 0.45]) add(new THREE.Mesh(tg, triM), x, 0, 0, ROOF);
 }
-for (const z of [SH.zF, SH.zB - 0.3]) { const s = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 0.8), new THREE.MeshBasicMaterial({map: labelTex(['LINHA 1'], 512, 96, '#1f4fb8', '#fff', 64)}));
-  s.position.set(-5.5, 3.75, z + (z > 0 ? 0.16 : -0.02)); if (z < 0) s.rotation.y = Math.PI; scene.add(s); }
+function lockedShed(k, price){
+  const x0 = shedX0(k), xc = x0 + SHED_L/2, zc = (Z_BACK + FAIXA_Z)/2;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(SHED_L, SHED_D), new THREE.MeshBasicMaterial({color:0x1d2433, transparent:true, opacity:0.08}));
+  m.rotation.x = -Math.PI/2; m.position.set(xc, 0.09, (Z_BACK + Z_FRONT)/2); scene.add(m);
+  const seg = 2;
+  for (let x = x0; x < x0 + SHED_L - 0.1; x += seg*2) box(seg, 0.02, 0.2, M.white, x + seg/2, 0.12, Z_BACK).castShadow = false;
+  for (let z = Z_BACK; z < FAIXA_Z - 0.1; z += seg*2) for (const x of [x0, x0 + SHED_L]) box(0.2, 0.02, seg, M.white, x, 0.12, z + seg/2).castShadow = false;
+  for (let x = x0; x <= x0 + SHED_L + 0.01; x += 12) for (const z of [Z_BACK, Z_FRONT]) box(1.3, 0.25, 1.3, M.gray, x, 0.13, z);   // sapatas prontas
+  floorLabel(['🔒 BARRACÃO ' + (k + 1), 'R$ ' + price], xc, zc, 34, 13, '#ffffff', '#1d2433', 96, 0.92);
+}
+buildShed(X0);
+lockedShed(1, '400.000');
+lockedShed(2, '900.000');
+
+// vagas do barracão 1: 12 vagas de 8 m (estoque 0–18, vagas 18–114, expedição 114–132)
+const VAGA_X0 = X0 + 18, VAGA_W = 8, N_VAGAS = 12;
+const vagaCX = i => VAGA_X0 + VAGA_W*i + VAGA_W/2;
+for (let i = 0; i <= N_VAGAS; i++) floorLine(VAGA_X0 + VAGA_W*i, Z_BACK + 1.6, VAGA_X0 + VAGA_W*i, FAIXA_Z - 0.8);
+floorLine(VAGA_X0, Z_BACK + 1.6, VAGA_X0 + VAGA_W*N_VAGAS, Z_BACK + 1.6);
+for (let i = 0; i < N_VAGAS; i++) floorLabel(i === 0 ? ['VAGA 1'] : ['VAGA ' + (i + 1), 'livre'], vagaCX(i), FAIXA_Z - 2.2, 6.4, 2.3, i === 0 ? '#22b45a' : '#ffffff', i === 0 ? '#ffffff' : '#1d2433', 92, i === 0 ? 1 : 0.9);
+floorLabel(['ESTOQUE'], X0 + 9, FAIXA_Z - 2.2, 12, 2.3, '#ffbe0b', '#1d2433', 110);
+floorLabel(['EXPEDIÇÃO'], X0 + 123, FAIXA_Z - 9, 13, 2.3, '#ff7a1a', '#ffffff', 110);
+floorLine(X0 + 1, Z_BACK + 1.6, X0 + 17, Z_BACK + 1.6); floorLine(X0 + 115, Z_BACK + 1.6, X0 + 131, Z_BACK + 1.6);
+floorLabel(['DESCARGA'], X0 + 10, CORR_Z - 2.6, 8, 1.6, '#ffbe0b', '#1d2433', 110, 0.95);
+floorLabel(['CARGA'], X0 + 123, CORR_Z - 2.6, 8, 1.6, '#ff7a1a', '#ffffff', 110, 0.95);
+const lineSign = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.6), new THREE.MeshBasicMaterial({map: labelTex(['BARRACÃO 1 · PARECIS TELHA'], 1280, 205, '#1f4fb8', '#fff', 120)}));
+lineSign.position.set(X0 + 66, EAVE - 1.3, Z_FRONT + 0.3); scene.add(lineSign);
+
 let roofOp = -1;
-function updateRoof(){
-  const d = camera.position.distanceTo(controls.target), t = Math.max(0, Math.min(1, (d - 40) / 10));
+function updateRoof(d){
+  const t = Math.max(0, Math.min(1, (d - 48) / 22));
   if (Math.abs(t - roofOp) < 0.005) return; roofOp = t;
   ROOF.visible = t > 0.01; roofMats.forEach(m => { m.opacity = t; m.depthWrite = t > 0.95; });
   ROOF.traverse(o => { if (o.isMesh) o.castShadow = t > 0.6; });
 }
 
-// ---------------- yard: wall, front fence + gates, guardhouse ----------------
+// ---------------- muro, grade da frente, portões, portaria, escritório ----------------
 {
-  const wallM = mat(0xe9e6df, 0, 0.9), capM = mat(0xb9bec6, 0, 0.8);
+  const wallM = mat(0xe9e6df, 0, 0.9), capW = mat(0xb9bec6, 0, 0.8);
   const wall = (x0, z0, x1, z1) => { const L = Math.hypot(x1-x0, z1-z0), ang = -Math.atan2(z1-z0, x1-x0);
-    const b = box(L, 1.3, 0.25, wallM, (x0+x1)/2, 0.65, (z0+z1)/2); b.rotation.y = ang; const c = box(L + 0.1, 0.1, 0.36, capM, (x0+x1)/2, 1.35, (z0+z1)/2); c.rotation.y = ang;
-    for (let t = 0; t <= L; t += 4) box(0.4, 1.45, 0.4, capM, x0 + (x1-x0)*t/L, 0.72, z0 + (z1-z0)*t/L); };
-  wall(-25, -17, 25, -17); wall(-25, -17, -25, 15); wall(25, -17, 25, 15);
-  // front: blue metal fence with two open truck gates
+    const b = box(L, 1.6, 0.3, wallM, (x0+x1)/2, 0.8, (z0+z1)/2); b.rotation.y = ang; const c = box(L + 0.1, 0.12, 0.42, capW, (x0+x1)/2, 1.66, (z0+z1)/2); c.rotation.y = ang;
+    for (let t = 0; t <= L; t += 8) box(0.5, 1.8, 0.5, capW, x0 + (x1-x0)*t/L, 0.9, z0 + (z1-z0)*t/L); };
+  wall(YARD_X0, YARD_Z0, YARD_X1, YARD_Z0); wall(YARD_X0, YARD_Z0, YARD_X0, FENCE_Z); wall(YARD_X1, YARD_Z0, YARD_X1, FENCE_Z);
+  const barC = document.createElement('canvas'); barC.width = 256; barC.height = 64; { const g = barC.getContext('2d'); g.clearRect(0,0,256,64); g.fillStyle = '#2463e6'; for (let x = 4; x < 256; x += 16) g.fillRect(x, 0, 5, 64); }
+  const barTex = new THREE.CanvasTexture(barC); barTex.wrapS = THREE.RepeatWrapping;
   const fenceM = mat(0x2463e6, 0.3, 0.45);
-  const fence = (x0, x1) => { const z = 15, L = x1 - x0; box(L, 0.08, 0.08, fenceM, (x0+x1)/2, 1.5, z); box(L, 0.08, 0.08, fenceM, (x0+x1)/2, 0.25, z);
-    for (let x = x0; x <= x1 + 0.01; x += 0.35) box(0.05, 1.3, 0.05, fenceM, x, 0.85, z).castShadow = false;
-    for (let x = x0; x <= x1 + 0.01; x += 3) box(0.16, 1.7, 0.16, fenceM, x, 0.85, z); };
-  fence(-25, -20.2); fence(-11.8, 11.8); fence(20.2, 25);
-  for (const gx of [-16, 16]) for (const x of [gx - 4.2, gx + 4.2]) { box(0.45, 2.2, 0.45, fenceM, x, 1.1, 15); box(0.6, 0.15, 0.6, M.yellow, x, 2.25, 15); }
-  // guardhouse next to the right gate
-  const hx = 22.3, hz = 12.6;
-  box(2.6, 2.4, 2.2, M.wall, hx, 1.2, hz); box(3.0, 0.22, 2.6, M.blue, hx, 2.5, hz);
-  box(2.0, 0.8, 0.05, M.glass, hx, 1.6, hz + 1.11); box(0.05, 0.8, 1.4, M.glass, hx - 1.31, 1.6, hz);
-  box(0.9, 1.9, 0.05, M.blue, hx + 0.6, 0.95, hz - 1.11);
-  // sidewalk along the road
-  box(160, 0.1, 1.4, M.concrete, 0, 0.05, 15.9);
-  // light poles
-  for (const [x, z] of [[-24, -16], [24, -16], [-24, 14], [-12, 14], [12, 14], [0, -16]]) {
-    const sx = x > 0 ? -1 : 1;
-    cylY(0.08, 4.2, M.dark, x, 2.1, z, 8); box(0.8, 0.12, 0.3, M.dark, x + sx*0.35, 4.2, z); box(0.5, 0.06, 0.24, M.white, x + sx*0.5, 4.13, z).castShadow = false;
-  }
-}
-
-// ---------------- office ----------------
-{
-  const ox = 19.5, oz = -9;
-  box(7, 3.2, 5, M.wall, ox, 1.6, oz); box(7.4, 0.3, 5.4, M.blue, ox, 3.35, oz);
-  for (const dx of [-2.2, 0, 2.2]) box(1.4, 1.1, 0.05, M.glass, ox + dx, 1.9, oz + 2.52);
-  box(1.1, 2.1, 0.06, M.blue, ox - 2.9, 1.05, oz + 2.53);
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.3), new THREE.MeshBasicMaterial({map: labelTex(['PARECIS TELHA', 'telhas galvanizadas'], 1024, 224, '#ffbe0b', '#1d2433', 110)}));
-  sign.position.set(ox, 4.25, oz + 1.2); sign.rotation.x = -0.35; scene.add(sign);
-  box(0.12, 1.2, 0.12, M.dark, ox - 2.6, 3.9, oz + 1.2); box(0.12, 1.2, 0.12, M.dark, ox + 2.6, 3.9, oz + 1.2);
-  box(7.0, 0.35, 0.06, M.blue, ox, 2.65, oz + 2.53); box(1.0, 0.5, 0.8, M.gray, ox + 2.2, 3.75, oz - 1.2); box(1.0, 0.5, 0.8, M.gray, ox + 0.8, 3.75, oz - 1.4);
-  for (const x of [ox - 4.2, ox + 4.2]) { box(1.2, 0.3, 1.2, M.green, x, 0.2, oz + 3.2); tree(x, oz + 3.2, 0.55); }
-}
-// ---------------- parking + cars ----------------
-{
-  const px0 = 15.5, px1 = 24, pz0 = -4.2, pz1 = 1.8;
-  box(px1 - px0, 0.03, pz1 - pz0, M.asphalt, (px0+px1)/2, 0.075, (pz0+pz1)/2).castShadow = false;
-  for (let x = px0 + 0.1; x <= px1; x += 2.1) box(0.1, 0.02, 2.4, M.white, x, 0.1, pz0 + 1.3).castShadow = false;
+  const fence = (x0, x1) => { const L = x1 - x0, xc = (x0 + x1)/2;
+    const t = barTex.clone(); t.needsUpdate = true; t.repeat.set(L/4, 1);
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(L, 1.5), new THREE.MeshStandardMaterial({map:t, transparent:true, alphaTest:0.5, side:THREE.DoubleSide, metalness:0.3, roughness:0.5}));
+    p.position.set(xc, 0.85, FENCE_Z); scene.add(p);
+    box(L, 0.1, 0.1, fenceM, xc, 1.62, FENCE_Z); box(L, 0.1, 0.1, fenceM, xc, 0.12, FENCE_Z);
+    for (let x = x0; x <= x1 + 0.01; x += 6) box(0.18, 1.8, 0.18, fenceM, x, 0.9, FENCE_Z); };
+  fence(YARD_X0, GATE_IN_X - 6.5); fence(GATE_IN_X + 6.5, GATE_OUT_X - 6.5); fence(GATE_OUT_X + 6.5, YARD_X1);
+  for (const gx of [GATE_IN_X, GATE_OUT_X]) for (const x of [gx - 6.5, gx + 6.5]) { box(0.5, 2.4, 0.5, fenceM, x, 1.2, FENCE_Z); box(0.7, 0.16, 0.7, M.yellow, x, 2.48, FENCE_Z); }
+  // portaria
+  const hx = GATE_IN_X + 11, hz = FENCE_Z - 3;
+  box(3.2, 2.6, 2.6, M.wall, hx, 1.3, hz); box(3.7, 0.25, 3.1, M.blue, hx, 2.72, hz);
+  box(2.4, 0.9, 0.05, M.glass, hx, 1.7, hz + 1.31); box(0.05, 0.9, 1.8, M.glass, hx - 1.61, 1.7, hz);
+  // escritório + estacionamento na frente do barracão 1
+  const ox = X0 + 40, oz = 7;
+  box(12, 3.6, 6, M.wall, ox, 1.8, oz); box(12.6, 0.35, 6.6, M.blue, ox, 3.75, oz);
+  for (const dx of [-4, -1.3, 1.3, 4]) box(2.0, 1.3, 0.05, M.glass, ox + dx, 2.1, oz - 3.02);
+  box(1.4, 2.4, 0.06, M.blue, ox - 5.4, 1.2, oz - 3.03); box(12, 0.35, 0.06, M.blue, ox, 3.0, oz - 3.03);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.6), new THREE.MeshBasicMaterial({map: labelTex(['PARECIS TELHA', 'telhas e perfis'], 1024, 205, '#ffbe0b', '#1d2433', 110)}));
+  sign.position.set(ox, 4.8, oz); sign.rotation.x = -0.5; scene.add(sign);
+  for (const s of [-1, 1]) box(0.14, 1.4, 0.14, M.dark, ox + s*3.4, 4.6, oz);
+  box(1.4, 0.6, 1.0, M.gray, ox + 3, 4.2, oz + 1.5); box(1.4, 0.6, 1.0, M.gray, ox + 1, 4.2, oz + 1.5);
+  const px0 = ox + 8, px1 = ox + 30;
+  box(px1 - px0, 0.03, 8, M.asphalt, (px0 + px1)/2, 0.075, oz).castShadow = false;
+  for (let x = px0 + 0.2; x <= px1; x += 2.6) box(0.12, 0.02, 4.4, M.white, x, 0.1, oz + 1.6).castShadow = false;
   const car = (x, z, color) => { const g = new THREE.Group(); g.position.set(x, 0, z); scene.add(g); const c = mat(color, 0.3, 0.35);
-    box(1.6, 0.55, 2.9, c, 0, 0.55, 0, g); box(1.4, 0.45, 1.5, c, 0, 1.05, -0.1, g); box(1.42, 0.32, 1.3, M.glass, 0, 1.05, -0.1, g);
-    for (const [wx, wz] of [[-0.75, 0.95], [0.75, 0.95], [-0.75, -0.95], [0.75, -0.95]]) { const w = cylZ(0.3, 0.2, M.rubber, wx, 0.3, wz, 12, g); w.rotation.y = Math.PI/2; } };
-  car(px0 + 1.15, pz0 + 1.4, 0xffffff); car(px0 + 3.25, pz0 + 1.4, 0xe53935); car(px0 + 7.45, pz0 + 1.4, 0x2463e6);
+    box(1.7, 0.6, 3.6, c, 0, 0.6, 0, g); box(1.5, 0.5, 1.8, c, 0, 1.15, -0.1, g); box(1.52, 0.36, 1.6, M.glass, 0, 1.15, -0.1, g);
+    for (const [wx, wz] of [[-0.8, 1.2], [0.8, 1.2], [-0.8, -1.2], [0.8, -1.2]]) { const w = cylZ(0.33, 0.22, M.rubber, wx, 0.33, wz, 12, g); w.rotation.y = Math.PI/2; } };
+  car(px0 + 1.5, oz + 1.6, 0xffffff); car(px0 + 4.1, oz + 1.6, 0xe53935); car(px0 + 9.3, oz + 1.6, 0x2463e6); car(px0 + 14.5, oz + 1.6, 0x22b45a);
+  for (const x of [ox - 8, ox - 10.5]) { box(1.5, 0.35, 1.5, M.green, x, 0.2, oz); tree(x, oz, 0.6); }
+  // caixa d'água
+  const tx = YARD_X0 + 8, tz = YARD_Z0 + 7, legM = mat(0x5b6370, 0.5, 0.5), tank = mat(0xf2f4f6, 0.2, 0.5);
+  for (const [dx, dz] of [[-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]]) box(0.2, 8, 0.2, legM, tx + dx, 4, tz + dz);
+  for (const y of [2.5, 5]) { box(2.5, 0.1, 0.1, legM, tx, y, tz - 1.2); box(2.5, 0.1, 0.1, legM, tx, y, tz + 1.2); box(0.1, 0.1, 2.5, legM, tx - 1.2, y, tz); box(0.1, 0.1, 2.5, legM, tx + 1.2, y, tz); }
+  cylY(2.0, 3, tank, tx, 9.5, tz, 24); add(new THREE.Mesh(new THREE.ConeGeometry(2.1, 1.1, 24), M.blue), tx, 11.55, tz); box(4, 0.1, 4, legM, tx, 8, tz);
+  // postes
+  for (let x = 0; x <= SITE_X1; x += 36) { const z = FENCE_Z - 1.2;
+    cylY(0.09, 5.2, M.dark, x, 2.6, z, 8); box(1.0, 0.14, 0.34, M.dark, x, 5.2, z - 0.4); box(0.6, 0.06, 0.26, M.white, x, 5.12, z - 0.6).castShadow = false; }
+  // árvores em volta
+  for (let x = YARD_X0 - 10; x <= YARD_X1 + 10; x += 6.5) { tree(x + rnd()*2, YARD_Z0 - 5 - rnd()*4, 1.0 + rnd()*0.6); tree(x + rnd()*2, ROAD_Z + 9 + rnd()*5, 0.9 + rnd()*0.6); }
+  for (let z = YARD_Z0; z <= FENCE_Z; z += 6) { tree(YARD_X0 - 5 - rnd()*3, z, 1 + rnd()*0.5); tree(YARD_X1 + 5 + rnd()*3, z, 1 + rnd()*0.5); }
 }
-// ---------------- water tower ----------------
-{
-  const tx = 22.8, tz = -14.6, legM = mat(0x5b6370, 0.5, 0.5), tank = mat(0xf2f4f6, 0.2, 0.5);
-  for (const [dx, dz] of [[-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9], [0.9, 0.9]]) box(0.16, 5.5, 0.16, legM, tx + dx, 2.75, tz + dz);
-  for (const y of [1.6, 3.4]) { box(1.9, 0.08, 0.08, legM, tx, y, tz - 0.9); box(1.9, 0.08, 0.08, legM, tx, y, tz + 0.9); box(0.08, 0.08, 1.9, legM, tx - 0.9, y, tz); box(0.08, 0.08, 1.9, legM, tx + 0.9, y, tz); }
-  cylY(1.45, 2.2, tank, tx, 6.6, tz, 24); add(new THREE.Mesh(new THREE.ConeGeometry(1.55, 0.8, 24), M.blue), tx, 8.1, tz);
-  box(3.0, 0.08, 3.0, legM, tx, 5.5, tz);
-}
-
-// ---------------- locked plots (to buy later) ----------------
-function lockedPlot(cx, cz, w, d, title, price){
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({color:0x1d2433, transparent:true, opacity:0.14})); m.rotation.x = -Math.PI/2; m.position.set(cx, 0.08, cz); scene.add(m);
-  const dash = M.white; const seg = 1.0;
-  for (let x = cx - w/2; x < cx + w/2 - 0.1; x += seg*2) { box(seg, 0.02, 0.12, dash, x + seg/2, 0.09, cz - d/2).castShadow = false; box(seg, 0.02, 0.12, dash, x + seg/2, 0.09, cz + d/2).castShadow = false; }
-  for (let z = cz - d/2; z < cz + d/2 - 0.1; z += seg*2) { box(0.12, 0.02, seg, dash, cx - w/2, 0.09, z + seg/2).castShadow = false; box(0.12, 0.02, seg, dash, cx + w/2, 0.09, z + seg/2).castShadow = false; }
-  const lab = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2.0), new THREE.MeshBasicMaterial({map: labelTex(['🔒 ' + title, 'R$ ' + price], 640, 246, '#ffffff', '#1d2433', 84), transparent:true}));
-  lab.rotation.x = -Math.PI/2; lab.position.set(cx, 0.1, cz); scene.add(lab);
-}
-lockedPlot(-3, -12.5, 17, 6, 'LINHA 2', '65.000');
-lockedPlot(-17.5, -12.5, 8, 6, 'ESTOQUE 2', '25.000');
-lockedPlot(9.5, -12.5, 9, 6, 'GALPÃO 2', '120.000');
 
 // ================= PRODUCTION LINE (machine-local coords, same as the simulator) =================
 const W = 1.0, A = 0.028, PER = 0.2, R0 = 0.55, RC = 0.2, COIL_TOTAL = 30, LP = 1.3, STACK_N = 8, NEST = 0.012;
 const E = new THREE.Vector2(0, 0.98), C = new THREE.Vector2(-1.45, 1.0);
 const X_CUT = 4.15, TABLE_Y = 0.97, TX0 = 4.25, TX1 = 7.6, NST = 7, ST_X0 = 0.35, ST_DX = 0.47;
 const rib = z => A * Math.tanh(3 * Math.sin(2 * Math.PI * z / PER)) / Math.tanh(3);
-const LINE = new THREE.Group(); LINE.position.set(-4.5, 0, -1); scene.add(LINE);
-const toWorld = (x, y, z) => new V3(x, y, z).add(LINE.position);
+const LINE = new THREE.Group(); LINE.position.set(vagaCX(0), 0, -24); LINE.rotation.y = -Math.PI/2; scene.add(LINE); LINE.updateMatrixWorld(true);   // vaga 1: bobina no fundo, saída na frente
+const toWorld = (x, y, z) => LINE.localToWorld(new V3(x, y, z));
 ROOT = LINE;
 box(4.6, 0.22, 0.85, M.blue, 2.0, 0.66, 0); box(4.4, 0.12, 0.3, M.blue, 2.0, 0.28, 0);
 for (const x of [0.1, 1.4, 2.7, 3.9]) for (const s of [-1, 1]) box(0.18, 0.6, 0.16, M.blue, x, 0.3, s*0.32);
@@ -335,12 +366,48 @@ const PANEL_GEO = panelGeometry(LP);
 ROOT = scene;
 const L_CORE = tangentPoint(RC).sub(E).length();
 
-// ---------------- coil rack + shipping pallets ----------------
-const RACK_X = -13.5, RACK_Z = [-4.5, -2.7, -0.9], RACK_Y = 0.62;
-for (const z of RACK_Z) for (const dx of [-0.3, 0.3]) box(0.22, 0.16, 1.15, M.wood, RACK_X + dx, 0.08, z);
-box(0.12, 0.05, 5.4, M.dark, RACK_X - 0.6, 0.03, -2.7);
-const SLOT_X = [5.5, 7.5, 9.5, 11.5], SLOT_Z = 5.1, PALLET_TOP = 0.15;
-for (const x of SLOT_X) { for (const dz of [-0.45, 0, 0.45]) box(1.5, 0.1, 0.12, M.wood, x, 0.05, SLOT_Z + dz); box(1.5, 0.04, 1.15, M.wood, x, 0.12, SLOT_Z); }
+// ---------------- estoque (berços) + expedição (pallets) ----------------
+const RACK = []; for (const z of [-34, -29, -24]) for (const x of [X0 + 5, X0 + 9, X0 + 13]) RACK.push({x, z});
+const RACK_Y = 0.74;
+for (const r of RACK) for (const dz of [-0.3, 0.3]) box(1.2, 0.18, 0.24, M.wood, r.x, 0.19, r.z + dz);
+const SLOTS = []; for (let i = 0; i < 6; i++) SLOTS.push({x: X0 + 116.5 + i*2.6, z: -16.2});
+const PALLET_TOP = 0.21;
+for (const s of SLOTS) { for (const dz of [-0.45, 0, 0.45]) box(1.5, 0.1, 0.12, M.wood, s.x, 0.12, s.z + dz); box(1.5, 0.04, 1.15, M.wood, s.x, 0.19, s.z); }
+
+// ---------------- ponte rolante ----------------
+const SAFE_Y = 6.0;
+function makeCrane(){
+  const g = new THREE.Group(); scene.add(g);
+  const zc = (Z_BACK + Z_FRONT)/2, span = SHED_D - 2, gy = RUNWAY_Y + 1.0, yel = mat(0xffc400, 0.2, 0.5);
+  for (const dx of [-0.75, 0.75]) box(0.55, 1.1, span + 0.8, yel, dx, gy, zc, g);
+  for (const z of [Z_BACK + 1, Z_FRONT - 1]) { box(4.2, 0.75, 1.0, yel, 0, RUNWAY_Y + 0.85, z, g); for (const dx of [-1.6, 1.6]) cylZ(0.3, 0.3, M.dark, dx, RUNWAY_Y + 0.55, z, 12, g).rotation.y = Math.PI/2; }
+  for (const s of [-1, 1]) { const t = new THREE.Mesh(new THREE.PlaneGeometry(7, 0.9), new THREE.MeshBasicMaterial({map: labelTex(['PONTE 1 · 10 t'], 896, 115, '#ffc400', '#1d2433', 80)}));
+    t.position.set(s*1.04, gy, zc + 8); t.rotation.y = s*Math.PI/2; g.add(t); }
+  const trolley = new THREE.Group(); g.add(trolley); trolley.position.set(0, gy + 0.55, zc);
+  box(2.6, 0.8, 2.3, mat(0x3a3f47, 0.4, 0.5), 0, 0.4, 0, trolley); box(1.3, 0.7, 1.3, M.red, 0.4, 1.1, 0, trolley); cylZ(0.35, 1.6, M.dark, -0.6, 0.0, 0, 14, trolley);
+  const cable = cylY(0.035, 1, M.dark, 0, -0.5, 0, 6, trolley);
+  const hook = new THREE.Group(); trolley.add(hook);
+  box(1.0, 0.45, 0.45, yel, 0, 0.22, 0, hook); box(0.14, 0.4, 0.14, M.dark, 0, -0.15, 0, hook); box(0.5, 0.1, 0.14, M.dark, 0, -0.38, 0, hook);
+  return {g, trolley, hook, cable, gy: gy + 0.55, bx:0, tz:zc, hy:SAFE_Y, goal:null, idle:0};
+}
+function applyCrane(c){
+  c.g.position.x = c.bx; c.trolley.position.z = c.tz;
+  const ly = c.hy - c.gy; c.hook.position.y = ly; c.cable.position.y = ly/2 + 0.2; c.cable.scale.y = Math.max(0.05, -ly + 0.4);
+}
+const moveTo = (v, t, s) => Math.abs(t - v) <= s ? t : v + Math.sign(t - v)*s;
+function updateCrane(c, dt){
+  const gl = c.goal; if (!gl) { applyCrane(c); return; }
+  const needH = Math.abs(gl.x - c.bx) > 0.005 || Math.abs(gl.z - c.tz) > 0.005;
+  if (needH && c.hy < SAFE_Y - 0.005) c.hy = moveTo(c.hy, SAFE_Y, 1.8*dt);
+  else if (needH) { c.bx = moveTo(c.bx, gl.x, 5.5*dt); c.tz = moveTo(c.tz, gl.z, 3.2*dt); }
+  else { c.hy = moveTo(c.hy, gl.y, 1.8*dt); if (Math.abs(c.hy - gl.y) < 0.002) c.goal = null; }
+  applyCrane(c);
+}
+const crane = makeCrane(); const CRANE_PARK = {x: X0 + 17, z: -20, y: SAFE_Y};
+crane.bx = CRANE_PARK.x; crane.tz = CRANE_PARK.z; applyCrane(crane);
+const hookOffset = obj => { obj.updateMatrixWorld(true); const top = new THREE.Box3().setFromObject(obj).max.y; return top + 0.45 - obj.getWorldPosition(new V3()).y; };
+const craneGo = fn => ({start(){ crane.goal = fn(); }, done:() => !crane.goal});
+function cranePick(obj){ crane.hook.attach(obj); obj.userData.cargo = true; }
 
 // ---------------- vehicles ----------------
 function makeTruck(cabColor){
@@ -412,13 +479,15 @@ class Mover {
 }
 const H_PX = 0, H_NX = Math.PI, H_NZ = Math.PI/2, H_PZ = -Math.PI/2;   // headings for a model facing +x
 
+// ---------------- veículos ----------------
 const coilTruck = makeTruck(0xe53935), shipTruck = makeTruck(0x2463e6);
-const CT = new Mover(coilTruck.g, 6, 1.6), ST = new Mover(shipTruck.g, 6, 1.6);
-CT.place(-70, 19, H_PX); ST.place(70, 19, H_NX);
+const CT = new Mover(coilTruck.g, 8, 1.4), ST = new Mover(shipTruck.g, 8, 1.4);
+const OFF = [-300, ROAD_Z + 1.8];
+CT.place(OFF[0], OFF[1], H_PX); ST.place(OFF[0] - 20, OFF[1], H_PX);
 const fkA = makeForklift(0xffbe0b), fkB = makeForklift(0xff7a1a);
-const FA = new Mover(fkA.g, 2.6, 3.2), FB = new Mover(fkB.g, 2.6, 3.2);
-const HOME_A = [-11, 4.5], HOME_B = [8, 1.6];
-FA.place(HOME_A[0], HOME_A[1], H_NZ); FB.place(HOME_B[0], HOME_B[1], H_NZ);
+const FA = new Mover(fkA.g, 2.6, 3.2), FB = new Mover(fkB.g, 3.0, 3.2);
+const HOME_B = [X0 + 40, LANE_Z];
+FA.place(X0 + SHED_L + 6, LANE_Z, H_PX); FB.place(HOME_B[0], HOME_B[1], H_PX);   // a amarela fica na passagem entre os barracões
 const FORK_REACH = 1.45;
 useForkliftModel(fkA, 'empilhadeira_a.txt?v=1'); useForkliftModel(fkB, 'empilhadeira_b.txt?v=1');
 
@@ -444,15 +513,14 @@ function loadWorker(file, x, z, h, clip){
   next(0);
 }
 const opPos = toWorld(3.45, 0, 1.35);
-loadWorker('operador.txt?v=8', opPos.x, opPos.z, Math.PI, 'Look');
-loadWorker('ajudante.txt?v=8', -11.3, 7.5, Math.PI * 0.75, 'Radio');
+loadWorker('operador.txt?v=8', opPos.x, opPos.z, Math.PI + LINE.rotation.y, 'Look');
+loadWorker('ajudante.txt?v=8', X0 + 16.6, -19, Math.PI * 0.5, 'Radio');
 
 // ================= GAME STATE =================
 const S = { money:5000, sheets:0, coilLen:COIL_TOTAL, decHas:'coil', v:0, spin:0, roll:0, segReveal:X_CUT, feedFrac:1,
-  current:null, sliding:[], stack:[], ready:null, blade:0, rack:[null, null, null], slots:[null, null, null, null],
-  ctCoils:[], ctState:'away', stState:'away', stLoad:[], speedMul:1 };
-// start with two coils on the rack
-for (let i = 0; i < 2; i++) { const c = makeCoil(); c.position.set(RACK_X, RACK_Y, RACK_Z[i]); scene.add(c); S.rack[i] = c; }
+  current:null, sliding:[], stack:[], ready:null, blade:0, rack:Array(9).fill(null), slots:Array(6).fill(null),
+  truck:null, speedMul:1, feeding:false };
+for (let i = 0; i < 4; i++) { const c = makeCoil(); c.position.set(RACK[i].x, RACK_Y, RACK[i].z); c.rotation.y = Math.PI/2; scene.add(c); S.rack[i] = c; }
 
 // ---------------- sequences (one per actor) ----------------
 function runSeq(steps){ return {steps, i:0, started:false, t:0}; }
@@ -464,7 +532,6 @@ function tickSeq(sq, dt){
   if (sq.t > 0.03 && (!s.done || s.done(sq.t))) { s.end && s.end(); sq.i++; sq.started = false; }
   return sq.i >= sq.steps.length;
 }
-// lift helper
 function liftTo(fk, y){ fk.target = y; }
 function liftDone(fk){ return Math.abs(fk.liftY - (fk.target ?? fk.liftY)) < 0.005; }
 function updateLift(fk, dt){ if (fk.target == null) return; const d = fk.target - fk.liftY, s = Math.min(Math.abs(d), 0.8*dt); fk.liftY += Math.sign(d)*s; fk.lift.position.y = fk.liftY; }
@@ -477,90 +544,96 @@ function drop(obj, x, y, z, snapYaw){
   scene.attach(obj); obj.userData.cargo = false; obj.position.set(x, y, z);
   if (snapYaw) obj.rotation.set(0, Math.round(obj.rotation.y / (Math.PI/2)) * (Math.PI/2), 0);
 }
+const snap = o => o.rotation.set(0, Math.round(o.rotation.y / (Math.PI/2)) * (Math.PI/2), 0);
 
-// forklift A: coils
-let seqA = null, seqB = null;
-function planA(){
-  // 1) feed the decoiler
-  const rackIdx = S.rack.findIndex(c => c);
-  if (S.decHas !== 'coil' && rackIdx >= 0 && !S.feeding) {
-    S.feeding = true; const z = RACK_Z[rackIdx], dec = toWorld(C.x, C.y, 0); let coil = null;
-    const ax = dec.x - FORK_REACH;
+// ponte: abastece a máquina, descarrega o caminhão de bobina, carrega o caminhão de telha
+let seqC = null, seqB = null;
+function planCrane(){
+  const T = S.truck;
+  const ri = S.rack.findIndex(c => c);
+  if (S.decHas !== 'coil' && ri >= 0 && !S.feeding) {
+    S.feeding = true; const coil = S.rack[ri], r = RACK[ri], dec = toWorld(C.x, C.y, 0); let off = 0;
     return runSeq([
-      lift(fkA, 0), go(FA, [[-10.5, FA.pos.z], [-10.5, z], [RACK_X + FORK_REACH, z]]),
-      act(() => { coil = S.rack[rackIdx]; S.rack[rackIdx] = null; pickUp(fkA, coil); }), lift(fkA, 0.12),
-      go(FA, [[-10.5, z, true], [-10.5, dec.z]]), lift(fkA, dec.y - RACK_Y + 0.02), go(FA, [[ax, dec.z]]),
-      act(() => { scene.remove(coil); S.decHas = 'coil'; S.coilLen = COIL_TOTAL; S.segReveal = 0; S.feedFrac = 0; S.feeding = false; }),
-      go(FA, [[-10.5, dec.z, true]]), lift(fkA, 0), go(FA, [[-10.5, HOME_A[1]], HOME_A])
+      craneGo(() => { off = hookOffset(coil); return {x:r.x, z:r.z, y:RACK_Y + off}; }), wait(0.25),
+      act(() => { S.rack[ri] = null; cranePick(coil); }),
+      craneGo(() => ({x:dec.x, z:dec.z, y:dec.y + off})), wait(0.25),
+      act(() => { crane.hook.remove(coil); S.decHas = 'coil'; S.coilLen = COIL_TOTAL; S.segReveal = 0; S.feedFrac = 0; S.feeding = false; })
     ]);
   }
-  // 2) unload the coil truck into the rack
   const free = S.rack.findIndex(c => !c);
-  if (S.ctState === 'docked' && S.ctCoils.length && free >= 0) {
-    const coil = S.ctCoils[S.ctCoils.length - 1], wp = coil.getWorldPosition(new V3()), z = RACK_Z[free];
+  if (T && T.kind === 'coil' && T.state === 'docked' && T.cargo.length && free >= 0) {
+    const coil = T.cargo[T.cargo.length - 1], r = RACK[free]; let off = 0;
+    S.rack[free] = coil;
     return runSeq([
-      lift(fkA, wp.y - RACK_Y + 0.0), go(FA, [[-19.6, FA.pos.z < 6 ? 5.5 : FA.pos.z], [-19.6, wp.z], [wp.x - FORK_REACH, wp.z]]),
-      act(() => { S.ctCoils.pop(); pickUp(fkA, coil); }), lift(fkA, wp.y - RACK_Y + 0.12),
-      go(FA, [[-19.6, wp.z, true], [-19.6, 5.5], [-10.5, 5.5]]), lift(fkA, 0.04), go(FA, [[-10.5, z], [RACK_X + FORK_REACH, z]]),
-      act(() => { drop(coil, RACK_X, RACK_Y, z, true); S.rack[free] = coil; }), lift(fkA, 0),
-      go(FA, [[-10.5, z, true], [-10.5, HOME_A[1]], HOME_A])
+      craneGo(() => { const p = coil.getWorldPosition(new V3()); off = hookOffset(coil); return {x:p.x, z:p.z, y:p.y + off}; }), wait(0.25),
+      act(() => { T.cargo.pop(); cranePick(coil); }),
+      craneGo(() => ({x:r.x, z:r.z, y:RACK_Y + off})), wait(0.2),
+      act(() => { scene.attach(coil); coil.userData.cargo = false; coil.position.set(r.x, RACK_Y, r.z); coil.rotation.set(0, Math.PI/2, 0); })
+    ]);
+  }
+  const si = S.slots.findIndex(s => s);
+  if (T && T.kind === 'ship' && T.state === 'docked' && T.cargo.length < 3 && si >= 0) {
+    const st = S.slots[si], k = T.cargo.length, local = new V3(-2.0 + k*1.75, 0.08, 0); let off = 0;
+    S.slots[si] = null; T.cargo.push(st);
+    return runSeq([
+      craneGo(() => { off = hookOffset(st); return {x:st.position.x, z:st.position.z, y:st.position.y + off}; }), wait(0.25),
+      act(() => cranePick(st)),
+      craneGo(() => { const w = shipTruck.bed.localToWorld(local.clone()); return {x:w.x, z:w.z, y:w.y + off}; }), wait(0.2),
+      act(() => { shipTruck.bed.attach(st); st.userData.cargo = false; st.position.copy(local); snap(st); })
     ]);
   }
   return null;
 }
-// forklift B: sheet stacks
+// empilhadeira vermelha: leva a pilha da mesa da máquina até a expedição pela faixa
 function planB(){
   const free = S.slots.findIndex(s => !s);
   if (S.ready && free >= 0) {
-    const st = S.ready, wp = st.position.clone(), sx = SLOT_X[free];
+    const st = S.ready, wp = st.position.clone(), s = SLOTS[free];
     return runSeq([
-      lift(fkB, wp.y - 0.06), go(FB, [[wp.x, 2.6], [wp.x, wp.z + FORK_REACH]]),
+      lift(fkB, wp.y - 0.06), go(FB, [[wp.x, LANE_Z], [wp.x, wp.z + FORK_REACH]]),
       act(() => { S.ready = null; pickUp(fkB, st); }), lift(fkB, wp.y + 0.1),
-      go(FB, [[wp.x, 2.6, true], [sx, 2.6]]), go(FB, [[sx, SLOT_Z - FORK_REACH]]), lift(fkB, PALLET_TOP + 0.02),
-      act(() => { drop(st, sx, PALLET_TOP, SLOT_Z, true); S.slots[free] = st; }), lift(fkB, 0),
-      go(FB, [[sx, 2.6, true], HOME_B])
-    ]);
-  }
-  const filled = S.slots.findIndex(s => s);
-  if (S.stState === 'docked' && S.stLoad.length < 3 && filled >= 0) {
-    const st = S.slots[filled], sx = SLOT_X[filled], k = S.stLoad.length;
-    const spot = shipTruck.bed.localToWorld(new V3(-2.0 + k*1.75, 0.08, 0));
-    return runSeq([
-      lift(fkB, PALLET_TOP - 0.04), go(FB, [[sx, 2.6], [sx, SLOT_Z - FORK_REACH]]),
-      act(() => { S.slots[filled] = null; pickUp(fkB, st); }), lift(fkB, 0.3),
-      go(FB, [[sx, 2.6, true], [13.6, 2.6], [13.6, spot.z]]), lift(fkB, spot.y + 0.05), go(FB, [[spot.x - FORK_REACH, spot.z]]),
-      act(() => { st.userData.cargo = false; shipTruck.bed.attach(st); st.position.set(-2.0 + k*1.75, 0.08, 0); st.rotation.set(0, 0, 0); S.stLoad.push(st); }), lift(fkB, 0.3),
-      go(FB, [[13.6, spot.z, true], [13.6, 2.6]]), lift(fkB, 0), go(FB, [HOME_B])
+      go(FB, [[wp.x, LANE_Z, true], [s.x, LANE_Z]]), go(FB, [[s.x, s.z + FORK_REACH]]), lift(fkB, PALLET_TOP + 0.02),
+      act(() => { drop(st, s.x, PALLET_TOP, s.z, true); S.slots[free] = st; }), lift(fkB, 0),
+      go(FB, [[s.x, LANE_Z, true], HOME_B])
     ]);
   }
   return null;
 }
 
-// trucks
-function updateTrucks(){
-  const rackCount = S.rack.filter(Boolean).length + (S.decHas === 'coil' ? 0 : 0);
-  if (S.ctState === 'away' && rackCount <= 1) {
-    S.ctState = 'coming'; CT.place(-70, 19, H_PX);
-    for (let i = 0; i < 2; i++) { const c = makeCoil(); coilTruck.bed.add(c); c.position.set(-1.6 + i*1.7, 0.06 + R0, 0); c.rotation.y = Math.PI/2; S.ctCoils.push(c); }
-    CT.go([[-19.5, 19], [-16, 16.2], [-16, 10]], () => { S.ctState = 'docked'; });
-  }
-  if (S.ctState === 'docked' && !S.ctCoils.length && !FA.busy && !seqA) {
-    S.ctState = 'leaving'; CT.go([[-16, 16.5, true], [-12, 19], [75, 19]], () => { S.ctState = 'away'; });
-    pop(CT.pos.clone().setY(3), '-R$ 2.400 bobinas', '#ffd2d2');
-    S.money -= 2400;
-  }
-  const filled = S.slots.filter(Boolean).length;
-  if (S.stState === 'away' && filled >= 3) {
-    S.stState = 'coming'; ST.place(70, 19, H_NX);
-    ST.go([[19.5, 19], [16, 16.2], [16, 10]], () => { S.stState = 'docked'; });
-  }
-  if (S.stState === 'docked' && S.stLoad.length >= 3 && !seqB) {
-    S.stState = 'leaving';
-    const value = S.stLoad.length * STACK_N * 140;
-    ST.go([[16, 16.5, true], [12, 19], [-75, 19]], () => {
-      S.stState = 'away'; S.stLoad.forEach(st => shipTruck.bed.remove(st)); S.stLoad = [];
+// caminhões: entram pelo portão da esquerda, passam por dentro do barracão e saem pela direita
+function truckPathIn(stopX){ return [[GATE_IN_X - 14, OFF[1]], [GATE_IN_X - 2, ROAD_Z - 8], [GATE_IN_X, CORR_Z + 6], [GATE_IN_X + 7, CORR_Z], [stopX, CORR_Z]]; }
+function startTruck(kind){
+  const tr = kind === 'coil' ? coilTruck : shipTruck, mv = kind === 'coil' ? CT : ST;
+  const T = {kind, tr, mv, state:'in', cargo:[]};
+  if (kind === 'coil') for (let i = 0; i < 3; i++) { const c = makeCoil(); tr.bed.add(c); c.position.set(-2.0 + i*1.6, 0.06 + R0, 0); c.rotation.y = Math.PI/2; T.cargo.push(c); }
+  const stopX = (kind === 'coil' ? X0 + 10 : X0 + 123) + 0.65;
+  mv.place(GATE_IN_X - 120, OFF[1], H_PX);
+  mv.go(truckPathIn(stopX), () => { T.state = 'docked'; });
+  S.truck = T;
+}
+function leaveTruck(T){
+  T.state = 'out';
+  if (T.kind === 'coil') { S.money -= 3600; pop(T.mv.pos.clone().setY(4), '-R$ 3.600 bobinas', '#ffd2d2'); }
+  else { const value = T.cargo.length * STACK_N * 140; S.money += value; pop(T.mv.pos.clone().setY(4.5), '+R$ ' + fmtMoney(value)); }
+  T.mv.go([[X0 + SHED_L + 10, CORR_Z]], () => {
+    S.truck = null;                                           // libera o corredor do barracão 1 para o próximo
+    T.mv.go([[GATE_OUT_X - 7, CORR_Z], [GATE_OUT_X, CORR_Z + 6], [GATE_OUT_X + 2, ROAD_Z - 8], [GATE_OUT_X + 16, OFF[1]], [GATE_OUT_X + 220, OFF[1]]], () => {
+      T.cargo.forEach(o => T.tr.bed.remove(o)); T.cargo = [];
+      T.mv.place(OFF[0], OFF[1], H_PX);
     });
-    setTimeout(() => { S.money += value; pop(ST.pos.clone().setY(3.5), '+R$ ' + fmtMoney(value)); }, 900);
+  });
+}
+function updateTrucks(){
+  const rackCount = S.rack.filter(Boolean).length, filled = S.slots.filter(Boolean).length;
+  const ctFree = !CT.busy && CT.pos.x < -200, stFree = !ST.busy && ST.pos.x < -200;
+  if (!S.truck) {
+    if (filled >= 3 && stFree) startTruck('ship');
+    else if (rackCount <= 5 && ctFree) startTruck('coil');
+  }
+  const T = S.truck;
+  if (T && T.state === 'docked' && !seqC) {
+    if (T.kind === 'coil' && !T.cargo.length) leaveTruck(T);
+    if (T.kind === 'ship' && T.cargo.length >= 3) leaveTruck(T);
   }
 }
 
@@ -603,7 +676,7 @@ function stepMachine(dt){
     if (t >= 1) { s.m.position.y = s.yf; S.stack.push(s.m); S.sliding.splice(i, 1); }
   }
   if (!S.ready && S.stack.length >= STACK_N) {      // a full stack becomes one object the forklift can carry
-    const g = new THREE.Group(); const c = toWorld(TX1 - 0.12 - LP/2, TABLE_Y, 0); g.position.copy(c); scene.add(g);
+    const g = new THREE.Group(); const c = toWorld(TX1 - 0.12 - LP/2, TABLE_Y, 0); g.position.copy(c); scene.add(g); g.updateMatrixWorld(true);
     S.stack.forEach(m => g.attach(m)); S.stack = []; S.ready = g;
   }
   lampG.material.emissive.setHex(S.v > 0.01 ? 0x22b45a : 0); lampR.material.emissive.setHex(S.v > 0.01 ? 0 : 0xe53935);
@@ -630,29 +703,39 @@ let uiT = 0;
 function updateUI(){
   $('money').textContent = fmtMoney(S.money); $('sheets').textContent = S.sheets;
   const coilPct = S.decHas === 'coil' ? Math.round(100 * S.coilLen / COIL_TOTAL) : 0;
-  $('status').innerHTML = `Linha 1: <b>${S.v > 0.01 ? 'produzindo' : S.decHas !== 'coil' ? 'esperando bobina' : S.ready ? 'esperando a empilhadeira' : 'preparando'}</b> · bobina ${coilPct}%<br>`
-    + `Estoque de bobinas: <b>${S.rack.filter(Boolean).length}/3</b> · Expedição: <b>${S.slots.filter(Boolean).length}/4</b>`;
+  const T = S.truck, tr = !T ? 'nenhum caminhão' : T.kind === 'coil' ? (T.state === 'docked' ? 'descarregando bobinas' : 'caminhão de bobina chegando') : (T.state === 'docked' ? 'carregando telhas' : 'caminhão de entrega chegando');
+  $('status').innerHTML = `Vaga 1: <b>${S.v > 0.01 ? 'produzindo' : S.decHas !== 'coil' ? 'esperando bobina' : S.ready ? 'esperando a empilhadeira' : 'preparando'}</b> · bobina ${coilPct}%<br>`
+    + `Estoque: <b>${S.rack.filter(Boolean).length}/9</b> · Expedição: <b>${S.slots.filter(Boolean).length}/6</b><br>Corredor: <b>${tr}</b>`;
 }
 
 // ---------------- loop ----------------
 function resize(){ renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
-let last = performance.now();
+let last = performance.now(), shadowExt = 0;
+function followView(){
+  const t = controls.target, d = camera.position.distanceTo(t);
+  sun.position.set(t.x + 18, 40, t.z + 22); sun.target.position.copy(t); sun.target.updateMatrixWorld();
+  const e = Math.min(170, Math.max(40, d * 1.15));
+  if (Math.abs(e - shadowExt) > 3) { shadowExt = e; Object.assign(sun.shadow.camera, {left:-e, right:e, top:e*0.8, bottom:-e*0.8, far:120 + e}); sun.shadow.camera.updateProjectionMatrix(); }
+  scene.fog.near = d * 1.6; scene.fog.far = d * 4.5;
+  updateRoof(d);
+}
 function loop(now){
   const real = Math.min(0.05, (now - last)/1000); last = now; const dt = real * S.speedMul;
   stepMachine(dt);
-  if (!seqA) seqA = planA(); if (tickSeq(seqA, dt)) seqA = null;
+  if (!seqC) seqC = planCrane(); if (tickSeq(seqC, dt)) seqC = null;
+  if (!seqC && !crane.goal) { crane.idle += dt; if (crane.idle > 2.5 && (Math.abs(crane.bx - CRANE_PARK.x) > 0.5 || Math.abs(crane.tz - CRANE_PARK.z) > 0.5)) crane.goal = {...CRANE_PARK}; } else crane.idle = 0;
   if (!seqB) seqB = planB(); if (tickSeq(seqB, dt)) seqB = null;
   updateTrucks();
-  [CT, ST, FA, FB].forEach(m => m.update(dt)); updateLift(fkA, dt); updateLift(fkB, dt);
+  [CT, ST, FA, FB].forEach(m => m.update(dt)); updateLift(fkB, dt); updateCrane(crane, dt);
   workers.forEach(m => m.update(dt));
-  updatePops(real); updateRoof();
+  updatePops(real);
   uiT += real; if (uiT > 0.15) { uiT = 0; updateUI(); }
-  controls.update(); renderer.render(scene, camera);
+  controls.update(); followView(); renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }
 updateUI(); requestAnimationFrame(loop);
-window.__jogo = {S, camera, controls, CT, ST, FA, FB};
+window.__jogo = {S, camera, controls, CT, ST, FA, FB, crane, LINE};
 })();
 </script>
 
