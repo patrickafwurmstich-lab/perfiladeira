@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Perfiladeira de Telhas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Share+Tech+Mono&display=swap">
+<style>
+/* Layout: 3D shop floor on the left, a machine HMI (operator panel) docked on the right; stacks below on phones.
+   Deliberately single-theme: a dark steel control cabinet, like a real HMI. */
+:root{
+  --cabinet:#1c2129; --cabinet-2:#252b35; --edge:#3a4250;
+  --ink:#e8ecf2; --muted:#9aa4b4;
+  --lcd:#0b1a12; --lcd-ink:#62f29a;
+  --hazard:#f2b705; --run:#1fae4b; --stop:#d8282b; --warn:#f2b705;
+  --floor:#d9dde3;
+  --f-display:"Chakra Petch","Segoe UI",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-lcd:"Share Tech Mono",ui-monospace,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--cabinet);color:var(--ink);font-family:var(--f-body);overflow:hidden}
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;
+  padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));box-sizing:border-box}
+.stage{position:relative;min-width:0;border-radius:10px;overflow:hidden;background:var(--floor);border:1px solid var(--edge)}
+#view{display:block;width:100%;height:100%;touch-action:none}
+.hint{position:absolute;left:12px;bottom:10px;font:500 12px var(--f-body);color:#3b4250;background:rgba(255,255,255,.7);padding:4px 8px;border-radius:6px}
+.banner{position:absolute;left:50%;top:14px;transform:translateX(-50%);font:600 15px var(--f-display);letter-spacing:.04em;
+  padding:8px 14px;border-radius:6px;background:var(--stop);color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25);text-align:center;max-width:calc(100% - 24px)}
+.banner.warn{background:var(--hazard);color:#1a1a1a} .banner.ok{background:var(--run)}
+.hmi{min-width:0;display:flex;flex-direction:column;gap:12px;background:linear-gradient(180deg,var(--cabinet-2),var(--cabinet));
+  border:1px solid var(--edge);border-radius:10px;padding:0 14px 14px;overflow-y:auto}
+.hazard{height:10px;margin:0 -14px;border-radius:10px 10px 0 0;background:repeating-linear-gradient(-45deg,var(--hazard) 0 12px,#1a1a1a 12px 24px)}
+.hmi h1{font:700 18px var(--f-display);letter-spacing:.06em;text-transform:uppercase;margin:4px 0 0;text-wrap:balance}
+.hmi h1 small{display:block;font:500 11px var(--f-body);letter-spacing:.08em;color:var(--muted);margin-top:2px}
+.status{display:flex;align-items:center;gap:10px;font:600 14px var(--f-display);letter-spacing:.05em;text-transform:uppercase}
+.led{width:14px;height:14px;border-radius:50%;background:#444;box-shadow:inset 0 -2px 3px rgba(0,0,0,.5)}
+.led.run{background:var(--run);box-shadow:0 0 10px var(--run)} .led.stop{background:var(--stop);box-shadow:0 0 8px var(--stop)} .led.warn{background:var(--warn);box-shadow:0 0 10px var(--warn)}
+.lcd{background:var(--lcd);border:2px solid #050a07;border-radius:6px;padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;box-shadow:inset 0 0 18px rgba(0,0,0,.6)}
+.lcd div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.lcd span{font:500 10px var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:#4fa877}
+.lcd b{font:400 24px var(--f-lcd);color:var(--lcd-ink);font-variant-numeric:tabular-nums;text-shadow:0 0 6px rgba(98,242,154,.45);white-space:nowrap}
+.gauge{display:flex;flex-direction:column;gap:6px}
+.gauge .lab{display:flex;justify-content:space-between;gap:8px;font:500 12px var(--f-body);color:var(--muted)}
+.bar{height:14px;border-radius:7px;background:#0d1015;border:1px solid var(--edge);overflow:hidden}
+.bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#8e99a8,#c9d1dc);transition:width .2s}
+.bar i.low{background:linear-gradient(90deg,#b07d00,var(--hazard))} .bar i.empty{background:var(--stop)}
+.bar i.swap{background:repeating-linear-gradient(-45deg,var(--hazard) 0 8px,#c99800 8px 16px)}
+.swapbox{border:1px solid #6b5a12;background:#2a2510;border-radius:8px;padding:10px}
+.swapbox p{margin:6px 0 0;font:600 13px var(--f-display);letter-spacing:.03em;color:#ffe08a}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{font:700 14px var(--f-display);letter-spacing:.06em;text-transform:uppercase;border:0;border-radius:8px;padding:14px 8px;cursor:pointer;color:#fff;
+  box-shadow:0 4px 0 rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.25);transition:transform .06s,filter .15s}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.45)}
+.btn:focus-visible{outline:3px solid var(--hazard);outline-offset:2px}
+.btn:disabled{filter:grayscale(.85) brightness(.6);cursor:not-allowed}
+.btn.go{background:var(--run)} .btn.halt{background:var(--stop)}
+.btn.aux{background:#3d4757;font-size:12px;padding:11px 6px} .btn.aux.hl{background:#a77d00;color:#fff}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{display:flex;justify-content:space-between;font:500 12px var(--f-body);color:var(--muted)}
+.field label output{font:400 14px var(--f-lcd);color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--hazard)}
+.chk{display:flex;align-items:center;gap:8px;font:500 12px var(--f-body);color:var(--muted);cursor:pointer}
+.chk input{accent-color:var(--hazard);width:16px;height:16px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.foot{font:400 11px var(--f-body);color:var(--muted);line-height:1.5;margin:0}
+.foot kbd{font:400 11px var(--f-lcd);background:#0d1015;border:1px solid var(--edge);border-radius:4px;padding:1px 5px;color:var(--ink)}
+.small{background:none;border:1px solid var(--edge);color:var(--muted);border-radius:6px;font:500 12px var(--f-body);padding:6px 8px;cursor:pointer}
+.small[aria-pressed=true]{color:var(--ink);border-color:#6b7586}
+.small:focus-visible{outline:2px solid var(--hazard)}
+@media (max-width:820px){
+  body{overflow:auto}
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto;height:auto}
+  .stage{height:56vh;min-height:300px}
+  .hmi{overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){.btn{transition:none}}
+</style>
+</head>
+<body>
+
+
+<div class="app">
+  <div class="stage">
+    <canvas id="view" aria-label="Perfiladeira de telhas em 3D com dois trabalhadores e ponte rolante"></canvas>
+    <div class="banner" id="banner" hidden></div>
+    <div class="hint">Arraste para girar · roda do mouse para zoom</div>
+  </div>
+
+  <aside class="hmi" aria-label="Painel de operação">
+    <div class="hazard"></div>
+    <h1>Perfiladeira TR-40<small>Telha trapezoidal · largura útil 1000 mm</small></h1>
+
+    <div class="status"><span class="led stop" id="led"></span><span id="statusText">Parada</span></div>
+
+    <div class="lcd" role="group" aria-label="Contadores">
+      <div><span>Telhas</span><b id="lcdCount">000</b></div>
+      <div><span>Metros</span><b id="lcdMeters">0,0</b></div>
+      <div><span>Velocidade</span><b id="lcdSpeed">0,0</b></div>
+      <div><span>Comprimento</span><b id="lcdLen">1,30</b></div>
+    </div>
+
+    <div class="gauge">
+      <div class="lab"><span>Bobina restante</span><span id="coilText">30,0 m · 100%</span></div>
+      <div class="bar"><i id="coilBar"></i></div>
+    </div>
+
+    <div class="swapbox gauge" id="swapBox" hidden aria-live="polite">
+      <div class="lab"><span>Troca de bobina</span><span id="swapStep">1/20</span></div>
+      <div class="bar"><i class="swap" id="swapBar"></i></div>
+      <p id="swapText">Preparando…</p>
+    </div>
+
+    <div class="btns">
+      <button class="btn go" id="btnStart">Produzir</button>
+      <button class="btn halt" id="btnStop">Parar</button>
+      <button class="btn aux" id="btnCoil">Trocar bobina</button>
+      <button class="btn aux" id="btnClear">Retirar telhas</button>
+    </div>
+
+    <div class="field">
+      <label for="speed">Velocidade <output id="speedOut">24 m/min</output></label>
+      <input type="range" id="speed" min="10" max="60" step="1" value="24">
+    </div>
+    <div class="field">
+      <label for="len">Comprimento da telha <output id="lenOut">1,30 m</output></label>
+      <input type="range" id="len" min="0.8" max="3" step="0.05" value="1.3">
+    </div>
+
+    <label class="chk"><input type="checkbox" id="follow" checked> Câmera acompanha a ponte rolante</label>
+    <div class="row">
+      <button class="small" id="btnSound" aria-pressed="true">Som: ligado</button>
+      <button class="small" id="btnFast" aria-pressed="false">Tempo: 1×</button>
+    </div>
+    <p class="foot"><kbd>Espaço</kbd> produz / para. A bobina tem 30 m. Quando acabar, a ponte rolante troca por uma cheia. A mesa comporta 30 telhas; o ajudante leva a pilha para o palete.</p>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const $ = id => document.getElementById(id);
+const fmt = (n, d=1) => n.toFixed(d).replace('.', ',');
+const V3 = THREE.Vector3;
+const angDiff = (a, b) => Math.atan2(Math.sin(a-b), Math.cos(a-b));
+
+// ---------------- constants (meters) ----------------
+const W = 1.0, A = 0.028, PER = 0.2;
+const R0 = 0.55, RC = 0.20, COIL_TOTAL = 30;
+const E = new THREE.Vector2(0, 0.98), C = new THREE.Vector2(-1.45, 1.0);
+const X_CUT = 4.15, TABLE_Y = 0.97, TX0 = 4.25, TX1 = 7.6, MAX_STACK = 30, NEST = 0.012;
+const NST = 7, ST_X0 = 0.35, ST_DX = 0.47;
+const rib = z => A * Math.tanh(3 * Math.sin(2 * Math.PI * z / PER)) / Math.tanh(3);
+
+// crane / storage layout
+const CR = {x0:-3.0, x1:0.1, z0:-3.6, z1:0.9, top:3.3};
+const HANG = 1.05, TRAVEL = 3.1, PARK = {tx:-1.45, bz:-3.2};
+const RACK_Z = -2.7, RACK_X = [-2.05, -0.85], RACK_Y = 0.62;
+const CRADLE_Z = -1.55, CRADLE_X = [-2.15, -1.65, -1.15], CRADLE_Y = 0.3;
+const PALLET = {x:6.83, z:3.0, top:0.14};
+const OP_HOME = [3.45, 1.35], HELP_HOME = [6.3, 1.2];
+
+// ---------------- renderer / scene ----------------
+const canvas = $('view');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({canvas, antialias:true}); }
+catch(e){ $('banner').hidden=false; $('banner').textContent='Seu navegador não conseguiu iniciar o 3D (WebGL).'; return; }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xd9dde3);
+scene.fog = new THREE.Fog(0xd9dde3, 20, 44);
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+const CAM_HOME = new V3(2.0, 1.0, -0.3);
+camera.position.set(6.0, 4.6, 8.2);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.target.copy(CAM_HOME); controls.enableDamping = true; controls.maxPolarAngle = Math.PI * 0.48;
+controls.minDistance = 2.5; controls.maxDistance = 18; controls.update();
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8c919a, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.95);
+sun.position.set(4, 10, 6); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, {left:-8, right:8, top:7, bottom:-6, near:1, far:28});
+sun.target.position.set(2.0, 0, -0.5); scene.add(sun, sun.target);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({color:0xc8cdd4, roughness:0.95}));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+
+const mat = (color, metal=0.1, rough=0.5, extra={}) => new THREE.MeshStandardMaterial(Object.assign({color, metalness:metal, roughness:rough}, extra));
+const M = {
+  blue: mat(0x1f56d8, 0.15, 0.45), yellow: mat(0xf2b705, 0.1, 0.45), steel: mat(0xaeb5bf, 0.85, 0.3),
+  sheet: mat(0x9aa3ae, 0.8, 0.33, {side:THREE.DoubleSide}), dark: mat(0x1b1d22, 0.3, 0.55), gray: mat(0xb4b8be, 0.05, 0.6),
+  core: mat(0x34373d, 0.6, 0.45), red: mat(0xd8282b, 0, 0.4), green: mat(0x1fae4b, 0, 0.4), amber: mat(0xf2c400, 0, 0.4),
+  wood: mat(0x9a7448, 0, 0.85), strap: mat(0xff7a1a, 0, 0.7), line: mat(0xf2c400, 0, 0.8)
+};
+function add(mesh, x, y, z, parent=scene){ mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh; }
+const box = (w,h,d,m,x,y,z,p) => add(new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m), x,y,z,p);
+function cylZ(r,len,m,x,y,z,seg=24,p){ const g = new THREE.CylinderGeometry(r,r,len,seg); g.rotateX(Math.PI/2); return add(new THREE.Mesh(g,m), x,y,z,p); }
+function cylY(r,len,m,x,y,z,seg=24,p){ return add(new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,seg), m), x,y,z,p); }
+// a thin bar from a to b (used for slings and hoses)
+function bar(a, b, t, m, parent=scene){
+  const g = new THREE.BoxGeometry(t, 1, t), mesh = new THREE.Mesh(g, m), d = b.clone().sub(a);
+  mesh.position.copy(a).addScaledVector(d, 0.5); mesh.scale.y = d.length();
+  mesh.quaternion.setFromUnitVectors(new V3(0,1,0), d.normalize()); mesh.castShadow = true; parent.add(mesh); return mesh;
+}
+
+// floor safety markings
+function floorLine(x0, z0, x1, z1){ const m = new THREE.Mesh(new THREE.PlaneGeometry(Math.hypot(x1-x0, z1-z0) || 0.08, 0.07), M.line);
+  m.rotation.x = -Math.PI/2; m.rotation.z = -Math.atan2(z1-z0, x1-x0); m.position.set((x0+x1)/2, 0.003, (z0+z1)/2); m.receiveShadow = true; scene.add(m); }
+floorLine(CR.x0-0.3, 1.1, 8.2, 1.1); floorLine(CR.x0-0.3, 2.45, 5.9, 2.45);
+floorLine(CR.x0-0.3, CR.z0-0.3, CR.x1+0.3, CR.z0-0.3); floorLine(CR.x0-0.3, CR.z0-0.3, CR.x0-0.3, 2.45);
+
+// ---------------- bed ----------------
+box(4.6, 0.22, 0.85, M.blue, 2.0, 0.66, 0);
+box(4.4, 0.12, 0.30, M.blue, 2.0, 0.28, 0);
+for (const x of [0.1, 1.4, 2.7, 3.9]) for (const s of [-1, 1]) {
+  box(0.18, 0.6, 0.16, M.blue, x, 0.30, s*0.32); box(0.34, 0.04, 0.30, M.blue, x, 0.02, s*0.32);
+}
+for (const s of [-1, 1]) box(3.7, 0.22, 0.04, M.yellow, 1.75, 0.92, s*0.66);
+for (let i = 0; i < 10; i++) for (const y of [0.86, 0.98]) cylZ(0.016, 0.02, M.dark, i*0.39, y, 0.69, 6);
+
+// ---------------- forming stands with rollers ----------------
+const rollerGroups = [];
+for (let i = 0; i < NST; i++) {
+  const x = ST_X0 + i*ST_DX;
+  for (const s of [-1, 1]) { box(0.1, 0.62, 0.08, M.blue, x, 1.10, s*0.60); cylY(0.035, 0.06, M.dark, x, 1.44, s*0.60, 6); }
+  box(0.08, 0.06, 1.28, M.blue, x, 1.40, 0);
+  const amp = Math.min(1, (i+1)/NST);
+  for (const [y, sgn] of [[0.98-0.09, 1], [0.98+0.09, -1]]) {
+    const g = new THREE.Group(); g.position.set(x, y, 0); scene.add(g);
+    cylZ(0.022, 1.36, M.dark, 0, 0, 0, 12, g);
+    cylZ(0.06, 1.04, M.steel, 0, 0, 0, 24, g);
+    for (let k = 0; k < W/PER; k++) cylZ(0.06 + A*amp*0.9, 0.05, M.steel, 0, 0, -W/2 + PER*(k+0.25), 24, g);
+    rollerGroups.push({g, sgn});
+  }
+}
+
+// ---------------- strip inside the machine (segments) ----------------
+const SEG = 0.1, NSEG = Math.round(X_CUT / SEG), NY = 48;
+const lastStand = ST_X0 + (NST-1)*ST_DX;
+const segs = [];
+for (let k = 0; k < NSEG; k++) {
+  const x0 = k*SEG, x1 = (k+1)*SEG, pos = [], idx = [];
+  [x0, x1].forEach(x => {
+    let a = Math.min(1, Math.max(0, x / lastStand)); a = a*a*(3-2*a);
+    for (let j = 0; j <= NY; j++) { const z = -W/2 + W*j/NY; pos.push(x, E.y + rib(z)*a, z); }
+  });
+  for (let j = 0; j < NY; j++) { const a = j, b = j+1, c = NY+1+j+1, d = NY+1+j; idx.push(a,b,c, a,c,d); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, M.sheet); m.castShadow = true; scene.add(m); segs.push({m, x1});
+}
+
+// ---------------- decoiler + coil ----------------
+for (const s of [-1, 1]) {
+  const sh = new THREE.Shape(); sh.moveTo(-0.4, 0); sh.lineTo(0.4, 0); sh.lineTo(0.08, 1.0); sh.lineTo(-0.08, 1.0); sh.closePath();
+  const g = new THREE.ExtrudeGeometry(sh, {depth:0.12, bevelEnabled:false}); g.translate(0, 0, -0.06);
+  add(new THREE.Mesh(g, M.blue), C.x, 0, s*0.72);
+  box(0.9, 0.06, 0.22, M.blue, C.x, 0.03, s*0.72);
+  cylZ(0.11, 0.16, M.yellow, C.x, C.y, s*0.72, 24);
+  cylZ(0.07, 0.3, M.dark, C.x, C.y, s*0.66, 20);
+}
+box(0.16, 0.1, 1.44, M.blue, C.x, 0.06, 0);
+const mandrel = cylZ(0.07, 1.02, M.dark, C.x, C.y, 0, 20);
+const coreGeo = new THREE.CylinderGeometry(RC, RC, W + 0.02, 40); coreGeo.rotateX(Math.PI/2);
+const core = add(new THREE.Mesh(coreGeo, M.core), C.x, C.y, 0);
+const cc = document.createElement('canvas'); cc.width = cc.height = 256; const cx = cc.getContext('2d');
+cx.fillStyle = '#9aa3ae'; cx.fillRect(0, 0, 256, 256);
+for (let r = 128; r > 10; r -= 3) { cx.strokeStyle = r % 2 ? '#87909b' : '#b3bac3'; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(128, 128, r, 0, Math.PI*2); cx.stroke(); }
+const capTex = new THREE.CanvasTexture(cc); capTex.encoding = THREE.sRGBEncoding;
+const capMat = mat(0xffffff, 0.75, 0.35, {map: capTex});
+const coilGeo = new THREE.CylinderGeometry(1, 1, W, 64); coilGeo.rotateX(Math.PI/2);
+const coilMats = [M.sheet, capMat, capMat];
+const coil = add(new THREE.Mesh(coilGeo, coilMats), C.x, C.y, 0);
+function makeFullCoil(){
+  const g = new THREE.Group();
+  const c = add(new THREE.Mesh(coilGeo, coilMats), 0, 0, 0, g); c.scale.set(R0, R0, 1);
+  add(new THREE.Mesh(coreGeo, M.core), 0, 0, 0, g);
+  scene.add(g); return g;
+}
+
+// strip from coil to entry
+const feedGeo = new THREE.PlaneGeometry(1, W); feedGeo.rotateX(-Math.PI/2); feedGeo.translate(-0.5, 0, 0);
+const feed = add(new THREE.Mesh(feedGeo, M.sheet), E.x, E.y, 0);
+function tangentPoint(R){
+  const d = C.clone().sub(E), dl = d.length();
+  const ang = Math.atan2(d.y, d.x) - Math.asin(Math.min(1, R/dl));
+  const tl = Math.sqrt(Math.max(dl*dl - R*R, 0));
+  return new THREE.Vector2(E.x + Math.cos(ang)*tl, E.y + Math.sin(ang)*tl);
+}
+const L_CORE = tangentPoint(RC).sub(E).length();
+
+// ---------------- guillotine ----------------
+const GX = 3.95;
+for (const s of [-1, 1]) {
+  box(0.2, 1.5, 0.16, M.blue, GX, 1.05, s*0.72); box(0.42, 0.06, 0.34, M.blue, GX, 0.03, s*0.72);
+  cylY(0.025, 0.5, M.steel, GX, 1.35, s*0.55, 12);
+}
+box(0.42, 0.22, 1.7, M.blue, GX, 1.86, 0);
+box(0.34, 0.12, 1.3, M.blue, GX, 0.88, 0);
+cylY(0.13, 0.32, M.yellow, GX, 2.12, 0, 6); cylY(0.15, 0.05, M.yellow, GX, 2.3, 0, 6);
+const rod = cylY(0.06, 0.3, M.steel, GX, 1.62, 0, 16);
+for (const dz of [-0.05, 0.05]) {
+  const curve = new THREE.CatmullRomCurve3([new V3(GX-0.12, 2.2, dz), new V3(GX-0.48, 2.28, dz+0.06), new V3(GX-0.6, 2.0, dz+0.2), new V3(GX-0.55, 1.86, dz+0.3)]);
+  add(new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.018, 8, false), M.dark), 0, 0, 0);
+}
+const holder = box(0.16, 0.16, 1.4, M.yellow, GX, 1.30, 0);
+const blade = box(0.04, 0.14, 1.2, M.steel, GX, 1.15, 0);
+
+// ---------------- control cabinet with a live screen ----------------
+box(0.12, 0.6, 0.12, M.gray, 3.45, 0.75, 0.82);
+box(0.42, 0.5, 0.18, M.gray, 3.45, 1.18, 0.86);
+const sc = document.createElement('canvas'); sc.width = 256; sc.height = 160; const sx = sc.getContext('2d');
+const scrTex = new THREE.CanvasTexture(sc); scrTex.encoding = THREE.sRGBEncoding;
+const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.15), new THREE.MeshBasicMaterial({map: scrTex}));
+screen.position.set(3.45, 1.30, 0.952); scene.add(screen);
+const lamps = [];
+[[M.green,3.35,1.10],[M.amber,3.45,1.10],[M.red,3.55,1.10],[M.green,3.35,1.02],[M.amber,3.45,1.02],[M.red,3.55,1.02]].forEach(([m,x,y],i) => {
+  lamps.push(cylZ(i===5?0.03:0.022, 0.02, m.clone(), x, y, 0.955, 16));
+});
+
+// ---------------- output table ----------------
+for (const s of [-1, 1]) {
+  box(TX1-TX0, 0.08, 0.08, M.blue, (TX0+TX1)/2, TABLE_Y-0.04, s*0.58);
+  box(TX1-TX0, 0.06, 0.06, M.blue, (TX0+TX1)/2, 0.25, s*0.58);
+}
+for (let k = 0; k < 9; k++) cylZ(0.03, 1.12, M.steel, TX0+0.15+k*0.38, TABLE_Y-0.04, 0, 12);
+for (const x of [TX0+0.1, (TX0+TX1)/2, TX1-0.1]) {
+  for (const s of [-1, 1]) { box(0.1, TABLE_Y-0.08, 0.1, M.blue, x, (TABLE_Y-0.08)/2, s*0.58); box(0.22, 0.04, 0.2, M.blue, x, 0.02, s*0.58); }
+  box(0.08, 0.06, 1.16, M.blue, x, 0.25, 0);
+}
+// wooden pallet for finished sheets
+for (const dz of [-0.5, 0, 0.5]) box(1.5, 0.08, 0.12, M.wood, PALLET.x, 0.04, PALLET.z+dz);
+for (let i = 0; i < 7; i++) box(1.5, 0.025, 0.12, M.wood, PALLET.x, 0.125, PALLET.z-0.54+i*0.18);
+
+// ---------------- overhead crane (ponte rolante) ----------------
+for (const x of [CR.x0, CR.x1]) {
+  for (const z of [CR.z0, CR.z1]) { box(0.24, CR.top, 0.24, M.blue, x, CR.top/2, z); box(0.45, 0.04, 0.45, M.blue, x, 0.02, z); }
+  box(0.22, 0.28, CR.z1-CR.z0+0.24, M.blue, x, CR.top+0.14, (CR.z0+CR.z1)/2);
+  box(0.06, 0.04, CR.z1-CR.z0+0.2, M.steel, x, CR.top+0.30, (CR.z0+CR.z1)/2);
+}
+const bridge = new THREE.Group(); scene.add(bridge);
+const span = CR.x1 - CR.x0, midX = (CR.x0+CR.x1)/2;
+for (const z of [-0.25, 0.25]) box(span+0.3, 0.34, 0.14, M.yellow, midX, CR.top+0.5, z, bridge);
+for (const x of [CR.x0, CR.x1]) { box(0.36, 0.24, 0.8, M.yellow, x, CR.top+0.44, 0, bridge);
+  for (const z of [-0.28, 0.28]) cylZ(0.07, 0.05, M.dark, x, CR.top+0.36, z, 12, bridge).rotation.set(0, Math.PI/2, 0); }
+{ // capacity sign
+  const c2 = document.createElement('canvas'); c2.width = 128; c2.height = 64; const g2 = c2.getContext('2d');
+  g2.fillStyle = '#1a1a1a'; g2.fillRect(0, 0, 128, 64); g2.fillStyle = '#f2b705'; g2.font = 'bold 40px sans-serif'; g2.textAlign = 'center'; g2.fillText('5 t', 64, 47);
+  const t2 = new THREE.CanvasTexture(c2); t2.encoding = THREE.sRGBEncoding;
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.21), new THREE.MeshBasicMaterial({map:t2}));
+  sign.position.set(midX + 0.9, CR.top+0.5, 0.322); bridge.add(sign);
+}
+const trolley = new THREE.Group(); bridge.add(trolley);
+box(0.62, 0.24, 0.76, M.yellow, 0, CR.top+0.79, 0, trolley);
+const drumG = new THREE.CylinderGeometry(0.11, 0.11, 0.46, 18); drumG.rotateZ(Math.PI/2);
+add(new THREE.Mesh(drumG, M.dark), 0, CR.top+0.98, 0, trolley);
+box(0.2, 0.18, 0.2, M.blue, 0.33, CR.top+0.98, 0.18, trolley);
+const lampTop = cylY(0.04, 0.06, mat(0xff8a00, 0, 0.4, {emissive:0x000000}), -0.25, CR.top+0.94, 0.3, 12, trolley);
+const TROLLEY_Y = CR.top+0.67;
+const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 6), M.dark); scene.add(cable);
+const cable2 = cable.clone(); scene.add(cable2);
+const hook = new THREE.Group(); scene.add(hook);
+box(0.2, 0.24, 0.16, M.yellow, 0, 0.12, 0, hook);
+const hk = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.015, 8, 16, Math.PI*1.4), M.dark); hk.rotation.set(0, Math.PI/2, Math.PI*0.8); add(hk, 0, -0.04, 0, hook);
+bar(new V3(0, -0.06, 0), new V3(0, -0.3, -0.6), 0.02, M.strap, hook);
+bar(new V3(0, -0.06, 0), new V3(0, -0.3, 0.6), 0.02, M.strap, hook);
+box(0.09, 0.09, 1.3, M.yellow, 0, -0.32, 0, hook);
+const straps = [-1, 1].map(s => {
+  const g = new THREE.BoxGeometry(0.05, 1, 0.012); g.translate(0, -0.5, 0);
+  const m = new THREE.Mesh(g, M.strap); m.castShadow = true; m.position.set(0, -0.36, s*0.58); hook.add(m);
+  const tip = box(0.05, 0.05, 0.1, M.dark, 0, 0, s*0.54, hook);
+  return {m, tip};
+});
+const crane = { tx:PARK.tx, bz:PARK.bz, hy:TRAVEL, tgt:{tx:PARK.tx, bz:PARK.bz, hy:TRAVEL}, load:null, moving:false,
+  arrived(){ return Math.abs(this.tx-this.tgt.tx) < 0.002 && Math.abs(this.bz-this.tgt.bz) < 0.002 && Math.abs(this.hy-this.tgt.hy) < 0.002; } };
+function crTo(tx, bz, hy){ if (tx != null) crane.tgt.tx = tx; if (bz != null) crane.tgt.bz = bz; if (hy != null) crane.tgt.hy = hy; }
+function moveAxis(cur, tgt, vmax, dt){ const d = tgt - cur, v = Math.min(vmax, Math.abs(d)*2.2 + 0.04); return Math.abs(d) <= v*dt ? tgt : cur + Math.sign(d)*v*dt; }
+function updateCrane(dt){
+  const p = {tx:crane.tx, bz:crane.bz, hy:crane.hy};
+  crane.bz = moveAxis(crane.bz, crane.tgt.bz, 1.1, dt);
+  crane.tx = moveAxis(crane.tx, crane.tgt.tx, 0.8, dt);
+  crane.hy = moveAxis(crane.hy, crane.tgt.hy, 0.7, dt);
+  crane.moving = p.tx !== crane.tx || p.bz !== crane.bz || p.hy !== crane.hy;
+  bridge.position.z = crane.bz; trolley.position.x = crane.tx;
+  const yTop = TROLLEY_Y, yb = crane.hy + 0.24;
+  [cable, cable2].forEach((c, i) => { c.position.set(crane.tx, (yTop+yb)/2, crane.bz + (i ? 0.04 : -0.04)); c.scale.y = Math.max(0.01, yTop - yb); });
+  hook.position.set(crane.tx, crane.hy, crane.bz);
+  const L = crane.load ? HANG - 0.36 : 0.42;
+  straps.forEach(s => { s.m.scale.y = L; s.tip.position.y = -0.36 - L; });
+  if (crane.load) crane.load.position.set(crane.tx, crane.hy - HANG, crane.bz);
+  lampTop.material.emissive.setHex(crane.moving && (performance.now() % 600 < 300) ? 0xff8a00 : 0);
+}
+
+// ---------------- storage: full coils on a rack, empty cores on a cradle ----------------
+for (const x of RACK_X) for (const dx of [-0.3, 0.3]) box(0.22, 0.16, 1.15, M.wood, x+dx, 0.08, RACK_Z);
+box(2.6, 0.04, 0.12, M.dark, (RACK_X[0]+RACK_X[1])/2, 0.02, RACK_Z-0.62);
+box(1.65, 0.1, 1.15, M.wood, (CRADLE_X[0]+CRADLE_X[2])/2, 0.05, CRADLE_Z);
+const rack = RACK_X.map(x => { const g = makeFullCoil(); g.position.set(x, RACK_Y, RACK_Z); return g; });
+const cradleCores = [];
+const loadCore = add(new THREE.Mesh(coreGeo, M.core), 0, -10, 0); loadCore.visible = false;
+
+// ---------------- workers ----------------
+class Worker {
+  constructor(o){
+    const root = this.root = new THREE.Group(); scene.add(root);
+    const suit = mat(o.suit, 0.05, 0.75), vest = mat(o.vest, 0.05, 0.6), skin = mat(o.skin, 0, 0.7), helm = mat(o.helmet, 0.1, 0.35),
+          glove = mat(o.glove, 0, 0.8), refl = mat(0xe9edf2, 0.6, 0.3), boot = mat(0x2a211a, 0.1, 0.7);
+    this.legs = [-1, 1].map(s => { const g = new THREE.Group(); g.position.set(s*0.11, 0.92, 0); root.add(g);
+      box(0.16, 0.82, 0.18, suit, 0, -0.41, 0, g); box(0.18, 0.12, 0.28, boot, 0, -0.86, 0.04, g); return g; });
+    const spine = this.spine = new THREE.Group(); spine.position.y = 0.92; root.add(spine);
+    box(0.44, 0.6, 0.25, suit, 0, 0.3, 0, spine);
+    box(0.46, 0.07, 0.27, M.dark, 0, 0.03, 0, spine);
+    box(0.46, 0.38, 0.27, vest, 0, 0.36, 0, spine);
+    for (const y of [0.27, 0.42]) box(0.47, 0.035, 0.28, refl, 0, y, 0, spine);
+    const head = this.head = new THREE.Group(); head.position.y = 0.62; spine.add(head);
+    box(0.1, 0.06, 0.1, skin, 0, 0.02, 0, head);
+    box(0.24, 0.25, 0.23, skin, 0, 0.17, 0, head);
+    for (const s of [-1, 1]) box(0.035, 0.035, 0.01, M.dark, s*0.055, 0.19, 0.118, head);
+    box(0.08, 0.015, 0.01, mat(0x7a3b2e), 0, 0.11, 0.118, head);
+    const hel = add(new THREE.Mesh(new THREE.SphereGeometry(0.155, 16, 8, 0, Math.PI*2, 0, Math.PI/2), helm), 0, 0.26, 0, head); hel.scale.y = 0.8;
+    const brim = add(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.02, 20), helm), 0, 0.265, 0.03, head); brim.scale.z = 1.12;
+    box(0.03, 0.03, 0.3, helm, 0, 0.385, 0, head);
+    this.arms = [-1, 1].map(s => { const sh = new THREE.Group(); sh.position.set(s*0.29, 0.54, 0); spine.add(sh);
+      box(0.12, 0.3, 0.13, suit, 0, -0.15, 0, sh);
+      const el = new THREE.Group(); el.position.y = -0.3; sh.add(el);
+      box(0.11, 0.26, 0.12, suit, 0, -0.13, 0, el); box(0.12, 0.1, 0.13, glove, 0, -0.31, 0, el);
+      return {sh, el}; });
+    // radio remote for the crane, held in the right hand (character's right = -x when facing +z)
+    const rem = this.remote = new THREE.Group();
+    box(0.08, 0.16, 0.05, M.yellow, 0, 0, 0, rem); box(0.03, 0.03, 0.02, M.red, 0, 0.04, 0.03, rem); box(0.03, 0.03, 0.02, M.green, 0, -0.01, 0.03, rem);
+    rem.position.set(0, -0.37, 0.06); rem.rotation.x = 1.2; this.arms[0].el.add(rem); rem.visible = false;
+    root.position.set(o.x, 0, o.z); this.h = this.wantH = o.h; root.rotation.y = o.h;
+    this.path = []; this.speed = 1.7; this.action = 'idle'; this.actT = 0; this.revert = true; this.t = 0; this.ph = 0;
+    this.carry = null; this.carryY = 1.1; this.after = null; this.faceAfter = null;
+  }
+  get pos(){ return this.root.position; }
+  goTo(pts, face, after){ this.path = pts.map(p => new V3(p[0], 0, p[1])); this.faceAfter = face; this.after = after || null; this.actT = 0;
+    if (!['carry','pull'].includes(this.action)) this.action = 'idle'; }
+  act(a, dur=0, revert=true){ this.action = a; this.actT = dur; this.t = 0; this.revert = revert; }
+  faceTo(x, z){ this.wantH = Math.atan2(x - this.pos.x, z - this.pos.z); }
+  get ready(){ return !this.path.length && this.actT <= 0 && Math.abs(angDiff(this.wantH, this.h)) < 0.05; }
+  atHome(home){ return Math.hypot(this.pos.x - home[0], this.pos.z - home[1]) < 0.05; }
+  update(dt){
+    this.t += dt; let moving = false;
+    if (this.path.length) {
+      const d = this.path[0].clone().sub(this.pos); d.y = 0; const L = d.length();
+      if (L < 0.02) {
+        this.path.shift();
+        if (!this.path.length) {
+          if (this.faceAfter != null) { if (typeof this.faceAfter === 'number') this.wantH = this.faceAfter; else this.faceTo(this.faceAfter[0], this.faceAfter[1]); }
+          if (this.after) { this.action = this.after; this.t = 0; } else if (!['carry','pull'].includes(this.action)) this.action = 'idle';
+        }
+      } else {
+        this.wantH = Math.atan2(d.x, d.z);
+        const turn = Math.abs(angDiff(this.wantH, this.h));
+        const sp = turn > 0.8 ? 0.25 : this.speed * (this.action === 'carry' ? 0.75 : 1);
+        this.pos.addScaledVector(d.normalize(), Math.min(L, sp*dt)); moving = true;
+      }
+    }
+    const da = angDiff(this.wantH, this.h); this.h += Math.sign(da) * Math.min(Math.abs(da), 6*dt); this.root.rotation.y = this.h;
+    if (this.actT > 0) { this.actT -= dt; if (this.actT <= 0) { this.actT = 0; if (this.revert) this.action = 'idle'; } }
+
+    // pose
+    const P = {aL:0, aR:0, eL:-0.12, eR:-0.12, lean:0, bob:0, hy:0, hx:0}; let lL = 0, t = this.t;
+    if (moving) { this.ph += dt * this.speed * 5.5; const s = Math.sin(this.ph); lL = s*0.55; P.aL = s*0.45; P.aR = -s*0.45; P.bob = Math.abs(Math.cos(this.ph))*0.03; }
+    else P.bob = 0.006*Math.sin(t*1.8);
+    switch (this.action) {
+      case 'carry': P.aL = P.aR = -1.0; P.eL = P.eR = -0.75; break;
+      case 'pull': P.aL = P.aR = -1.25 + 0.2*Math.sin(t*6); P.eL = P.eR = -0.25; P.lean = -0.1; break;
+      case 'press': if (!moving) { const k = Math.min(1, t/0.18); P.aR = -0.95*k - (t > 0.18 && t < 0.36 ? 0.08 : 0); P.eR = -0.35*k; } break;
+      case 'reach': if (!moving) { const k = Math.min(1, t/0.3); P.aL = P.aR = (-2.1 + 0.12*Math.sin(t*7))*k; P.eL = P.eR = -0.4*k; P.hx = -0.3*k; } break;
+      case 'low': if (!moving) { const k = Math.min(1, t/0.3); P.lean = 0.5*k; P.aL = P.aR = -0.9*k; P.eL = P.eR = -0.3; } break;
+      case 'remote': if (!moving) { P.aR = -0.45; P.eR = -1.25; P.aL = 0.08; P.hx = -0.2; P.hy = Math.sin(t*0.5)*0.25; } break;
+      case 'watch': if (!moving) { P.hy = Math.sin(t*0.6)*0.35; P.aL = 0.03*Math.sin(t*1.6); P.aR = -P.aL; } break;
+      default: if (!moving) { P.aL = 0.04*Math.sin(t*1.6); P.aR = -P.aL; }
+    }
+    this.legs[0].rotation.x = lL; this.legs[1].rotation.x = -lL;
+    this.arms[0].sh.rotation.set(P.aR, 0, -0.07); this.arms[1].sh.rotation.set(P.aL, 0, 0.07);
+    this.arms[0].el.rotation.x = P.eR; this.arms[1].el.rotation.x = P.eL;
+    this.spine.rotation.x = P.lean; this.head.rotation.set(P.hx, P.hy, 0);
+    this.root.position.y = P.bob;
+    this.remote.visible = this.action === 'remote';
+    if (this.carry) {
+      const f = new V3(Math.sin(this.h), 0, Math.cos(this.h));
+      this.carry.position.set(this.pos.x + f.x*0.9, this.carryY, this.pos.z + f.z*0.9);
+      this.carry.rotation.y = this.h - Math.PI;
+    }
+  }
+}
+const op = new Worker({suit:0x2b4f9e, vest:0xff7a1a, skin:0xe0ac7e, helmet:0xf4f4f4, glove:0x3a3a3a, x:OP_HOME[0], z:OP_HOME[1], h:Math.PI});
+const helper = new Worker({suit:0x5d6b4f, vest:0xc6f21a, skin:0xb07a52, helmet:0xf2b705, glove:0xd9a400, x:HELP_HOME[0], z:HELP_HOME[1], h:Math.PI});
+op.speed = 1.8;
+
+// ---------------- roof sheets ----------------
+function panelGeometry(len){
+  const pos = [], idx = [];
+  [-len, 0].forEach(x => { for (let j = 0; j <= NY; j++) { const z = -W/2 + W*j/NY; pos.push(x, rib(z), z); } });
+  for (let j = 0; j < NY; j++) { const a = j, b = j+1, c = NY+1+j+1, d = NY+1+j; idx.push(a,b,c, a,c,d); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+
+// ---------------- state ----------------
+const state = { running:false, v:0, speed:24/60, LP:1.3, coilLen:COIL_TOTAL, tail:-1, total:0, meters:0,
+  current:null, stack:[], sliding:[], blade:0, coilSpin:0, rollSpin:0, startDelay:0,
+  decoilerHas:'coil', swap:null, helperSeq:null, feedFrac:1, segReveal:X_CUT, fast:false, camBack:0, msgT:0, piles:[] };
+
+function setMsg(text, kind){
+  const b = $('banner'); if (!text){ b.hidden = true; return; }
+  b.hidden = false; b.textContent = text; b.className = 'banner' + (kind === true ? ' warn' : kind ? ' ' + kind : '');
+  state.msgT = kind === 'ok' ? 3.5 : 0;
+}
+
+function newPanel(){
+  const m = new THREE.Mesh(panelGeometry(state.LP), M.sheet); m.castShadow = true; m.receiveShadow = true;
+  m.position.set(X_CUT, E.y, 0); m.scale.x = 0.0001; scene.add(m);
+  state.current = {m, len:0, LP:state.LP};
+}
+function finishPanel(final){
+  const p = state.current; if (!p) return;
+  state.current = null;
+  if (p.len < 0.05){ scene.remove(p.m); return; }
+  if (final && p.len < p.LP){ p.m.geometry.dispose(); p.m.geometry = panelGeometry(p.len); p.LP = p.len; }
+  p.m.scale.x = 1;
+  state.total++; state.blade = 0.0001; sound.cut();
+  const k = state.stack.length + state.sliding.length;
+  state.sliding.push({p, t:0, x0:p.m.position.x, xf:TX1-0.12, yf:TABLE_Y + A + 0.004 + k*NEST});
+}
+
+// ---------------- sequences (scripted multi-step actions) ----------------
+function runSeq(steps, onDone){ return {steps, i:0, t:0, started:false, onDone}; }
+function tickSeq(sq, dt){
+  const s = sq.steps[sq.i];
+  if (!sq.started){ sq.started = true; sq.t = 0; s.start && s.start.call(s); }
+  sq.t += dt; s.update && s.update.call(s, dt, sq.t);
+  if (sq.t > 0.05 && (!s.done || s.done.call(s, sq.t))) {
+    s.end && s.end.call(s); sq.i++; sq.started = false;
+    if (sq.i >= sq.steps.length){ sq.onDone && sq.onDone(); return true; }
+  }
+  return false;
+}
+
+function canRun(){ return state.coilLen > 0 || (state.tail >= 0 && state.tail < L_CORE + X_CUT); }
+function stopped(){ return !state.running && state.v < 0.01 && state.startDelay <= 0; }
+function canSwap(){ return stopped() && !canRun() && !state.swap && !state.helperSeq; }
+function canClear(){ return stopped() && state.stack.length > 0 && !state.sliding.length && !state.swap && !state.helperSeq; }
+
+function start(){
+  if (state.running || state.startDelay > 0 || state.swap) return;
+  if (state.stack.length + state.sliding.length >= MAX_STACK){ setMsg('Mesa cheia. Retire as telhas para continuar.', true); return; }
+  if (!canRun()){ setMsg('Bobina vazia. Troque a bobina para continuar.', true); return; }
+  sound.start(); setMsg('');
+  if (op.atHome(OP_HOME) && !op.path.length){ op.faceTo(3.38, 0); op.act('press', 0.5); state.startDelay = 0.3; }
+  else state.running = true;
+}
+function stop(){
+  if (!state.running && state.startDelay <= 0) return;
+  state.running = false; state.startDelay = 0;
+  if (op.atHome(OP_HOME) && !op.path.length){ op.faceTo(3.52, 0); op.act('press', 0.5); }
+}
+
+function changeCoil(){
+  if (!canSwap()) return;
+  sound.start(); setMsg('');
+  if (cradleCores.length >= CRADLE_X.length) { cradleCores.forEach(m => scene.remove(m)); cradleCores.length = 0; }
+  const spot = cradleCores.length;
+  const loadCoil = makeFullCoil(); loadCoil.visible = false;
+  const steps = [
+    {label:'Operador e ajudante indo para a troca', start(){
+        op.goTo([OP_HOME, [-0.62, 1.35], [-0.62, 0.85]], [C.x, 0]);
+        helper.goTo([[HELP_HOME[0], 2.0], [-2.2, 2.0]], [C.x, -0.5], 'remote'); },
+      done:() => op.ready && helper.ready},
+    {label:'Ponte rolante indo até o desbobinador', start(){ crTo(C.x, 0, TRAVEL); }, done:() => crane.arrived()},
+    {label:'Descendo o gancho', start(){ crTo(null, null, C.y + HANG); }, done:() => crane.arrived()},
+    {label:'Prendendo as cintas no núcleo vazio', start(){ op.faceTo(C.x, 0); op.act('reach', 1.4); }, done:() => op.ready,
+      end(){ state.decoilerHas = 'none'; loadCore.visible = true; loadCore.rotation.z = state.coilSpin; crane.load = loadCore; }},
+    {label:'Içando o núcleo vazio', start(){ op.goTo([[-0.62, 1.3]], [C.x, 0]); crTo(null, null, TRAVEL); }, done:() => crane.arrived() && op.ready},
+    {label:'Levando o núcleo até o berço', start(){ crTo(CRADLE_X[spot], CRADLE_Z); op.goTo([[-0.5, -1.55]], [CRADLE_X[spot], CRADLE_Z]); },
+      done:() => crane.arrived() && op.ready},
+    {label:'Baixando o núcleo no berço', start(){ crTo(null, null, CRADLE_Y + HANG); }, done:() => crane.arrived()},
+    {label:'Soltando as cintas', start(){ op.act('reach', 1.0); }, done:() => op.ready,
+      end(){ const m = add(new THREE.Mesh(coreGeo, M.core), CRADLE_X[spot], CRADLE_Y, CRADLE_Z); cradleCores.push(m); loadCore.visible = false; crane.load = null; }},
+    {label:'Subindo o gancho', start(){ crTo(null, null, TRAVEL); }, done:() => crane.arrived()},
+    {label:'Ponte indo até o estoque de bobinas', start(){ crTo(RACK_X[1], RACK_Z); op.goTo([[-0.05, -2.0], [-0.05, -2.7]], [RACK_X[1], RACK_Z]); },
+      done:() => crane.arrived() && op.ready},
+    {label:'Descendo o gancho na bobina nova', start(){ crTo(null, null, RACK_Y + HANG); }, done:() => crane.arrived()},
+    {label:'Prendendo as cintas na bobina nova', start(){ op.act('reach', 1.4); }, done:() => op.ready,
+      end(){ scene.remove(rack[1]); rack[1] = null; loadCoil.visible = true; crane.load = loadCoil; }},
+    {label:'Içando a bobina nova', start(){ crTo(null, null, TRAVEL); }, done:() => crane.arrived()},
+    {label:'Levando a bobina até o desbobinador', start(){ crTo(C.x, 0); }, done:() => crane.arrived()},
+    {label:'Descendo a bobina no mandril', start(){ crTo(null, null, C.y + HANG); op.goTo([[0.15, -2.4], [0.15, -1.0], [-0.6, -0.95], [-0.62, 0.85]], [C.x, 0]); },
+      done:() => crane.arrived() && op.ready},
+    {label:'Soltando as cintas e travando o mandril', start(){ op.act('reach', 1.2); }, done:() => op.ready,
+      end(){ crane.load = null; scene.remove(loadCoil); state.decoilerHas = 'coil'; state.coilLen = COIL_TOTAL; state.tail = -1;
+             state.feedFrac = 0; state.segReveal = 0; }},
+    {label:'Recolhendo a ponte rolante', start(){ crTo(PARK.tx, PARK.bz, TRAVEL); op.goTo([[-0.62, 1.3], [-0.95, 1.0]], Math.PI/2); this.roll = 0; },
+      update(dt){ // the remaining coil rolls to the front slot; a new one is put in the back slot
+        if (!rack[1] && rack[0]) { const g = rack[0], nx = Math.min(RACK_X[1], g.position.x + 0.9*dt); g.rotation.z -= (nx - g.position.x)/R0; g.position.x = nx;
+          if (nx >= RACK_X[1]) { rack[1] = g; rack[0] = makeFullCoil(); rack[0].position.set(RACK_X[0], RACK_Y, RACK_Z); rack[0].scale.setScalar(0.01); } }
+        else if (rack[0] && rack[0].scale.x < 1) rack[0].scale.setScalar(Math.min(1, rack[0].scale.x + dt*2));
+      },
+      done:() => crane.arrived() && op.ready && rack[1] && rack[0].scale.x >= 1},
+    {label:'Puxando a ponta da chapa até a máquina', start(){ op.act('pull', 0, false); op.goTo([[-0.12, 1.0]], Math.PI/2); },
+      update(){ state.feedFrac = Math.min(1, Math.max(0, (op.pos.x + 0.95) / 0.83)); }, done:() => op.ready,
+      end(){ state.feedFrac = 1; op.act('idle'); }},
+    {label:'Passando a chapa pelas estações', start(){ op.faceTo(1.5, 0); }, update(dt){ state.segReveal = Math.min(X_CUT, state.segReveal + dt*1.6); },
+      done:() => state.segReveal >= X_CUT},
+    {label:'Voltando aos postos', start(){
+        op.goTo([[-0.12, 1.35], OP_HOME], Math.PI, 'watch');
+        helper.goTo([[-2.2, 2.0], [HELP_HOME[0], 2.0], HELP_HOME], Math.PI, 'watch'); },
+      done:() => op.ready && helper.ready}
+  ];
+  state.swap = runSeq(steps, () => {
+    state.swap = null; state.segReveal = X_CUT; state.feedFrac = 1;
+    segs.forEach(s => s.m.visible = true);
+    if ($('follow').checked) state.camBack = 2.5;
+    setMsg('Bobina trocada. Pronta para produzir!', 'ok');
+  });
+}
+
+function clearTable(){
+  if (!canClear()) return;
+  sound.start(); setMsg('');
+  const items = state.stack.slice(); state.stack = [];
+  const xf = TX1 - 0.12, maxL = Math.max(...items.map(p => p.LP)), cx = xf - maxL/2;
+  let g = null;
+  if (state.piles.length >= 3) { state.piles.forEach(p => { scene.remove(p.g); p.items.forEach(i => i.m.geometry.dispose()); }); state.piles = []; }
+  const pileTop = PALLET.top + state.piles.reduce((s, p) => s + p.h, 0);
+  state.helperSeq = runSeq([
+    {start(){ helper.goTo([[HELP_HOME[0], 0.9], [cx, 0.9]], Math.PI); }, done:() => helper.ready},
+    {start(){ helper.act('low', 0.6, false); }, done:() => helper.ready,
+      end(){ g = new THREE.Group(); g.position.set(cx, TABLE_Y, 0); scene.add(g);
+        items.forEach(p => { p.m.position.x -= cx; p.m.position.y -= TABLE_Y; g.add(p.m); });
+        helper.carry = g; helper.carryY = TABLE_Y; }},
+    {start(){ helper.act('carry', 0.5, false); }, update(dt, t){ helper.carryY = TABLE_Y + Math.min(1, t/0.5)*0.14; }, done:() => helper.ready},
+    {start(){ helper.goTo([[cx, 1.6], [PALLET.x, 2.1]], 0); }, done:() => helper.ready},
+    {start(){ helper.act('low', 0.8, false); this.y0 = helper.carryY; },
+      update(dt, t){ const k = Math.min(1, t/0.7); helper.carryY = this.y0 + (pileTop - this.y0)*k; }, done:() => helper.ready,
+      end(){ helper.carry = null; state.piles.push({g, items, h: items.length*NEST + 0.035}); }},
+    {start(){ helper.act('idle'); helper.goTo([[PALLET.x, 1.6], HELP_HOME], Math.PI, 'watch'); }, done:() => helper.ready}
+  ], () => { state.helperSeq = null; });
+}
+
+// ---------------- sound ----------------
+const sound = (() => {
+  let ctx = null, hum = null, humGain = null, on = true;
+  function ensure(){
+    if (ctx || !on) return;
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      hum = ctx.createOscillator(); hum.type = 'sawtooth'; hum.frequency.value = 55;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+      humGain = ctx.createGain(); humGain.gain.value = 0;
+      hum.connect(lp); lp.connect(humGain); humGain.connect(ctx.destination); hum.start();
+    } catch(e){ ctx = null; }
+  }
+  return {
+    start(){ ensure(); if (ctx && ctx.state === 'suspended') ctx.resume(); },
+    level(v){ if (humGain) { humGain.gain.setTargetAtTime(on ? Math.min(0.06, v*0.09) : 0, ctx.currentTime, 0.1); hum.frequency.setTargetAtTime(45 + v*50, ctx.currentTime, 0.2); } },
+    cut(){
+      if (!ctx || !on) return;
+      const n = ctx.createBufferSource(), buf = ctx.createBuffer(1, ctx.sampleRate*0.18, ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/d.length, 3);
+      n.buffer = buf; const g = ctx.createGain(); g.gain.value = 0.35; n.connect(g); g.connect(ctx.destination); n.start();
+    },
+    beep(){
+      if (!ctx || !on) return;
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'square'; o.frequency.value = 1350; g.gain.value = 0.035;
+      o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.12);
+    },
+    toggle(){ on = !on; if (!on && humGain) humGain.gain.value = 0; return on; }
+  };
+})();
+
+// ---------------- UI ----------------
+$('btnStart').addEventListener('click', start);
+$('btnStop').addEventListener('click', stop);
+$('btnCoil').addEventListener('click', changeCoil);
+$('btnClear').addEventListener('click', clearTable);
+$('speed').addEventListener('input', e => { state.speed = +e.target.value/60; $('speedOut').textContent = e.target.value + ' m/min'; });
+$('len').addEventListener('input', e => { state.LP = +e.target.value; $('lenOut').textContent = fmt(state.LP, 2) + ' m'; $('lcdLen').textContent = fmt(state.LP, 2); });
+$('btnSound').addEventListener('click', e => { const on = sound.toggle(); e.target.textContent = 'Som: ' + (on ? 'ligado' : 'desligado'); e.target.setAttribute('aria-pressed', on); });
+$('btnFast').addEventListener('click', e => { state.fast = !state.fast; e.target.textContent = 'Tempo: ' + (state.fast ? '2×' : '1×'); e.target.setAttribute('aria-pressed', state.fast); });
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !['INPUT','BUTTON'].includes(document.activeElement.tagName)) { e.preventDefault(); state.running ? stop() : start(); }
+});
+
+function drawScreen(){
+  sx.fillStyle = '#071a10'; sx.fillRect(0, 0, 256, 160);
+  sx.fillStyle = '#62f29a'; sx.font = '22px "Share Tech Mono", monospace';
+  sx.fillText('TELHAS ' + String(state.total).padStart(3, '0'), 16, 40);
+  sx.fillText((state.v*60).toFixed(1).padStart(5,' ') + ' m/min', 16, 78);
+  sx.fillText(state.swap ? 'TROCA BOBINA' : 'BOB ' + Math.round(100*state.coilLen/COIL_TOTAL) + '%', 16, 116);
+  sx.fillStyle = state.running ? '#1fae4b' : (state.swap || !canRun() ? '#f2b705' : '#d8282b');
+  sx.fillRect(16, 130, 224, 14);
+  scrTex.needsUpdate = true;
+}
+function updateUI(){
+  const pct = state.coilLen / COIL_TOTAL;
+  $('lcdCount').textContent = String(state.total).padStart(3, '0');
+  $('lcdMeters').textContent = fmt(state.meters, 1);
+  $('lcdSpeed').textContent = fmt(state.v*60, 1);
+  $('coilText').textContent = fmt(state.coilLen, 1) + ' m · ' + Math.round(pct*100) + '%';
+  const barEl = $('coilBar'); barEl.style.width = (pct*100) + '%';
+  barEl.className = pct <= 0 ? 'empty' : (pct < 0.2 ? 'low' : '');
+  const led = $('led'), st = $('statusText');
+  if (state.swap){ led.className = 'led warn'; st.textContent = 'Trocando bobina'; }
+  else if (state.running || state.startDelay > 0){ led.className = 'led run'; st.textContent = state.coilLen > 0 ? 'Produzindo' : 'Terminando a bobina'; }
+  else if (!canRun()){ led.className = 'led warn'; st.textContent = 'Bobina vazia'; }
+  else if (state.v > 0.01){ led.className = 'led stop'; st.textContent = 'Parando'; }
+  else if (state.helperSeq){ led.className = 'led stop'; st.textContent = 'Retirando telhas'; }
+  else { led.className = 'led stop'; st.textContent = 'Parada'; }
+  const sb = $('swapBox');
+  if (state.swap){ const n = state.swap.steps.length, i = Math.min(state.swap.i, n-1);
+    sb.hidden = false; $('swapStep').textContent = (i+1) + '/' + n; $('swapText').textContent = state.swap.steps[i].label + '…';
+    $('swapBar').style.width = ((i + 0.5)/n*100) + '%'; }
+  else sb.hidden = true;
+  $('btnStart').disabled = state.running || state.startDelay > 0 || !!state.swap;
+  $('btnStop').disabled = !state.running && state.startDelay <= 0;
+  $('btnCoil').disabled = !canSwap();
+  $('btnCoil').classList.toggle('hl', canSwap());
+  $('btnClear').disabled = !canClear();
+  $('btnClear').classList.toggle('hl', canClear() && state.stack.length >= MAX_STACK);
+  $('btnClear').title = state.running ? 'Pare a máquina para retirar as telhas' : '';
+  lamps[0].material.emissive.setHex(state.running ? 0x1fae4b : 0); lamps[0].material.emissiveIntensity = 0.8;
+  lamps[2].material.emissive.setHex(!state.running ? 0xd8282b : 0); lamps[2].material.emissiveIntensity = 0.6;
+  lamps[1].material.emissive.setHex(!canRun() || state.swap ? 0xf2b705 : 0); lamps[1].material.emissiveIntensity = 0.7;
+  drawScreen();
+}
+
+// ---------------- simulation ----------------
+let beepT = 0;
+function step(dt){
+  if (state.startDelay > 0) { state.startDelay -= dt; if (state.startDelay <= 0) { state.startDelay = 0; state.running = true; } }
+  const target = state.running ? state.speed : 0;
+  state.v += (target - state.v) * Math.min(1, dt * 3);
+  if (!state.running && state.v < 0.002) state.v = 0;
+  const ds = state.v * dt;
+
+  if (ds > 0 && canRun()) {
+    if (state.coilLen > 0) { state.coilLen = Math.max(0, state.coilLen - ds); if (state.coilLen === 0) state.tail = 0; }
+    else if (state.tail >= 0) state.tail += ds;
+    state.meters += ds; state.rollSpin += ds;
+    if (!state.current) newPanel();
+    const p = state.current;
+    p.len += ds;
+    if (p.len >= p.LP) { const over = p.len - p.LP; p.len = p.LP; finishPanel(false); if (over > 0) { newPanel(); state.current.len = over; } }
+    if (state.tail >= L_CORE + X_CUT) {
+      finishPanel(true); state.running = false; state.v = 0;
+      setMsg('A bobina acabou. Clique em "Trocar bobina".', true);
+    }
+    if (state.stack.length + state.sliding.length >= MAX_STACK && state.running) { state.running = false; setMsg('Mesa cheia. Pare e clique em "Retirar telhas".', true); }
+  }
+
+  // scripted actions
+  if (state.swap) tickSeq(state.swap, dt);
+  if (state.helperSeq) tickSeq(state.helperSeq, dt);
+  if (!state.swap) {
+    if (op.ready && (op.action === 'idle' || op.action === 'watch') && op.atHome(OP_HOME)) op.action = state.running ? 'watch' : 'idle';
+  }
+  op.update(dt); helper.update(dt); updateCrane(dt);
+  if (crane.moving) { beepT += dt; if (beepT > 0.7) { beepT = 0; sound.beep(); } } else beepT = 0.6;
+
+  // coil visuals
+  const R = Math.sqrt(RC*RC + (R0*R0 - RC*RC) * state.coilLen / COIL_TOTAL);
+  coil.visible = state.decoilerHas === 'coil' && state.coilLen > 0; coil.scale.set(R, R, 1);
+  core.visible = mandrel.visible = state.decoilerHas !== 'none';
+  if (state.coilLen > 0) state.coilSpin -= ds / R;
+  coil.rotation.z = state.coilSpin; core.rotation.z = state.coilSpin;
+  // feed strip from coil to the machine entry
+  const T = tangentPoint(R), d = T.clone().sub(E);
+  let len = d.length();
+  if (state.swap) len = state.decoilerHas === 'coil' ? len * state.feedFrac : 0;
+  else if (state.tail >= 0) len = Math.max(0, L_CORE - state.tail);
+  feed.visible = len > 0.01; feed.scale.x = Math.max(len, 0.001);
+  feed.rotation.z = Math.atan2(d.y, d.x) - Math.PI;
+  // strip inside the machine
+  if (state.swap) segs.forEach(s => s.m.visible = s.x1 <= state.segReveal + 1e-6);
+  else if (state.tail >= 0) { const tx = state.tail - L_CORE; segs.forEach(s => s.m.visible = s.x1 > tx); }
+  // panel emerging
+  if (state.current) { const p = state.current; p.m.position.x = X_CUT + p.len; p.m.scale.x = Math.max(p.len / p.LP, 0.0001); }
+  rollerGroups.forEach(r => r.g.rotation.z = -r.sgn * state.rollSpin / 0.06);
+  // blade stroke
+  if (state.blade > 0) {
+    state.blade += dt; const t = state.blade / 0.32;
+    const k = t < 0.4 ? t/0.4 : t < 0.6 ? 1 : Math.max(0, 1 - (t-0.6)/0.4);
+    holder.position.y = 1.30 - 0.2*k; blade.position.y = 1.15 - 0.2*k; rod.position.y = 1.62 - 0.1*k;
+    if (t >= 1) state.blade = 0;
+  }
+  // sheets sliding to the stack
+  for (let i = state.sliding.length - 1; i >= 0; i--) {
+    const s = state.sliding[i]; s.t += dt / 0.9; const t = Math.min(1, s.t), e = 1 - Math.pow(1 - t, 3);
+    s.p.m.position.x = s.x0 + (s.xf - s.x0) * e;
+    s.p.m.position.y = t < 0.8 ? E.y + 0.01 : E.y + 0.01 + (s.yf - E.y - 0.01) * ((t - 0.8) / 0.2);
+    if (t >= 1) { s.p.m.position.y = s.yf; state.stack.push(s.p); state.sliding.splice(i, 1); }
+  }
+  if (state.msgT > 0) { state.msgT -= dt; if (state.msgT <= 0) setMsg(''); }
+  sound.level(Math.max(state.v, crane.moving ? 0.25 : 0));
+}
+
+function resize(){
+  const r = canvas.parentElement.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false); camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(canvas.parentElement); resize();
+
+const camGoal = new V3();
+function updateCamera(dt){
+  let goal = null;
+  if (state.swap && $('follow').checked) goal = camGoal.set(crane.tx + 0.8, 1.3, crane.bz*0.5);
+  else if (state.camBack > 0) { state.camBack -= dt; goal = CAM_HOME; }
+  if (goal) { const delta = goal.clone().sub(controls.target).multiplyScalar(Math.min(1, dt*1.4)); controls.target.add(delta); camera.position.add(delta); }
+}
+
+let last = performance.now(), uiT = 0;
+function loop(now){
+  const real = Math.min(0.05, (now - last) / 1000); last = now;
+  const dt = real * (state.fast ? 2 : 1);
+  step(dt); updateCamera(real);
+  uiT += real; if (uiT > 0.12) { uiT = 0; updateUI(); }
+  controls.update(); renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+updateUI(); requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
