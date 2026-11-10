@@ -21,6 +21,7 @@
   color-scheme:dark;
 }
 html,body{height:100%}
+[hidden]{display:none!important}
 body{background:var(--cabinet);color:var(--ink);font-family:var(--f-body);overflow:hidden}
 .app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;
   padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));box-sizing:border-box}
@@ -140,6 +141,10 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/fflate.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/curves/NURBSUtils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/curves/NURBSCurve.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
 <script>
 (function(){
 const $ = id => document.getElementById(id);
@@ -156,9 +161,9 @@ const NST = 7, ST_X0 = 0.35, ST_DX = 0.47;
 const rib = z => A * Math.tanh(3 * Math.sin(2 * Math.PI * z / PER)) / Math.tanh(3);
 
 // crane / storage layout
-const CR = {x0:-3.0, x1:0.1, z0:-3.6, z1:0.9, top:3.3};
+const CR = {x0:-3.0, x1:2.2, z0:-3.6, z1:0.9, top:3.3};
 const HANG = 1.05, TRAVEL = 3.1, PARK = {tx:-1.45, bz:-3.2};
-const RACK_Z = -2.7, RACK_X = [-2.05, -0.85], RACK_Y = 0.62;
+const RACK_Z = -2.7, RACK_X = [0.6, 1.8], RACK_Y = 0.62;   // [0] = front slot (taken first)
 const CRADLE_Z = -1.55, CRADLE_X = [-2.15, -1.65, -1.15], CRADLE_Y = 0.3;
 const PALLET = {x:6.83, z:3.0, top:0.14};
 const OP_HOME = [3.45, 1.35], HELP_HOME = [6.3, 1.2];
@@ -193,7 +198,7 @@ floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
 const mat = (color, metal=0.1, rough=0.5, extra={}) => new THREE.MeshStandardMaterial(Object.assign({color, metalness:metal, roughness:rough}, extra));
 const M = {
   blue: mat(0x1f56d8, 0.15, 0.45), yellow: mat(0xf2b705, 0.1, 0.45), steel: mat(0xaeb5bf, 0.85, 0.3),
-  sheet: mat(0x9aa3ae, 0.8, 0.33, {side:THREE.DoubleSide}), dark: mat(0x1b1d22, 0.3, 0.55), gray: mat(0xb4b8be, 0.05, 0.6),
+  sheet: mat(0xb9c1cb, 0.45, 0.38, {side:THREE.DoubleSide}), dark: mat(0x1b1d22, 0.3, 0.55), gray: mat(0xb4b8be, 0.05, 0.6),
   core: mat(0x34373d, 0.6, 0.45), red: mat(0xd8282b, 0, 0.4), green: mat(0x1fae4b, 0, 0.4), amber: mat(0xf2c400, 0, 0.4),
   wood: mat(0x9a7448, 0, 0.85), strap: mat(0xff7a1a, 0, 0.7), line: mat(0xf2c400, 0, 0.8)
 };
@@ -271,7 +276,7 @@ const cc = document.createElement('canvas'); cc.width = cc.height = 256; const c
 cx.fillStyle = '#9aa3ae'; cx.fillRect(0, 0, 256, 256);
 for (let r = 128; r > 10; r -= 3) { cx.strokeStyle = r % 2 ? '#87909b' : '#b3bac3'; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(128, 128, r, 0, Math.PI*2); cx.stroke(); }
 const capTex = new THREE.CanvasTexture(cc); capTex.encoding = THREE.sRGBEncoding;
-const capMat = mat(0xffffff, 0.75, 0.35, {map: capTex});
+const capMat = mat(0xffffff, 0.35, 0.45, {map: capTex});
 const coilGeo = new THREE.CylinderGeometry(1, 1, W, 64); coilGeo.rotateX(Math.PI/2);
 const coilMats = [M.sheet, capMat, capMat];
 const coil = add(new THREE.Mesh(coilGeo, coilMats), C.x, C.y, 0);
@@ -407,11 +412,12 @@ const loadCore = add(new THREE.Mesh(coreGeo, M.core), 0, -10, 0); loadCore.visib
 class Worker {
   constructor(o){
     const root = this.root = new THREE.Group(); scene.add(root);
+    const body = this.body = new THREE.Group(); root.add(body); this.model = null;
     const suit = mat(o.suit, 0.05, 0.75), vest = mat(o.vest, 0.05, 0.6), skin = mat(o.skin, 0, 0.7), helm = mat(o.helmet, 0.1, 0.35),
           glove = mat(o.glove, 0, 0.8), refl = mat(0xe9edf2, 0.6, 0.3), boot = mat(0x2a211a, 0.1, 0.7);
-    this.legs = [-1, 1].map(s => { const g = new THREE.Group(); g.position.set(s*0.11, 0.92, 0); root.add(g);
+    this.legs = [-1, 1].map(s => { const g = new THREE.Group(); g.position.set(s*0.11, 0.92, 0); body.add(g);
       box(0.16, 0.82, 0.18, suit, 0, -0.41, 0, g); box(0.18, 0.12, 0.28, boot, 0, -0.86, 0.04, g); return g; });
-    const spine = this.spine = new THREE.Group(); spine.position.y = 0.92; root.add(spine);
+    const spine = this.spine = new THREE.Group(); spine.position.y = 0.92; body.add(spine);
     box(0.44, 0.6, 0.25, suit, 0, 0.3, 0, spine);
     box(0.46, 0.07, 0.27, M.dark, 0, 0.03, 0, spine);
     box(0.46, 0.38, 0.27, vest, 0, 0.36, 0, spine);
@@ -484,6 +490,7 @@ class Worker {
     this.spine.rotation.x = P.lean; this.head.rotation.set(P.hx, P.hy, 0);
     this.root.position.y = P.bob;
     this.remote.visible = this.action === 'remote';
+    if (this.model) { this.root.position.y = 0; this.updateModel(dt, moving); }
     if (this.carry) {
       const f = new V3(Math.sin(this.h), 0, Math.cos(this.h));
       this.carry.position.set(this.pos.x + f.x*0.9, this.carryY, this.pos.z + f.z*0.9);
@@ -491,9 +498,89 @@ class Worker {
     }
   }
 }
+// ---- real characters (Apocalypse pack): replaces the blocky body when the FBX loads ----
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
+function rotateBoneWorld(bone, axis, ang){
+  bone.getWorldQuaternion(_q1); bone.parent.getWorldQuaternion(_q2);
+  _q3.setFromAxisAngle(axis, ang); _q1.premultiply(_q3);
+  bone.quaternion.copy(_q2.invert().multiply(_q1)); bone.updateMatrixWorld(true);
+}
+function attachAt(bone, obj, worldPos){
+  bone.updateMatrixWorld(true);
+  const local = new THREE.Matrix4().copy(bone.matrixWorld).invert().multiply(new THREE.Matrix4().compose(worldPos, new THREE.Quaternion(), new V3(1,1,1)));
+  local.decompose(obj.position, obj.quaternion, obj.scale); bone.add(obj);
+}
+Worker.prototype.setModel = function(obj, look){
+  const holder = new THREE.Group(); holder.add(obj);
+  const B = {}; obj.traverse(n => { if (n.isBone) B[n.name.replace(/^.*[:|]/, '')] = n; });
+  const meshes = []; obj.traverse(n => { if (n.isMesh) meshes.push(n); });
+  meshes.forEach(m => {
+    const nm = m.name.toLowerCase();
+    if (look.hide.some(h => nm.includes(h))) { m.visible = false; return; }
+    let mt;
+    if (nm.includes('outwear')) mt = new THREE.MeshStandardMaterial({color:look.vest, roughness:0.6});
+    else if (nm.includes('pants')) mt = new THREE.MeshStandardMaterial({color:look.pants, roughness:0.8});
+    else mt = new THREE.MeshStandardMaterial({map:PALETTE, roughness:0.75});
+    mt.skinning = !!m.isSkinnedMesh; m.material = mt; m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false;
+  });
+  // face the toes to +Z, scale to 1.75 m, feet on the floor, hips centred
+  holder.updateMatrixWorld(true);
+  const a = new V3(), b = new V3(); B.LeftFoot.getWorldPosition(a); B.LeftToeBase.getWorldPosition(b);
+  holder.rotation.y = -Math.atan2(b.x - a.x, b.z - a.z); holder.updateMatrixWorld(true);
+  const vis = () => { const bx = new THREE.Box3(); meshes.forEach(m => { if (m.visible) bx.expandByObject(m); }); return bx; };
+  let bx = vis(); holder.scale.setScalar(look.height / (bx.max.y - bx.min.y)); holder.updateMatrixWorld(true);
+  bx = vis(); const hp = new V3(); B.Hips.getWorldPosition(hp);
+  holder.position.set(-hp.x, -bx.min.y, -hp.z); holder.updateMatrixWorld(true);
+  // hard hat on the head bone
+  bx = vis(); const head = new V3(); B.Head.getWorldPosition(head);
+  const face = meshes.find(m => /face/i.test(m.name)); const fb = new THREE.Box3().expandByObject(face || meshes[0]);
+  const r = Math.max(0.11, Math.max(fb.max.x - fb.min.x, fb.max.z - fb.min.z) * 0.5 * look.helmetK);
+  const hm = new THREE.MeshStandardMaterial({color:look.helmet, roughness:0.35, metalness:0.1});
+  const helmet = new THREE.Group();
+  const dome = add(new THREE.Mesh(new THREE.SphereGeometry(r, 18, 9, 0, Math.PI*2, 0, Math.PI/2), hm), 0, 0, 0, helmet); dome.scale.y = 0.85;
+  const brim = add(new THREE.Mesh(new THREE.CylinderGeometry(r*1.12, r*1.12, r*0.1, 22), hm), 0, 0, r*0.16, helmet); brim.scale.z = 1.15;
+  add(new THREE.Mesh(new THREE.BoxGeometry(r*0.22, r*0.18, r*1.9), hm), 0, r*0.8, 0, helmet);
+  attachAt(B.Head, helmet, new V3(head.x, bx.max.y - r*0.62 + look.helmetDy, head.z + look.helmetDz));
+  // radio in the right hand (shown while operating the crane)
+  const radio = new THREE.Group(); box(0.05, 0.13, 0.035, M.yellow, 0, 0, 0, radio); box(0.012, 0.09, 0.012, M.dark, 0.012, 0.1, 0, radio);
+  const hand = new V3(); B.RightHand.getWorldPosition(hand); attachAt(B.RightHand, radio, hand); radio.visible = false;
+  this.radio = radio; this.bones = B; this.holder = holder; this.model = obj;
+  this.mixer = new THREE.AnimationMixer(obj); this.acts = {};
+  for (const n of ['Idle','Walk','Carry','Radio','Look']) { const c = obj.animations.find(c => c.name === n) || obj.animations.find(c => c.name.includes(n)); if (c) this.acts[n] = this.mixer.clipAction(c); }
+  this.cur = null; this.body.visible = false; this.root.add(holder);
+};
+Worker.prototype.updateModel = function(dt, moving){
+  const name = moving ? (this.action === 'carry' ? 'Carry' : 'Walk') : ({remote:'Radio', watch:'Look', carry:'Carry'}[this.action] || 'Idle');
+  if (name !== this.cur) {
+    const nx = this.acts[name] || this.acts.Idle;
+    if (nx) { nx.reset().setEffectiveWeight(1).fadeIn(0.25).play(); }
+    if (this.cur && this.acts[this.cur] && this.acts[this.cur] !== nx) this.acts[this.cur].fadeOut(0.25);
+    this.cur = name;
+  }
+  const act = this.acts[name]; if (act) act.timeScale = (name === 'Carry' && !moving) ? 0 : (moving ? this.speed * (name === 'Carry' ? 0.75 : 1) / 1.45 : 1);
+  this.mixer.update(dt); this.holder.updateMatrixWorld(true);
+  this.radio.visible = this.action === 'remote';
+  const ax = new V3(Math.cos(this.h), 0, -Math.sin(this.h)), t = this.t, B = this.bones;
+  const rot = (b, ang) => { if (B[b] && ang) rotateBoneWorld(B[b], ax, ang); };
+  let k;
+  switch (this.action) {
+    case 'press': if (!moving) { k = Math.min(1, t/0.18); rot('RightArm', -0.95*k - (t > 0.18 && t < 0.36 ? 0.1 : 0)); rot('RightForeArm', -0.35*k); } break;
+    case 'reach': if (!moving) { k = Math.min(1, t/0.3); const a = (-1.9 + 0.12*Math.sin(t*7))*k; rot('LeftArm', a); rot('RightArm', a); rot('LeftForeArm', -0.4*k); rot('RightForeArm', -0.4*k); } break;
+    case 'low': if (!moving) { k = Math.min(1, t/0.3); rot('Spine', 0.25*k); rot('Spine1', 0.25*k); rot('LeftArm', -0.8*k); rot('RightArm', -0.8*k); } break;
+    case 'pull': { const a = -1.15 + 0.2*Math.sin(t*6); rot('LeftArm', a); rot('RightArm', a); rot('LeftForeArm', -0.3); rot('RightForeArm', -0.3); } break;
+  }
+};
+const PALETTE = new THREE.TextureLoader().load('personagens/paleta.png'); PALETTE.encoding = THREE.sRGBEncoding;
 const op = new Worker({suit:0x2b4f9e, vest:0xff7a1a, skin:0xe0ac7e, helmet:0xf4f4f4, glove:0x3a3a3a, x:OP_HOME[0], z:OP_HOME[1], h:Math.PI});
 const helper = new Worker({suit:0x5d6b4f, vest:0xc6f21a, skin:0xb07a52, helmet:0xf2b705, glove:0xd9a400, x:HELP_HOME[0], z:HELP_HOME[1], h:Math.PI});
 op.speed = 1.8;
+if (THREE.FBXLoader && location.protocol !== 'file:') {
+  const mgr = new THREE.LoadingManager(); mgr.setURLModifier(u => /\.(png|jpe?g|tga|bmp)$/i.test(u) ? 'personagens/paleta.png' : u);
+  const ld = new THREE.FBXLoader(mgr);
+  [[op, 'personagens/operador.fbx', {vest:0xff7a1a, pants:0x2b4f9e, helmet:0xf4f4f4, hide:['hat'], height:1.7, helmetK:1.25, helmetDy:0, helmetDz:0}],
+   [helper, 'personagens/ajudante.fbx', {vest:0xc6f21a, pants:0x4f5a44, helmet:0xf2b705, hide:[], height:1.78, helmetK:1.25, helmetDy:0, helmetDz:0}]
+  ].forEach(([w, url, look]) => ld.load(url, obj => { try { w.setModel(obj, look); } catch(e){ console.warn('modelo', url, e); } }, undefined, e => console.warn('não carregou', url, e)));
+}
 
 // ---------------- roof sheets ----------------
 function panelGeometry(len){
@@ -585,25 +672,25 @@ function changeCoil(){
     {label:'Soltando as cintas', start(){ op.act('reach', 1.0); }, done:() => op.ready,
       end(){ const m = add(new THREE.Mesh(coreGeo, M.core), CRADLE_X[spot], CRADLE_Y, CRADLE_Z); cradleCores.push(m); loadCore.visible = false; crane.load = null; }},
     {label:'Subindo o gancho', start(){ crTo(null, null, TRAVEL); }, done:() => crane.arrived()},
-    {label:'Ponte indo até o estoque de bobinas', start(){ crTo(RACK_X[1], RACK_Z); op.goTo([[-0.05, -2.0], [-0.05, -2.7]], [RACK_X[1], RACK_Z]); },
+    {label:'Ponte indo até o estoque de bobinas', start(){ crTo(RACK_X[0], RACK_Z); op.goTo([[-0.2, -2.0], [-0.2, -2.7]], [RACK_X[0], RACK_Z]); },
       done:() => crane.arrived() && op.ready},
     {label:'Descendo o gancho na bobina nova', start(){ crTo(null, null, RACK_Y + HANG); }, done:() => crane.arrived()},
     {label:'Prendendo as cintas na bobina nova', start(){ op.act('reach', 1.4); }, done:() => op.ready,
-      end(){ scene.remove(rack[1]); rack[1] = null; loadCoil.visible = true; crane.load = loadCoil; }},
+      end(){ scene.remove(rack[0]); rack[0] = null; loadCoil.visible = true; crane.load = loadCoil; }},
     {label:'Içando a bobina nova', start(){ crTo(null, null, TRAVEL); }, done:() => crane.arrived()},
     {label:'Levando a bobina até o desbobinador', start(){ crTo(C.x, 0); }, done:() => crane.arrived()},
-    {label:'Descendo a bobina no mandril', start(){ crTo(null, null, C.y + HANG); op.goTo([[0.15, -2.4], [0.15, -1.0], [-0.6, -0.95], [-0.62, 0.85]], [C.x, 0]); },
+    {label:'Descendo a bobina no mandril', start(){ crTo(null, null, C.y + HANG); op.goTo([[-0.45, -0.9], [-0.62, 0.85]], [C.x, 0]); },
       done:() => crane.arrived() && op.ready},
     {label:'Soltando as cintas e travando o mandril', start(){ op.act('reach', 1.2); }, done:() => op.ready,
       end(){ crane.load = null; scene.remove(loadCoil); state.decoilerHas = 'coil'; state.coilLen = COIL_TOTAL; state.tail = -1;
              state.feedFrac = 0; state.segReveal = 0; }},
     {label:'Recolhendo a ponte rolante', start(){ crTo(PARK.tx, PARK.bz, TRAVEL); op.goTo([[-0.62, 1.3], [-0.95, 1.0]], Math.PI/2); this.roll = 0; },
       update(dt){ // the remaining coil rolls to the front slot; a new one is put in the back slot
-        if (!rack[1] && rack[0]) { const g = rack[0], nx = Math.min(RACK_X[1], g.position.x + 0.9*dt); g.rotation.z -= (nx - g.position.x)/R0; g.position.x = nx;
-          if (nx >= RACK_X[1]) { rack[1] = g; rack[0] = makeFullCoil(); rack[0].position.set(RACK_X[0], RACK_Y, RACK_Z); rack[0].scale.setScalar(0.01); } }
-        else if (rack[0] && rack[0].scale.x < 1) rack[0].scale.setScalar(Math.min(1, rack[0].scale.x + dt*2));
+        if (!rack[0] && rack[1]) { const g = rack[1], nx = Math.max(RACK_X[0], g.position.x - 0.9*dt); g.rotation.z -= (nx - g.position.x)/R0; g.position.x = nx;
+          if (nx <= RACK_X[0]) { rack[0] = g; rack[1] = makeFullCoil(); rack[1].position.set(RACK_X[1], RACK_Y, RACK_Z); rack[1].scale.setScalar(0.01); } }
+        else if (rack[1] && rack[1].scale.x < 1) rack[1].scale.setScalar(Math.min(1, rack[1].scale.x + dt*2));
       },
-      done:() => crane.arrived() && op.ready && rack[1] && rack[0].scale.x >= 1},
+      done:() => crane.arrived() && op.ready && rack[0] && rack[1].scale.x >= 1},
     {label:'Puxando a ponta da chapa até a máquina', start(){ op.act('pull', 0, false); op.goTo([[-0.12, 1.0]], Math.PI/2); },
       update(){ state.feedFrac = Math.min(1, Math.max(0, (op.pos.x + 0.95) / 0.83)); }, done:() => op.ready,
       end(){ state.feedFrac = 1; op.act('idle'); }},
