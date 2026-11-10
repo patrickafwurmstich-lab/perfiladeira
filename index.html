@@ -141,10 +141,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/fflate.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/curves/NURBSUtils.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/curves/NURBSCurve.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 (function(){
 const $ = id => document.getElementById(id);
@@ -512,57 +509,27 @@ function attachAt(bone, obj, worldPos){
   const local = new THREE.Matrix4().copy(bone.matrixWorld).invert().multiply(new THREE.Matrix4().compose(worldPos, new THREE.Quaternion(), new V3(1,1,1)));
   local.decompose(obj.position, obj.quaternion, obj.scale); bone.add(obj);
 }
-Worker.prototype.setModel = function(obj, look){
+Worker.prototype.setModel = function(obj, clips, look){
+  // obj: the worker built in Blender (shirt, hi-vis vest and hard hat already rigged to the skeleton)
   const holder = new THREE.Group(); holder.add(obj);
   const B = {}; obj.traverse(n => { if (n.isBone) B[n.name.replace(/^.*[:|]/, '')] = n; });
-  const meshes = []; obj.traverse(n => { if (n.isMesh) meshes.push(n); });
-  meshes.forEach(m => {
-    const nm = m.name.toLowerCase();
-    if (look.hide.some(h => nm.includes(h))) { m.visible = false; return; }
-    let mt;
-    if (nm.includes('outwear')) mt = new THREE.MeshStandardMaterial({map:texLoad(look.shirt), roughness:0.7});
-    else if (nm.includes('pants')) mt = new THREE.MeshStandardMaterial({map:texLoad(look.pants), roughness:0.8});
-    else mt = new THREE.MeshStandardMaterial({map:PALETTE, roughness:0.75});
-    mt.skinning = !!m.isSkinnedMesh; m.material = mt; m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false;
-  });
-  // face the character to +Z, scale to 1.75 m, feet on the floor, hips centred
+  obj.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; n.frustumCulled = false; } });
+  // face the character to +Z (up × (right − left)), scale, feet on the floor, hips centred
   holder.updateMatrixWorld(true);
   const a = new V3(), b = new V3(); B.LeftUpLeg.getWorldPosition(a); B.RightUpLeg.getWorldPosition(b);
-  const fwd = new V3(0, 1, 0).cross(b.sub(a));            // up × (right − left) = the way the body faces
+  const fwd = new V3(0, 1, 0).cross(b.sub(a));
   holder.rotation.y = -Math.atan2(fwd.x, fwd.z); holder.updateMatrixWorld(true);
-  const vis = () => { const bx = new THREE.Box3(); meshes.forEach(m => { if (m.visible) bx.expandByObject(m); }); return bx; };
-  let bx = vis(); holder.scale.setScalar(look.height / (bx.max.y - bx.min.y)); holder.updateMatrixWorld(true);
-  bx = vis(); const hp = new V3(); B.Hips.getWorldPosition(hp);
-  holder.position.set(-hp.x, -bx.min.y, -hp.z); holder.updateMatrixWorld(true);
-  this.mixer = new THREE.AnimationMixer(obj); this.acts = {};
-  for (const n of ['Idle','Walk','Carry','Radio','Look']) { const c = obj.animations.find(c => c.name === n) || obj.animations.find(c => c.name.includes(n)); if (c) this.acts[n] = this.mixer.clipAction(c); }
-  // pose the rig in its idle animation first, so the hat is fitted to the head as it really moves
-  if (this.acts.Idle) { this.acts.Idle.play(); this.mixer.update(0); this.acts.Idle.stop(); }
-  holder.updateMatrixWorld(true);
-  // hard hat on the head bone
-  const fb = new THREE.Box3(), tv = new V3();
-  meshes.forEach(m => {
-    if (!m.visible || !m.isSkinnedMesh) return;
-    const hi = m.skeleton.bones.findIndex(bn => bn.name === B.Head.name), g = m.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, ps = g.attributes.position;
-    if (hi < 0 || !si) return;
-    for (let i = 0; i < ps.count; i++) {
-      let w = 0; for (let j = 0; j < 4; j++) if (si.array[i*4 + j] === hi) w += sw.array[i*4 + j];
-      if (w > 0.5) { m.boneTransform(i, tv); fb.expandByPoint(tv.applyMatrix4(m.matrixWorld)); }
-    }
-  });
-  if (fb.isEmpty()) { B.Head.getWorldPosition(tv); fb.setFromCenterAndSize(tv.add(new V3(0, 0.12, 0)), new V3(0.24, 0.26, 0.24)); }
-  const fc = fb.getCenter(new V3());
-  const r = Math.max(0.1, Math.max(fb.max.x - fb.min.x, fb.max.z - fb.min.z) * 0.5 * look.helmetK);
-  const hm = new THREE.MeshStandardMaterial({color:look.helmet, roughness:0.35, metalness:0.1});
-  const helmet = new THREE.Group();
-  const dome = add(new THREE.Mesh(new THREE.SphereGeometry(r, 18, 9, 0, Math.PI*2, 0, Math.PI/2), hm), 0, 0, 0, helmet); dome.scale.y = 0.85;
-  const brim = add(new THREE.Mesh(new THREE.CylinderGeometry(r*1.12, r*1.12, r*0.1, 22), hm), 0, 0, r*0.16, helmet); brim.scale.z = 1.15;
-  add(new THREE.Mesh(new THREE.BoxGeometry(r*0.22, r*0.18, r*1.9), hm), 0, r*0.8, 0, helmet);
-  attachAt(B.Head, helmet, new V3(fc.x, fb.max.y - r*0.5 + look.helmetDy, fc.z + look.helmetDz));
+  let bx = new THREE.Box3().setFromObject(holder);
+  holder.scale.setScalar(look.height / (bx.max.y - bx.min.y)); holder.updateMatrixWorld(true);
+  bx = new THREE.Box3().setFromObject(holder); const hp = new V3(); B.Hips.getWorldPosition(hp);
+  holder.position.set(-hp.x, -bx.min.y, -hp.z);
   // radio in the right hand (shown while operating the crane)
+  holder.updateMatrixWorld(true);
   const radio = new THREE.Group(); box(0.05, 0.13, 0.035, M.yellow, 0, 0, 0, radio); box(0.012, 0.09, 0.012, M.dark, 0.012, 0.1, 0, radio);
   const hand = new V3(); B.RightHand.getWorldPosition(hand); attachAt(B.RightHand, radio, hand); radio.visible = false;
-  this.helmet = helmet; this.radio = radio; this.bones = B; this.holder = holder; this.model = obj;
+  this.radio = radio; this.bones = B; this.holder = holder; this.model = obj;
+  this.mixer = new THREE.AnimationMixer(obj); this.acts = {};
+  for (const n of ['Idle','Walk','Carry','Radio','Look']) { const c = clips.find(c => c.name === n) || clips.find(c => c.name.includes(n)); if (c) this.acts[n] = this.mixer.clipAction(c); }
   this.cur = null; this.body.visible = false; this.root.add(holder);
 };
 Worker.prototype.updateModel = function(dt, moving){
@@ -588,20 +555,17 @@ Worker.prototype.updateModel = function(dt, moving){
 };
 const texCache = {};
 function texLoad(url){ if (!texCache[url]) { const t = texCache[url] = new THREE.TextureLoader().load(url); t.encoding = THREE.sRGBEncoding; } return texCache[url]; }
-const PALETTE = texLoad('personagens/paleta.png');
 const op = new Worker({suit:0x2b4f9e, vest:0xff7a1a, skin:0xe0ac7e, helmet:0xf4f4f4, glove:0x3a3a3a, x:OP_HOME[0], z:OP_HOME[1], h:Math.PI});
 const helper = new Worker({suit:0x5d6b4f, vest:0xc6f21a, skin:0xb07a52, helmet:0xf2b705, glove:0xd9a400, x:HELP_HOME[0], z:HELP_HOME[1], h:Math.PI});
 op.speed = 1.8;
-if (THREE.FBXLoader && location.protocol !== 'file:') {
-  const mgr = new THREE.LoadingManager(); mgr.setURLModifier(u => /\.(png|jpe?g|tga|bmp)$/i.test(u) ? 'personagens/paleta.png' : u);
-  const ld = new THREE.FBXLoader(mgr);
-  const looks = [[op, {shirt:'personagens/op_camisa.png', pants:'personagens/op_calca.png', helmet:0xf4f4f4, hide:['beard'], height:1.76, helmetK:1.12, helmetDy:0, helmetDz:0}],
-   [helper, {shirt:'personagens/aj_camisa.png', pants:'personagens/aj_calca.png', helmet:0xf2b705, hide:[], height:1.8, helmetK:1.12, helmetDy:0, helmetDz:0}]];
-  // the FBX travels as base64 text so it can be served anywhere
-  fetch('personagens/trabalhador.txt').then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(t => {
-    const bin = atob(t.trim()), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    looks.forEach(([w, look]) => { try { w.setModel(ld.parse(u8.buffer, 'personagens/'), look); } catch(e){ console.warn('modelo', e); } });
-  }).catch(e => console.warn('personagens não carregaram', e));
+if (THREE.GLTFLoader && location.protocol !== 'file:') {
+  // the .glb files travel as base64 text so they can be served anywhere
+  const ld = new THREE.GLTFLoader();
+  [[op, 'personagens/operador.txt', {height:1.78}], [helper, 'personagens/ajudante.txt', {height:1.8}]].forEach(([w, url, look]) =>
+    fetch(url).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(t => {
+      const bin = atob(t.trim()), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      ld.parse(u8.buffer, '', g => { try { w.setModel(g.scene, g.animations, look); } catch(e){ console.warn('modelo', url, e); } }, e => console.warn('glb', url, e));
+    }).catch(e => console.warn('personagem não carregou', url, e)));
 }
 
 // ---------------- roof sheets ----------------
