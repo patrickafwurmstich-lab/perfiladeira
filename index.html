@@ -541,7 +541,7 @@ Worker.prototype.setModel = function(obj, look){
     const hi = m.skeleton.bones.indexOf(B.Head), g = m.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, ps = g.attributes.position;
     if (hi < 0 || !si) return;
     for (let i = 0; i < ps.count; i++) {
-      let w = 0; for (let j = 0; j < 4; j++) if (si.getComponent(i, j) === hi) w += sw.getComponent(i, j);
+      let w = 0; for (let j = 0; j < 4; j++) if (si.array[i*4 + j] === hi) w += sw.array[i*4 + j];
       if (w > 0.5) fb.expandByPoint(tv.fromBufferAttribute(ps, i).applyMatrix4(m.matrixWorld));
     }
   });
