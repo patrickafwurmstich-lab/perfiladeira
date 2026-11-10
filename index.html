@@ -186,7 +186,7 @@ controls.minDistance = 2.5; controls.maxDistance = 18; controls.update();
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8c919a, 0.75));
 const sun = new THREE.DirectionalLight(0xffffff, 0.95);
 sun.position.set(4, 10, 6); sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;   // no striped self-shadow on curved surfaces
 Object.assign(sun.shadow.camera, {left:-8, right:8, top:7, bottom:-6, near:1, far:28});
 sun.target.position.set(2.0, 0, -0.5); scene.add(sun, sun.target);
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({color:0xc8cdd4, roughness:0.95}));
