@@ -563,7 +563,7 @@ op.speed = 1.8;
 if (THREE.GLTFLoader && location.protocol !== 'file:') {
   // the .glb files travel as base64 text so they can be served anywhere
   const ld = new THREE.GLTFLoader();
-  [[op, 'personagens/operador.txt', {}], [helper, 'personagens/ajudante.txt', {}]].forEach(([w, url, look]) =>
+  [[op, 'personagens/operador.txt?v=4', {}], [helper, 'personagens/ajudante.txt?v=4', {}]]   // ?v= busts old cached models.forEach(([w, url, look]) =>
     fetch(url).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(t => {
       const bin = atob(t.trim()), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
       ld.parse(u8.buffer, '', g => { try { w.setModel(g.scene, g.animations, look); } catch(e){ console.warn('modelo', url, e); } }, e => console.warn('glb', url, e));
