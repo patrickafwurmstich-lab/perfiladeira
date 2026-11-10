@@ -492,9 +492,11 @@ class Worker {
     this.remote.visible = this.action === 'remote';
     if (this.model) { this.root.position.y = 0; this.updateModel(dt, moving); }
     if (this.carry) {
-      const f = new V3(Math.sin(this.h), 0, Math.cos(this.h));
-      this.carry.position.set(this.pos.x + f.x*0.9, this.carryY, this.pos.z + f.z*0.9);
-      this.carry.rotation.y = this.h - Math.PI;
+      // k = 0: held low in front (picking up / putting down); k = 1: on the right shoulder, sheets pointing forward
+      const f = new V3(Math.sin(this.h), 0, Math.cos(this.h)), rgt = new V3(-Math.cos(this.h), 0, Math.sin(this.h)), k = this.carryK || 0;
+      const fx = this.pos.x + f.x*0.9, fz = this.pos.z + f.z*0.9, sx = this.pos.x + rgt.x*0.2 + f.x*0.05, sz = this.pos.z + rgt.z*0.2 + f.z*0.05;
+      this.carry.position.set(fx + (sx - fx)*k, this.carryY + (1.5 - this.carryY)*k, fz + (sz - fz)*k);
+      this.carry.rotation.y = this.h - Math.PI + k*Math.PI/2;
     }
   }
 }
@@ -722,11 +724,11 @@ function clearTable(){
     {start(){ helper.act('low', 0.6, false); }, done:() => helper.ready,
       end(){ g = new THREE.Group(); g.position.set(cx, TABLE_Y, 0); scene.add(g);
         items.forEach(p => { p.m.position.x -= cx; p.m.position.y -= TABLE_Y; g.add(p.m); });
-        helper.carry = g; helper.carryY = TABLE_Y; }},
-    {start(){ helper.act('carry', 0.5, false); }, update(dt, t){ helper.carryY = TABLE_Y + Math.min(1, t/0.5)*0.14; }, done:() => helper.ready},
+        helper.carry = g; helper.carryY = TABLE_Y; helper.carryK = 0; }},
+    {start(){ helper.act('carry', 0.6, false); }, update(dt, t){ const k = Math.min(1, t/0.5); helper.carryY = TABLE_Y + k*0.14; helper.carryK = k; }, done:() => helper.ready},
     {start(){ helper.goTo([[cx, 1.6], [PALLET.x, 2.1]], 0); }, done:() => helper.ready},
     {start(){ helper.act('low', 0.8, false); this.y0 = helper.carryY; },
-      update(dt, t){ const k = Math.min(1, t/0.7); helper.carryY = this.y0 + (pileTop - this.y0)*k; }, done:() => helper.ready,
+      update(dt, t){ const k = Math.min(1, t/0.7); helper.carryK = 1 - k; helper.carryY = this.y0 + (pileTop - this.y0)*k; }, done:() => helper.ready,
       end(){ helper.carry = null; state.piles.push({g, items, h: items.length*NEST + 0.035}); }},
     {start(){ helper.act('idle'); helper.goTo([[PALLET.x, 1.6], HELP_HOME], Math.PI, 'watch'); }, done:() => helper.ready}
   ], () => { state.helperSeq = null; });
