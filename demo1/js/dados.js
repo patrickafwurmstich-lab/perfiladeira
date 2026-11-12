@@ -143,6 +143,19 @@ PT.DADOS = {
              multaCancelamento: 0.05,            // cancelamento por atraso da fábrica: devolve a entrada + multa
              prazoMinimoAceite: true },
 
+  // ---------------- MESA DE CARREGAMENTO 2D (Fase 2, ordem do Gemini: 1º) ----------------
+  carregamento: {
+    mesa2D: true,
+    carroceria: { comprimento: 12, largura: 2.5, celula: 0.5 },   // grade 24 x 5
+    capacidadeKg: 6000,
+    pecasPorPacote: 20,
+    balanco: [0.30, 0.70],         // centro de massa deve ficar entre 30% e 70% do comprimento
+    chanceDanoSemCinta: 0.35,      // por pacote sem cinta
+    fracaoDanoPacote: 0.15,        // % das peças do pacote que amassam
+    danoDesbalanceado: 0.10,       // chance extra por pacote se a carga estiver desbalanceada
+    segundosCinta: 1.2             // tempo real para passar cada cinta
+  },
+
   // ---------------- REPUTAÇÃO ----------------
   reputacao: {
     inicial: { pontualidade: 0.6, qualidade: 0.6, financeira: 0.6 },

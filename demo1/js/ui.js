@@ -13,8 +13,8 @@ PT.ui = (function () {
   function el(tag, attrs, html) { const e = document.createElement(tag); Object.assign(e, attrs || {}); if (html !== undefined) e.innerHTML = html; return e; }
   function modalAberto() { return !!st.modal; }
   function capturandoTeclado() { const a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'SELECT' || a.tagName === 'TEXTAREA'); }
-  function abrirModal(nome) { st.modal = nome; ['computador', 'clp', 'minijogo', 'ligacao', 'progresso'].forEach(n => $(n).style.display = n === nome ? 'flex' : 'none'); }
-  function fecharModal() { if (st.modal === 'minijogo' || st.modal === 'progresso') return; st.modal = null; ['computador', 'clp', 'ligacao'].forEach(n => $(n).style.display = 'none'); proximaLigacao(); }
+  function abrirModal(nome) { st.modal = nome; ['computador', 'clp', 'minijogo', 'ligacao', 'progresso', 'carga'].forEach(n => $(n).style.display = n === nome ? 'flex' : 'none'); }
+  function fecharModal() { if (st.modal === 'minijogo' || st.modal === 'progresso') return; st.modal = null; ['computador', 'clp', 'ligacao', 'carga'].forEach(n => $(n).style.display = 'none'); proximaLigacao(); }
 
   // ---------------- AVISOS / CELULAR ----------------
   function aviso(txt) {
@@ -318,7 +318,7 @@ PT.ui = (function () {
   });
 
   return {
-    hud, aviso, email, modalAberto, capturandoTeclado, abrirComputador, abrirCLP, minijogo, progresso, fecharModal,
+    hud, aviso, email, modalAberto, abrirModal, capturandoTeclado, abrirComputador, abrirCLP, minijogo, progresso, fecharModal,
     salvarCorreio() { return st.correio.slice(0, 60); }, carregarCorreio(c) { st.correio = c || []; }
   };
 })();

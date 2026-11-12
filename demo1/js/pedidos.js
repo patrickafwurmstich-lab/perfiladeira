@@ -67,9 +67,12 @@ PT.pedidos = (function () {
   function pilhasPara(p) { return PT.ent.naZona('expedicao', o => o.tipo === 'pilha' && !o.preso && o.produto === p.produto && Math.abs(o.comprimento - p.comprimento) < 1e-6); }
   function disponivel(p) { const ps = pilhasPara(p); return { boas: ps.reduce((a, o) => a + o.qtd - o.defeituosas, 0), tortas: ps.reduce((a, o) => a + o.defeituosas, 0) }; }
 
-  function carregar(c, incluirTortas) {
+  // lim (opcional, vem da mesa de carregamento 2D): { boas, tortas, dano }
+  function carregar(c, incluirTortas, lim) {
     const p = st.lista.find(x => x.id === c.e.pedidoId); if (!p || p.status !== 'coleta') return;
     let falta = p.pecas - p.carregadas;
+    const teto = { boas: lim ? lim.boas : Infinity, tortas: lim ? lim.tortas : Infinity };
+    let boasAgora = 0;
     const ps = pilhasPara(p);
     // primeiro as boas, depois (se o jogador quiser) as tortas
     for (const passo of ['boas', 'tortas']) {
@@ -77,7 +80,8 @@ PT.pedidos = (function () {
       for (const o of ps) {
         if (falta <= 0) break;
         const disp = passo === 'boas' ? o.qtd - o.defeituosas : o.defeituosas;
-        const n = Math.min(disp, falta); if (n <= 0) continue;
+        const n = Math.min(disp, falta, teto[passo]); if (n <= 0) continue;
+        teto[passo] -= n; if (passo === 'boas') boasAgora += n;
         o.qtd -= n; if (passo === 'tortas') { o.defeituosas -= n; p.tortasEntregues += n; }
         falta -= n; p.carregadas += n;
         // MANIFESTO: o que está fisicamente na carroceria deste caminhão
@@ -85,6 +89,8 @@ PT.pedidos = (function () {
         if (o.qtd <= 0) PT.ent.remover(o); else PT.estoque.atualizarPilha(o);
       }
     }
+    // carga mal amarrada/desbalanceada: parte das telhas chega amassada na obra
+    if (lim && lim.dano > 0) { const d = Math.min(lim.dano, boasAgora); p.tortasEntregues += d; p.danoTransporte = (p.danoTransporte || 0) + d; }
     if (p.carregadas >= p.pecas) concluir(p, c);
     else PT.ev.emit('aviso', 'Carregadas ' + p.carregadas + ' de ' + p.pecas + '. Faltam ' + (p.pecas - p.carregadas) + ' peças na zona verde.');
   }
@@ -99,6 +105,7 @@ PT.pedidos = (function () {
     const fracTorta = p.tortasEntregues / p.pecas;
     if (fracTorta > 0) { PT.rep.efeito('qualidade', E.defeito * (1 + fracTorta * 4)); PT.ev.emit('celular', { de: p.cliente, texto: 'Chegaram ' + p.tortasEntregues + ' telha(s) torta(s) aqui na obra, hein! Da próxima vez confere antes.' }); }
     else PT.rep.efeito('qualidade', E.semDefeito);
+    if (p.danoTransporte) PT.ev.emit('celular', { de: p.cliente, texto: p.danoTransporte + ' telha(s) chegaram AMASSADAS. Carga solta na carroceria, né? Vou descontar.' });
     PT.rep.entregou();
     const pg = D.clientes[p.perfil].pagamento, saldo = p.valor - p.entradaPaga;
     if (saldo > 0) {
@@ -198,14 +205,15 @@ PT.pedidos = (function () {
       if (Math.hypot(j.x - c.x, j.z - PT.DADOS.mundo.caminhao.z) > 8) return;
       const p = st.lista.find(x => x.id === c.e.pedidoId); if (!p || p.status !== 'coleta') return;
       const d = disponivel(p);
-      ops.push({ rotulo: 'Carregar ' + p.id + ' (' + p.carregadas + '/' + p.pecas + ' — na zona verde: ' + d.boas + ' boas)', prio: 1, acao: () => carregar(c, false) });
-      if (d.tortas > 0) ops.push({ rotulo: 'Carregar incluindo ' + d.tortas + ' torta(s)... ninguém vai notar', prio: 2, acao: () => carregar(c, true) });
+      if (PT.DADOS.carregamento.mesa2D && PT.carga) ops.push({ rotulo: 'Montar a carga de ' + p.id + ' na mesa de carregamento (' + p.carregadas + '/' + p.pecas + ')', prio: 1, acao: () => PT.carga.abrir(c, p) });
+      ops.push({ rotulo: 'Carregar ' + p.id + ' direto (' + p.carregadas + '/' + p.pecas + ' — na zona verde: ' + d.boas + ' boas)', prio: 2, acao: () => carregar(c, false) });
+      if (d.tortas > 0) ops.push({ rotulo: 'Carregar incluindo ' + d.tortas + ' torta(s)... ninguém vai notar', prio: 3, acao: () => carregar(c, true) });
     });
     return ops;
   });
 
   return {
-    st, gerar, aceitar, recusar, contraproposta, chamarAgora, descricao, disponivel, devolverManifesto,
+    st, gerar, aceitar, recusar, contraproposta, chamarAgora, descricao, disponivel, devolverManifesto, carregarCaminhao: carregar, pilhasPara,
     salvar() { return { lista: st.lista.map(p => Object.assign({}, p, { caminhao: null, status: p.status === 'coleta' ? 'aceito' : p.status })), cont: st.cont, proxHoras: st.proxHoras }; },
     carregar(o) {
       st.lista = o.lista || []; st.cont = o.cont || 0; st.proxHoras = o.proxHoras || 2;
