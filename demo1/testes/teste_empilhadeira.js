@@ -43,9 +43,9 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
     // desvirar
     T.ir(e.x, e.z + 1.8); let r1 = T.fazer(/Desvirar/); T.min(31); ok(e.tombada === 0, 'V9 desvirar leva 30 min de jogo (' + r1 + ')');
     // tombar COM cinto
-    PT.empi.entrar(e); PT.ev.emit('tecla', 'KeyC'); e.garfoY = 3; e.x = 60; e.z = 25; e.rot = 0; PT.ent.sync(e);
+    PT.ui.cancelarInteracoes(); PT.empi.entrar(e); PT.ev.emit('tecla', 'KeyC'); e.garfoY = 3; e.x = 60; e.z = 25; e.rot = 0; PT.ent.sync(e);
     drive({ KeyW: true }, 30); drive({ KeyW: true, KeyD: true }, 30);
-    ok(e.tombada > 0 && !PT.mundo.jog.morto, 'V10 com cinto: tomba mas o personagem não é arremessado');
+    ok(e.tombada > 0 && !PT.mundo.jog.morto, 'V10 com cinto: tomba mas o personagem não é arremessado (tomb ' + e.tombada + ' cinto ' + e.cinto + ' morto ' + PT.mundo.jog.morto + ' risco ' + (e.risco||0).toFixed(1) + ' ctrl ' + !!PT.mundo.jog.controlando + ')');
     e.tombada = 0; PT.empi.atualizarVisual(e);
     // bobina sem mandril
     const bo = PT.estoque.novaBobina('GL043-1T', 70, 30, 0); e.x = 67.5; e.z = 30; e.rot = 0; e.garfoY = 0; PT.ent.sync(e);
