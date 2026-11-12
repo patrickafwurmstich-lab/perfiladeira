@@ -9,7 +9,7 @@ PT.mundo = (function () {
   let renderer, scene, camera;
   const teclas = {};
   // câmera: '3p' atrás do personagem (mouse gira) ou '1p' nos olhos dele. Sem câmera livre.
-  const cam = { yaw: Math.PI, pitch: 0.3, olhar: 0, dist: C.dist, modo: '3p', travado: false, arrastando: false, ux: 0, uy: 0 };
+  const cam = { yaw: Math.PI, pitch: 0.2, olhar: 0, dist: C.dist, modo: '3p', travado: false, arrastando: false, ux: 0, uy: 0 };
   const paredes = [];   // AABB fixas {x0,x1,z0,z1}
 
   // ---------------- INICIALIZAÇÃO ----------------
@@ -45,12 +45,28 @@ PT.mundo = (function () {
     m.position.set(x, y, z); m.receiveShadow = true; m.castShadow = !!sombra; scene.add(m); return m;
   }
 
+  // piso de concreto: placas de 6 x 6 m com junta serrada, tom variando de placa para placa e algumas manchas de óleo
+  function texturaPiso() {
+    const PX = 16, w = M.L * PX, h = M.D * PX, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'); let sem = 7; const rnd = () => (sem = (sem * 16807) % 2147483647) / 2147483647;
+    for (let x = 0; x < M.L; x += 6) for (let z = 0; z < M.D; z += 6) {
+      const v = 128 + Math.round((rnd() - 0.5) * 14); g.fillStyle = 'rgb(' + v + ',' + (v + 9) + ',' + (v + 17) + ')'; g.fillRect(x * PX, z * PX, 6 * PX, 6 * PX);
+      for (let k = 0; k < 40; k++) { const t = 0.03 + rnd() * 0.05; g.fillStyle = 'rgba(0,0,0,' + t.toFixed(3) + ')'; g.fillRect((x + rnd() * 6) * PX, (z + rnd() * 6) * PX, 2 + rnd() * 6, 2 + rnd() * 6); }
+    }
+    for (let k = 0; k < 26; k++) { g.fillStyle = 'rgba(40,36,30,' + (0.12 + rnd() * 0.15).toFixed(2) + ')'; g.beginPath(); g.ellipse(rnd() * w, rnd() * h, 6 + rnd() * 22, 4 + rnd() * 14, rnd() * 3, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = 'rgba(60,66,72,0.85)';
+    for (let x = 0; x <= M.L; x += 6) g.fillRect(x * PX - 1, 0, 2, h);
+    for (let z = 0; z <= M.D; z += 6) g.fillRect(0, z * PX - 1, w, 2);
+    const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+  }
+
   function construirBarracao() {
     // pátio
     caixa(320, 0.1, 140, 0x8fa36b, M.L / 2, -0.06, M.D / 2);
     // piso do barracão (tiles para depois virar cicatriz)
     PT.registroModelos.usos.barracao_132x40 = 1; PT.registroModelos.max.barracao_132x40 = 1;
-    caixa(M.L, 0.1, M.D, 0x7f8a93, M.L / 2, 0, M.D / 2);
+    const piso = caixa(M.L, 0.1, M.D, 0xffffff, M.L / 2, 0, M.D / 2);
+    piso.material.map = texturaPiso(); piso.material.needsUpdate = true;
     PT.registroModelos.usos.piso_concreto = Math.ceil(M.L / 6) * Math.ceil(M.D / 6);
     PT.registroModelos.max.piso_concreto = PT.registroModelos.usos.piso_concreto;
     // corredor do caminhão (asfalto escuro) passando por dentro

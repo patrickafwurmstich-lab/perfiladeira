@@ -54,10 +54,13 @@ perfiladeira/godot/
 3. **M3 — Produzir:** máquina genérica, bobina no mandril, cabo do quadro, CLP, alinhamento (minijogo), produção, mesa de saída e pilhas.
 4. **M4 — Ponte e zoeira:** botoeira, carga pendurada, sobrecarga, cabo estourando, ragdoll e respawn.
 5. **M5 — Vender:** PC (loja, banco, e-mail, pedidos), ligações, caminhão de entrega e coleta, loja de balcão.
-6. **M6 — Equipe:** funcionários e clientes com navmesh, empilhadeira, mesa de carregamento.
-7. **M7 — Desempenho no notebook e exportação:** meta de 60 fps a 1080p com qualidade média (mínimo de 30). Exportar para Windows.
+6. **M5.5 — Loop completo com NPCs parados (Grok):** comprar → receber → produzir → vender → entregar → morrer funcionando do começo ao fim, com funcionários e clientes ainda sem navegação, para testar o fluxo antes da IA dos NPCs.
+7. **M6 — Equipe:** funcionários e clientes com navmesh, empilhadeira, mesa de carregamento.
+8. **M7 — Desempenho no notebook e exportação:** exportar para Windows e medir no notebook do Lucas.
 
 ## 6. Metas de desempenho (Ryzen 5 3500U / Vega 8)
+- **Meta obrigatória: 30 fps estáveis a 1080p** no notebook do Lucas. 60 fps é desejável e só com qualidade baixa (sombras curtas, LOD agressivo). Correção do Grok: 60 fps em qualidade média era otimista para a Vega 8.
+- Medir desde o M2, sem deixar para o M7, com uma cena-teste fixa (barracão + 3 máquinas + 7 personagens + ponte carregando).
 - Até cerca de 300 chamadas de desenho e até 300 mil triângulos visíveis.
 - 1 luz direcional com sombra (2 cascatas) e luz ambiente de céu. Sem SDFGI nem volumetria (o Compatibility nem tem).
 - No máximo 7 personagens com esqueleto na tela (dono + 6 funcionários); clientes da loja só quando o jogador está perto.
@@ -67,7 +70,9 @@ perfiladeira/godot/
 - **Compatibility renderer:** menos efeitos de luz. O estilo de cores chapadas não depende deles.
 - **Licença ithappy:** controlar o que vai para o repositório público.
 - **Tempo acelerado (x20):** já resolvido na Demo com passo fixo; replicar igual (sub-passos anti-túnel do caminhão e da ponte).
-- **Save:** manter `save_version` e migrador desde o primeiro dia.
+- **Save:** manter `save_version` e migrador desde o primeiro dia. Importar o save da Demo só em estado "parado": a Demo já bloqueia salvar com carga na ponte, caminhão no pátio ou cliente no balcão. Uma peça pela metade na máquina é guardada (`progressoM`), como já é na Demo.
+- **Navegação (Grok):** o jogador instala máquinas onde quiser, então a navmesh precisa acompanhar. Cada máquina e pilha recebe um NavigationObstacle3D (desvio na hora). A navmesh é reassada em segundo plano depois de cada instalação ou mudança.
+- **Ragdoll + quedas:** quando o cabo estoura, cai a carga e o dono vira ragdoll ao mesmo tempo. Limitar a uns 20 corpos rígidos ativos e "dormir" os objetos parados.
 
 ## 8. O que o Lucas precisa fazer
 - Instalar o Godot 4.7 (versão padrão, não a .NET) no notebook.
