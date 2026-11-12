@@ -30,7 +30,7 @@ window.OF = (function () {
   // caixa arredondada (w = X, h = Y, d = Z); raio padrão proporcional
   function caixa(w, h, d, cor, nome, raio, seg) {
     raio = raio === undefined ? Math.min(0.04, Math.min(w, h, d) * 0.18) : raio;
-    const g = raio > 0 ? new THREE.RoundedBoxGeometry(w, h, d, seg || 2, raio) : new THREE.BoxGeometry(w, h, d);
+    const g = raio > 0 ? new THREE.RoundedBoxGeometry(w, h, d, seg || 1, raio) : new THREE.BoxGeometry(w, h, d);
     return malha(g, cor, nome);
   }
   // cilindro com borda arredondada (eixo Y), feito em torno

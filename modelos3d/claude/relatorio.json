@@ -1,111 +1,111 @@
 {
  "bobina_1t": {
   "id": "bobina_1t",
-  "tris": 5664,
+  "tris": 7478,
   "med": {
-   "x": 1.018,
-   "y": 1.018,
-   "z": 1.217,
+   "x": 0.637,
+   "y": 0.638,
+   "z": 1.21,
    "minY": 0
   }
  },
  "bobina_2t": {
   "id": "bobina_2t",
-  "tris": 5664,
+  "tris": 7478,
   "med": {
-   "x": 1.318,
-   "y": 1.318,
-   "z": 1.217,
+   "x": 0.737,
+   "y": 0.738,
+   "z": 1.21,
    "minY": 0
   }
  },
  "mesa_saida": {
   "id": "mesa_saida",
-  "tris": 10692,
+  "tris": 5484,
   "med": {
    "x": 6.002,
-   "y": 0.99,
-   "z": 1.46,
+   "y": 1.03,
+   "z": 1.48,
    "minY": 0
   }
  },
  "botoeira": {
   "id": "botoeira",
-  "tris": 2472,
+  "tris": 3058,
   "med": {
-   "x": 0.115,
-   "y": 0.595,
-   "z": 0.103,
+   "x": 0.136,
+   "y": 0.721,
+   "z": 0.104,
    "minY": 0
   }
  },
  "mandril": {
   "id": "mandril",
-  "tris": 1236,
+  "tris": 1132,
   "med": {
-   "x": 1.25,
-   "y": 0.3,
-   "z": 0.3,
-   "minY": 0
+   "x": 1.19,
+   "y": 0.48,
+   "z": 0.52,
+   "minY": -0.02
   }
  },
  "berco_bobina": {
   "id": "berco_bobina",
-  "tris": 2156,
+  "tris": 1416,
   "med": {
    "x": 1.6,
-   "y": 0.515,
+   "y": 0.58,
    "z": 1.6,
    "minY": 0
   }
  },
  "telha_tp40": {
   "id": "telha_tp40",
-  "tris": 158,
+  "tris": 180,
   "med": {
    "x": 1,
-   "y": 0.05,
-   "z": 1.095,
-   "minY": -0.005
+   "y": 0.043,
+   "z": 1.04,
+   "minY": 0
   }
  },
  "pilha_telhas": {
   "id": "pilha_telhas",
-  "tris": 5640,
+  "tris": 3996,
   "med": {
-   "x": 6,
-   "y": 0.453,
-   "z": 1.095,
+   "x": 6.012,
+   "y": 0.332,
+   "z": 1.12,
    "minY": 0
   }
  },
  "pilha_chapas": {
   "id": "pilha_chapas",
-  "tris": 3900,
+  "tris": 588,
   "med": {
-   "x": 3.024,
-   "y": 0.29,
-   "z": 1.22,
+   "x": 3.016,
+   "y": 0.264,
+   "z": 1.214,
    "minY": 0
   }
  },
  "pilha_rufos": {
   "id": "pilha_rufos",
-  "tris": 1808,
+  "tris": 936,
   "med": {
    "x": 3,
-   "y": 0.27,
-   "z": 0.6,
+   "y": 0.212,
+   "z": 0.62,
    "minY": 0
   }
  },
  "piso_concreto": {
   "id": "piso_concreto",
-  "tris": 300,
+  "tris": 72,
   "med": {
-   "x": 5.98,
-   "y": 0.1,
-   "z": 5.98,
+   "x": 6,
+   "y": 0.102,
+   "z": 6,
    "minY": -0.1
   }
  },
@@ -114,88 +114,148 @@
   "tris": 12,
   "med": {
    "x": 1,
-   "y": 0.004,
-   "z": 1,
+   "y": 0.003,
+   "z": 0.1,
    "minY": 0
   }
  },
  "cabo_eletrico": {
   "id": "cabo_eletrico",
-  "tris": 2340,
+  "tris": 876,
   "med": {
    "x": 1,
-   "y": 0.049,
-   "z": 0.052,
-   "minY": -0.003
+   "y": 0.056,
+   "z": 0.08,
+   "minY": 0
   }
  },
  "placa_dias_sem_acidente": {
   "id": "placa_dias_sem_acidente",
-  "tris": 304,
+  "tris": 688,
   "med": {
-   "x": 2.48,
-   "y": 1.28,
-   "z": 0.054,
-   "minY": 1.56
+   "x": 1.54,
+   "y": 0.84,
+   "z": 0.032,
+   "minY": 1.78
   }
  },
  "placa_parede": {
   "id": "placa_parede",
-  "tris": 302,
+  "tris": 686,
   "med": {
-   "x": 1.04,
-   "y": 0.74,
-   "z": 0.032,
-   "minY": 1.43
+   "x": 0.6,
+   "y": 0.42,
+   "z": 0.013,
+   "minY": 1.49
   }
  },
  "porta_escritorio": {
   "id": "porta_escritorio",
-  "tris": 2100,
+  "tris": 2028,
   "med": {
    "x": 1.08,
    "y": 2.18,
-   "z": 0.12,
+   "z": 0.14,
    "minY": 0
   }
  },
  "sino_balcao": {
   "id": "sino_balcao",
-  "tris": 1040,
+  "tris": 1188,
   "med": {
-   "x": 0.128,
-   "y": 0.123,
-   "z": 0.128,
+   "x": 0.116,
+   "y": 0.075,
+   "z": 0.116,
    "minY": 0
   }
  },
  "balcao_loja": {
   "id": "balcao_loja",
-  "tris": 10200,
+  "tris": 4392,
   "med": {
-   "x": 9.1,
-   "y": 1.1,
-   "z": 0.82,
+   "x": 9,
+   "y": 1.4,
+   "z": 0.83,
    "minY": 0
   }
  },
  "mostruario": {
   "id": "mostruario",
-  "tris": 1378,
+  "tris": 1522,
   "med": {
-   "x": 2,
-   "y": 1.85,
-   "z": 0.142,
+   "x": 1.92,
+   "y": 1.95,
+   "z": 0.4,
    "minY": 0
   }
  },
  "clp_padrao": {
   "id": "clp_padrao",
-  "tris": 3446,
+  "tris": 3662,
   "med": {
-   "x": 0.56,
-   "y": 1.652,
-   "z": 0.3,
+   "x": 0.66,
+   "y": 1.848,
+   "z": 0.4,
+   "minY": 0
+  }
+ },
+ "marcacao_zona_verde": {
+  "id": "marcacao_zona_verde",
+  "tris": 12,
+  "med": {
+   "x": 1,
+   "y": 0.003,
+   "z": 0.1,
+   "minY": 0
+  }
+ },
+ "marcacao_zona_vermelha": {
+  "id": "marcacao_zona_vermelha",
+  "tris": 12,
+  "med": {
+   "x": 1,
+   "y": 0.003,
+   "z": 0.1,
+   "minY": 0
+  }
+ },
+ "marcacao_perigo": {
+  "id": "marcacao_perigo",
+  "tris": 72,
+  "med": {
+   "x": 1,
+   "y": 0.004,
+   "z": 0.156,
+   "minY": 0
+  }
+ },
+ "cabo_eletrico_curva": {
+  "id": "cabo_eletrico_curva",
+  "tris": 448,
+  "med": {
+   "x": 0.421,
+   "y": 0.04,
+   "z": 0.421,
+   "minY": 0.01
+  }
+ },
+ "balcao_modulo": {
+  "id": "balcao_modulo",
+  "tris": 1308,
+  "med": {
+   "x": 3,
+   "y": 1.05,
+   "z": 0.83,
+   "minY": 0
+  }
+ },
+ "balcao_modulo_caixa": {
+  "id": "balcao_modulo_caixa",
+  "tris": 1776,
+  "med": {
+   "x": 3,
+   "y": 1.4,
+   "z": 0.83,
    "minY": 0
   }
  }

@@ -85,3 +85,6 @@ const G3 = 'https://grab3d.com/models/';
     caminhao_entrega: P('Baú para entregas de máquinas; carroceria aberta (Truck Flat) para telhas. Caminhão brasileiro sob medida: modelador (opcional)', [['Grab3D Delivery Truck', G3 + 'vehicles/delivery-truck/'], ['Kenney Car Kit — Truck Flat', 'https://kenney.nl/assets/car-kit']])
   };
 })();
+
+// Modelos já feitos pelo Claude (GLB em modelos3d/claude/glb/). Revisão 2 após crítica do ChatGPT.
+PT.MODELOS_PRONTOS = ["balcao_loja", "balcao_modulo", "balcao_modulo_caixa", "berco_bobina", "bobina_1t", "bobina_2t", "botoeira", "cabo_eletrico", "cabo_eletrico_curva", "clp_padrao", "mandril", "marcacao_perigo", "marcacao_zona", "marcacao_zona_verde", "marcacao_zona_vermelha", "mesa_saida", "mostruario", "pilha_chapas", "pilha_rufos", "pilha_telhas", "piso_concreto", "placa_dias_sem_acidente", "placa_parede", "porta_escritorio", "sino_balcao", "telha_tp40"];

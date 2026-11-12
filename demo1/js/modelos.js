@@ -87,10 +87,10 @@ PT.MODELOS = {
   mesa_saida: { nome: 'Mesa de saída de produtos', categoria: 'Máquinas', dims: [6, 1.4, 0.8], forma: 'caixa', cor: 0x7f8c8d, polys: '1–2k', prioridade: 'Demo' },
 
   // ---------- MATERIAIS E PRODUTOS ----------
-  bobina_1t: { nome: 'Bobina de aço 1 t', categoria: 'Materiais', dims: [1.0, 1.2, 1.0], forma: 'cilindro', cor: 0xbdc3c7,
+  bobina_1t: { nome: 'Bobina de aço 1 t', categoria: 'Materiais', dims: [0.64, 1.2, 0.64], forma: 'cilindro', cor: 0xbdc3c7,
     estados: ['cheia', 'pela metade', 'quase no fim'], sockets: ['furo central (mandril/gancho C)'], polys: '1–2k', prioridade: 'Demo',
     notas: 'Raio externo diminui conforme consome — dá para escalar o modelo.' },
-  bobina_2t: { nome: 'Bobina de aço 2 t', categoria: 'Materiais', dims: [1.3, 1.2, 1.3], forma: 'cilindro', cor: 0x95a5a6, polys: '1–2k', prioridade: 'Demo' },
+  bobina_2t: { nome: 'Bobina de aço 2 t', categoria: 'Materiais', dims: [0.74, 1.2, 0.74], forma: 'cilindro', cor: 0x95a5a6, polys: '1–2k', prioridade: 'Demo' },
   pilha_telhas: { nome: 'Pilha de telhas TP-40', categoria: 'Produtos', dims: [6, 1.05, 0.5], forma: 'caixa', cor: 0x5dade2,
     estados: ['altura variável (1–60 telhas)', 'com telhas tortas visíveis'], polys: 'MultiMesh de 1 telha (~200 tris)', prioridade: 'Demo',
     notas: 'Comprimento varia com o pedido (1–12 m): modelo de 1 m esticável ou 3 tamanhos.' },
