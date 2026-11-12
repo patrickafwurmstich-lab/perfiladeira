@@ -45,6 +45,7 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
     // tombar COM cinto
     PT.ui.cancelarInteracoes(); PT.empi.entrar(e); PT.ev.emit('tecla', 'KeyC'); e.garfoY = 3; e.x = 60; e.z = 25; e.rot = 0; PT.ent.sync(e);
     drive({ KeyW: true }, 30); drive({ KeyW: true, KeyD: true }, 30);
+    ok(PT.mundo.jog.controlando === null && PT.mundo.jog.y === 0, 'V10b depois de tombar o jogador não volta para o banco');
     ok(e.tombada > 0 && !PT.mundo.jog.morto, 'V10 com cinto: tomba mas o personagem não é arremessado (tomb ' + e.tombada + ' cinto ' + e.cinto + ' morto ' + PT.mundo.jog.morto + ' risco ' + (e.risco||0).toFixed(1) + ' ctrl ' + !!PT.mundo.jog.controlando + ')');
     e.tombada = 0; PT.empi.atualizarVisual(e);
     // bobina sem mandril
@@ -59,6 +60,8 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
     e.x = bo.x - 2.5; e.z = bo.z; e.rot = 0; PT.ent.sync(e); PT.empi.entrar(e); PT.empi.pegarOuSoltar();
     ok(e.carga === bo, 'V13 com mandril pega a bobina');
     PT.empi.pegarOuSoltar(); PT.empi.sair();
+    // entrar cancela a recarga
+    e.carregando = true; PT.empi.entrar(e); ok(e.carregando === false, 'V13b subir na empilhadeira desliga o carregador'); PT.empi.sair();
     // save com empilhadeira
     PT.ui.fecharModal();
     const sv = PT.save.salvar(); ok(sv, 'V14 salva com a empilhadeira no chão (motivo: ' + PT.save.estavel() + ')');

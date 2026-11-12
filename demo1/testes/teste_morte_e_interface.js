@@ -34,7 +34,7 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
   ok(r === false, 'W4 perder o foco da janela solta as teclas');
   // W5: ligação fechada vira chamada perdida
   r = await p.evaluate(() => {
-    let ped; for (let i = 0; i < 30 && !ped; i++) { const x = PT.pedidos.gerar(); if (x.canal === 'telefone') ped = x; }
+    PT.ui.cancelarInteracoes(); let ped; for (let i = 0; i < 30 && !ped; i++) { const x = PT.pedidos.gerar(); if (x.canal === 'telefone') ped = x; }
     const aberta = PT.ui.modalAberto(); PT.ui.fecharModal();
     const mail = PT.ui.salvarCorreio().find(m => m.pedidoId === ped.id && /Chamada perdida/.test(m.assunto));
     return { aberta, mail: !!mail, status: ped.status };

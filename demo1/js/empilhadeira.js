@@ -61,7 +61,7 @@ PT.empi = (function () {
       // TOMBAMENTO: velocidade × curva × altura do garfo × peso
       const risco = Math.abs(o.vel) * Math.abs(taxaGiro) * (1 + o.garfoY * D.fatorAltura) * (1 + pesoCarga / D.capacidadeKg);
       o.risco = risco;
-      if (risco > D.limiarTombo) tombar(o, taxaGiro);
+      if (risco > D.limiarTombo) { tombar(o, taxaGiro); return; }   // não recoloca o jogador no banco (ChatGPT, bug 9)
       // jogador vai junto, sentado
       const j = PT.mundo.jog; j.x = o.x - Math.cos(o.rot) * 0.2; j.z = o.z + Math.sin(o.rot) * 0.2; j.y = 0.9; j.rot = o.rot + Math.PI / 2;
       // carga acompanha o garfo
@@ -75,13 +75,20 @@ PT.empi = (function () {
     if (fp.x0 < 0.2 || fp.x1 > M.L - 0.2 || fp.z0 < 0.2 || fp.z1 > M.D - 0.2) return true;
     if (PT.mundo.paredes.some(p => PT.construcao.cruza(fp, p))) return true;
     const agora = PT.construcao.footprint(o.x, o.z, o.dims, o.rot);
+    // a carga comprida no garfo também colide (ChatGPT, bug 10)
+    if (o.carga && o.carga.dims) {
+      const off = 1.7 + o.carga.dims[0] / 2 - 0.5, cx = x + Math.cos(rot) * off, cz = z - Math.sin(rot) * off;
+      const fc = PT.construcao.footprint(cx, cz, o.carga.dims, rot), ac = PT.construcao.footprint(o.carga.x, o.carga.z, o.carga.dims, o.carga.rot);
+      if (PT.mundo.paredes.some(p => PT.construcao.cruza(fc, p))) return true;
+      if (PT.ent.lista.some(e => e !== o && e !== o.carga && !e.preso && e.aabb && e.solido && PT.construcao.cruza(fc, e.aabb) && !PT.construcao.cruza(ac, e.aabb))) return true;
+    }
     return PT.ent.lista.some(e => e !== o && e !== o.carga && !e.preso && e.aabb && e.solido && e.y < 0.5 && PT.construcao.cruza(fp, e.aabb) && !PT.construcao.cruza(agora, e.aabb));
   }
   function aviso(t) { const n = performance.now(); if (n - ultAviso > 2500) { ultAviso = n; PT.ev.emit('aviso', t); } }
 
   function entrar(o) {
     if (o.tombada > 0) { PT.ev.emit('aviso', 'Ela está tombada. Desvire primeiro.'); return; }
-    atual = o; o.cinto = false; PT.mundo.jog.controlando = controle;
+    atual = o; o.cinto = false; o.carregando = false; PT.mundo.jog.controlando = controle;
     PT.ev.emit('aviso', '🔔 Aperte C para colocar o CINTO. W/S anda, A/D vira, R/F garfo, ESPAÇO pega/solta, E sai.');
   }
   function sair() {
@@ -114,7 +121,7 @@ PT.empi = (function () {
       PT.zoeira.acidente('Bobina rolou do garfo!'); return;
     }
     if (alvo.montadaEm) PT.maq.desmontarBobina(alvo);
-    o.carga = alvo; alvo.preso = 'empilhadeira';
+    o.carga = alvo; alvo.preso = 'empilhadeira'; PT.maq.lista.forEach(m => { if (m.mesa === alvo) m.mesa = null; });
     PT.ev.emit('empiPegou', alvo);
   }
 
@@ -141,6 +148,7 @@ PT.empi = (function () {
   PT.ev.on('minuto', () => PT.ent.lista.forEach(o => {
     if (o.tipo !== 'empilhadeira') return;
     if (o.tombada > 0 && o.desvirando) { o.tombada -= 1; if (o.tombada <= 0) { o.tombada = 0; o.desvirando = false; atualizarVisual(o); PT.ev.emit('aviso', 'Empilhadeira desvirada. Nem arranhou... quase.'); } }
+    if (o.carregando && Math.hypot(o.x - PT.DADOS.mundo.quadro.x, o.z - PT.DADOS.mundo.quadro.z) > 6) o.carregando = false;
     if (o.carregando) { o.bateria = Math.min(1, o.bateria + 1 / (E().horasRecarga * 60)); if (o.bateria >= 1) o.carregando = false; o.avisouBateria = false; o.alertou = false; atualizarVisual(o); }
   }));
 

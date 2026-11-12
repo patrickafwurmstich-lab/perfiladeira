@@ -60,7 +60,7 @@ PT.func = (function () {
   function tarefasAbertas() {
     const T = [];
     PT.maq.lista.forEach(m => {
-      if (m.mesa && PT.ent.lista.includes(m.mesa) && !m.mesa.preso && (m.mesa.qtd >= F().pilhaParaTirar || m.estado === 'mesa_cheia' || m.estado === 'concluida') && m.mesa.qtd > 0)
+      if (PT.maq.mesaOcupada(m) && (m.mesa.qtd >= F().pilhaParaTirar || m.estado === 'mesa_cheia' || m.estado === 'concluida') && m.mesa.qtd > 0)
         T.push({ id: 'tirar_' + m.mesa.id, setor: 'expedicao', tipo: 'tirarPilha', alvo: m.mesa, maq: m, ajudante: true });
       if (m.estado === 'enroscada') T.push({ id: 'enrosco_' + m.id, setor: 'manutencao', tipo: 'limparEnrosco', alvo: m, ajudante: true, base: 2 });
       if (m.desgaste > F().desgasteParaGraxa && !(m.lubrificado > 0)) T.push({ id: 'graxa_' + m.id, setor: 'manutencao', tipo: 'graxa', alvo: m, ajudante: true });
@@ -93,8 +93,8 @@ PT.func = (function () {
   function passo(f, dt) {
     const h = PT.tempo.st.minutos / 60;
     if (PT.tempo.st.dia * 24 + h < f.ausenteAte) { f.g.visible = false; return; } else f.g.visible = true;
-    if (st.tartaruga > 0) { irPara(f, cafe(f), dt); f.estado = 'tartaruga'; return; }
-    if (h >= 12 && h < 13) { if (f.tarefa && f.estado !== 'executar') cancelar(f); irPara(f, cafe(f), dt); f.estado = 'almoço'; f.energia = Math.min(1, f.energia + dt * 0.02); return; }
+    if (st.tartaruga > 0) { if (f.tarefa || f.carregando) cancelar(f); irPara(f, cafe(f), dt); f.estado = 'tartaruga'; return; }
+    if (h >= 12 && h < 13) { if (f.tarefa || f.carregando) cancelar(f); irPara(f, cafe(f), dt); f.estado = 'almoço'; f.energia = Math.min(1, f.energia + dt * 0.02); return; }
     switch (f.estado) {
       case 'parado': case 'almoço': case 'café': case 'tartaruga':
         f.tarefa = escolherTarefa(f);
@@ -117,12 +117,12 @@ PT.func = (function () {
   }
   function valida(t) {
     if (!t) return false;
-    if (t.tipo === 'tirarPilha') return PT.ent.lista.includes(t.alvo) && (t.alvo.preso === 'funcionario' || !t.alvo.preso);
+    if (t.tipo === 'tirarPilha') return PT.ent.lista.includes(t.alvo) && (!t.alvo.preso || String(t.alvo.preso).indexOf('funcionario') === 0);
     if (t.tipo === 'limparEnrosco') return t.alvo.estado === 'enroscada';
     return PT.maq.lista.includes(t.alvo);
   }
   function destinoDa(f, t) {
-    if (t.tipo === 'tirarPilha' && f.carregando) return zonaVerdeLivre(f.carregando);
+    if (t.tipo === 'tirarPilha' && f.carregando) { const z = PT.DADOS.mundo.zonas.expedicao; return zonaVerdeLivre(f.carregando) || { x: (z.x0 + z.x1) / 2, z: z.z1 + 1 }; }
     if (t.tipo === 'tirarPilha') return { x: t.alvo.x, z: t.alvo.z + 1.2 };
     if (t.tipo === 'operar') { const p = PT.maq.pontoEntrada(t.alvo); return { x: t.alvo.x - t.alvo.def.dims[0] / 2 + 1, z: t.alvo.z + t.alvo.def.dims[1] / 2 + 0.9 }; }
     return { x: t.alvo.x, z: t.alvo.z + t.alvo.def.dims[1] / 2 + 0.9 };
@@ -131,9 +131,16 @@ PT.func = (function () {
     const dur = F().duracao[t.tipo];
     if (f.tempo < dur) return false;
     if (t.tipo === 'tirarPilha') {
-      if (!f.carregando) { f.carregando = t.alvo; t.alvo.preso = 'funcionario'; f.estado = 'deslocar'; return false; }
+      if (!f.carregando) {
+        f.carregando = t.alvo; t.alvo.preso = 'funcionario:' + f.id;
+        if (t.maq && t.maq.mesa === t.alvo) t.maq.mesa = null;          // a pilha saiu da máquina: a tarefa não reabre (ChatGPT, bug 4)
+        f.estado = 'deslocar'; return false;
+      }
       // chegou na zona verde: solta (e talvez esconda as tortas...)
-      const pl = f.carregando; f.carregando = null; const d = zonaVerdeLivre(pl);
+      const d = zonaVerdeLivre(f.carregando);
+      if (!d) { f.tempo = 0; if (!f.avisouCheia) { f.avisouCheia = true; PT.ev.emit('aviso', f.nome.split(' ')[0] + ': "Patrão, a expedição tá lotada!"'); } return false; }   // espera abrir espaço (bug 6)
+      f.avisouCheia = false;
+      const pl = f.carregando; f.carregando = null;
       PT.estoque.soltarNoChao(pl, d.x, d.z);
       if (pl.defeituosas > 0 && ['apressado', 'distraído'].includes(f.personalidade) && PT.tempo.st.dia * 24 > f.orientadoAte && Math.random() < F().chanceEsconderTorta) {
         pl.tortasEscondidas = true; PT.estoque.atualizarPilha(pl); PT.ev.emit('loteSuspeito', { f, pl });
@@ -149,7 +156,7 @@ PT.func = (function () {
     }
     return true;
   }
-  function cancelar(f) { soltar(f); f.tarefa = null; f.estado = 'parado'; }
+  function cancelar(f) { soltar(f); f.tarefa = null; f.estado = 'parado'; f.tempo = 0; f.desvio = null; f.tentouDesvio = false; }
   function soltar(f) { if (f.carregando) { PT.estoque.soltarNoChao(f.carregando, f.carregando.x, f.carregando.z); f.carregando = null; } }
   function cafe(f) { const i = st.lista.indexOf(f); return { x: 12 + (i % 3) * 1.2, z: 30 + Math.floor(i / 3) * 1.2 }; }
   function zonaVerdeLivre(pl) {
@@ -158,16 +165,24 @@ PT.func = (function () {
       const fp = PT.construcao.footprint(xx, zz, pl.dims, 0);
       if (!PT.ent.lista.some(e => e !== pl && !e.preso && e.aabb && PT.construcao.cruza(fp, e.aabb))) return { x: xx, z: zz };
     }
-    return { x: (z.x0 + z.x1) / 2, z: (z.z0 + z.z1) / 2 };
+    return null;   // nunca inventa posição ocupada (ChatGPT, bug 6)
   }
   // anda em linha reta desviando de obstáculos (empurrão); retorna true quando chegou
   function irPara(f, d, dt) {
+    if (f.desvio) {      // contornando: vai primeiro ao ponto de desvio no corredor central
+      if (Math.hypot(f.desvio.x - f.x, f.desvio.z - f.z) < 0.6) f.desvio = null; else d = f.desvio;
+    }
     const dx = d.x - f.x, dz = d.z - f.z, dist = Math.hypot(dx, dz);
-    if (dist < 0.4) return true;
+    if (dist < 0.4) { f.semProgresso = 0; return true; }
+    const x0 = f.x, z0 = f.z;
     const v = F().velocidade * (0.7 + f.atributos.ritmo * 0.6) * (f.energia < 0.25 ? 0.6 : 1) * (f.carregando ? 0.7 : 1);
     const passo = Math.min(dist, v * dt);
     let nx = f.x + dx / dist * passo, nz = f.z + dz / dist * passo;
     const p = PT.mundo.empurrar(nx, nz, 0.3); f.x = p.x; f.z = p.z; f.rot = Math.atan2(dx, dz);
+    // sem progresso (andando contra obstáculo): tenta contornar pelo corredor central; se continuar, desiste (ChatGPT, bug 5)
+    if (Math.hypot(f.x - x0, f.z - z0) < passo * 0.25) f.semProgresso = (f.semProgresso || 0) + dt; else f.semProgresso = Math.max(0, (f.semProgresso || 0) - dt);
+    if (f.semProgresso > 2 && !f.desvio && !f.tentouDesvio) { f.tentouDesvio = true; f.semProgresso = 0; f.desvio = { x: f.x + (d.x > f.x ? 3 : -3), z: F().corredorCentralZ }; }
+    else if (f.semProgresso > 5) { f.semProgresso = 0; f.tentouDesvio = false; f.desvio = null; if (f.tarefa) { PT.ev.emit('aviso', f.nome.split(' ')[0] + ' não achou passagem. Deixe um corredor livre!'); cancelar(f); } }
     return false;
   }
 
@@ -194,8 +209,8 @@ PT.func = (function () {
     if (dia % 15 === 13 && st.lista.length) PT.ev.emit('celular', { de: 'RH', texto: 'Folha quinzenal em 2 dias: ' + PT.util.reais(folhaMensal() / 2) + '.' });
     if (dia % 15 === 0 && st.lista.length) {
       const v = folhaMensal() / 2;
-      if (PT.eco.pagar(v, 'Folha quinzenal (' + st.lista.length + ' funcionários)')) { st.tartaruga = 0; }
-      else { st.tartaruga = 2; st.devendo = v; PT.ev.emit('celular', { de: 'Equipe', texto: 'SEM PIX, SEM TELHA! Operação tartaruga até cair o salário.' }); }
+      if (PT.eco.pagar(v, 'Folha quinzenal (' + st.lista.length + ' funcionários)')) { st.tartaruga = st.devendo > 0 ? 2 : 0; }
+      else { st.tartaruga = 2; st.devendo = (st.devendo || 0) + v; PT.ev.emit('celular', { de: 'Equipe', texto: 'SEM PIX, SEM TELHA! Operação tartaruga até cair o salário.' }); }
     }
     if (dia - st.ultimoCandidatos >= 3) gerarCandidatos();
   });

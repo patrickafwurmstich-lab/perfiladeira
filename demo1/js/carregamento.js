@@ -39,7 +39,7 @@ PT.carga = (function () {
   }
 
   function abrir(c, p, incluirTortas) {
-    st = { c, p, incluirTortas: !!incluirTortas, pacotes: montarPacotes(p, incluirTortas), sel: null };
+    st = { c, p, incluirTortas: !!incluirTortas, pacotes: montarPacotes(p, incluirTortas), sel: null, foto: JSON.stringify(PT.pedidos.disponivel(p)) };
     if (!st.pacotes.length) { PT.ev.emit('aviso', 'Não há peças desse pedido na zona verde.'); st = null; return; }
     PT.ui.abrirModal('carga'); desenhar();
   }
@@ -137,6 +137,8 @@ PT.carga = (function () {
 
   function confirmar() {
     const a = analise(); if (!a.pos.length || a.acimaPeso) return;
+    // a zona verde mudou com a janela aberta (funcionário/jogador mexeu)? refaz a mesa (ChatGPT, bug 2)
+    if (JSON.stringify(PT.pedidos.disponivel(st.p)) !== st.foto) { PT.ev.emit('aviso', 'As pilhas da zona verde mudaram. Monte a carga de novo.'); const c = st.c, p = st.p, t = st.incluirTortas; abrir(c, p, t); return; }
     // sorteio do dano na viagem (por pacote)
     let dano = 0;
     a.pos.forEach(o => {

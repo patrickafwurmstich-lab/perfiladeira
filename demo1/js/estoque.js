@@ -114,7 +114,7 @@ PT.estoque = (function () {
     } else if (c.tipo === 'paleteira') {
       if (!c.carga) {
         const alvo = PT.ent.perto(frente(j, 1.6).x, frente(j, 1.6).z, 1.4, o => !o.preso && o.y < 0.2 && (o.tipo === 'pilha' || (o.tipo === 'volume' && !o.pequeno)) && (o.pesoKg || 0) <= 2500);
-        if (alvo) ops.push({ rotulo: 'Erguer ' + (alvo.rotulo || alvo.tipo) + ' com a paleteira', acao: () => { c.carga = alvo; prender(alvo, 'paleteira'); c.lento = 0.55; PT.ev.emit('paleteiraCarregou', alvo); } });
+        if (alvo) ops.push({ rotulo: 'Erguer ' + (alvo.rotulo || alvo.tipo) + ' com a paleteira', acao: () => { c.carga = alvo; prender(alvo, 'paleteira'); PT.maq.lista.forEach(m => { if (m.mesa === alvo) m.mesa = null; }); c.lento = 0.55; PT.ev.emit('paleteiraCarregou', alvo); } });
       } else {
         ops.push({ rotulo: 'Baixar a carga', acao: () => { const p = frente(j, 1.1 + c.carga.dims[0] / 2); soltarNoChao(c.carga, p.x, p.z); c.carga = null; c.lento = 0.75; } });
       }

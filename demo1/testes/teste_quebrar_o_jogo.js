@@ -58,9 +58,9 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
     // H) tirar a bobina com a ponte no meio da produção
     const m = T.fabrica(); m.cfg.comprimento = 4; m.cfg.quantidade = 200; PT.maq.iniciar(m); T.min(3);
     const bo = m.bobina; const P = PT.ponte.st; P.x = bo.x; P.z = bo.z; P.y = bo.y + bo.g.userData.altura + 0.2; T.frames(2);
-    PT.mundo.jog.controlando = PT.ponte.controle; PT.ev.emit('tecla', 'Space'); T.frames(2);
+    PT.ui.cancelarInteracoes(); PT.mundo.jog.controlando = PT.ponte.controle; PT.ev.emit('tecla', 'Space'); T.frames(2);
     ok(P.carga === bo && !m.bobina && m.estado !== 'produzindo', 'H1 tirar a bobina no meio da produção para a máquina (' + m.estado + ')');
-    P.y = 6; T.frames(2); P.x = 70; T.frames(2); P.y = bo.g.userData.altura * bo.g.userData.mesh.scale.x + 0.02; T.frames(2); PT.ev.emit('tecla', 'Space'); T.frames(30); PT.mundo.jog.controlando = null;
+    P.y = 6; T.frames(2); P.x = 70; T.frames(2); P.y = bo.g.userData.altura * bo.g.userData.mesh.scale.x + 0.02; T.frames(2); PT.ui.cancelarInteracoes(); PT.ev.emit('tecla', 'Space'); T.frames(30); PT.mundo.jog.controlando = null;
     // I) mover máquina depois que a paleteira levou a pilha
     PT.maq.ligar(m, false); const pilha = m.mesa; pilha.x = 110; pilha.z = 13; PT.ent.sync(pilha);
     PT.maq.desinstalar(m); ok(!!PT.construcao.ativo, 'I1 pode mover a máquina depois que a pilha saiu da mesa');
@@ -107,7 +107,7 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
     // Q) carga baixa na ponte não atravessa a máquina
     const b3 = PT.estoque.novaBobina('GL043-1T', 50, 31, 0);
     const P2 = PT.ponte.st; P2.x = 50; P2.z = 31; P2.y = b3.g.userData.altura + 0.3; T.frames(2);
-    PT.mundo.jog.controlando = PT.ponte.controle; PT.ev.emit('tecla', 'Space');
+    PT.ui.cancelarInteracoes(); PT.mundo.jog.controlando = PT.ponte.controle; PT.ev.emit('tecla', 'Space');
     P2.y = 1.2; T.frames(2);   // carga quase no chão
     const tecl = { KeyW: true }; PT.mundo.cam.yaw = 0;   // W = andar para -Z (na direção da máquina em z=26)
     for (let i = 0; i < 120; i++) PT.ponte.controle.controlar(0.05, tecl), PT.ponte.atualizar(0.05);

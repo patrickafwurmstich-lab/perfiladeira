@@ -39,16 +39,39 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
     ok(!!esc || naVerde.every(o => o.defeituosas === 0), 'X6 ajudante apressado esconde as tortas no meio da pilha (' + (esc ? esc.defeituosas + ' escondidas' : 'sem tortas') + ')');
     if (esc) { T.ir(esc.x, esc.z + 1.5); const rr = T.fazer(/Inspecionar o lote/); ok(/^ok/.test(rr) && !esc.tortasEscondidas, 'X7 inspecionar o lote revela as tortas'); }
     Math.random = rnd;
+
+    // ===== 4ª rodada do ChatGPT =====
+    const m4 = PT.maq.lista[0];
+    ok(!m4.mesa || PT.maq.mesaOcupada(m4) || !PT.func.tarefasAbertas().some(t => t.tipo === 'tirarPilha' && naVerde.includes(t.alvo)), 'Y1 pilha que já foi para a zona verde não vira tarefa de novo');
+    // carregando durante a tartaruga solta a carga
+    const fj = PT.func.st.lista[0]; const plx = PT.estoque.novaPilha('TP40', 3, 70, 30); PT.estoque.addNaPilha(plx, 5, 0);
+    fj.carregando = plx; plx.preso = 'funcionario:' + fj.id; fj.tarefa = { id: 'x', tipo: 'tirarPilha', setor: 'expedicao', alvo: plx }; fj.estado = 'deslocar'; fj.ausenteAte = 0;
+    PT.func.st.tartaruga = 2; rodar(1);
+    ok(!fj.carregando && !plx.preso && !fj.tarefa, 'Y2 operação tartaruga faz o funcionário largar a pilha e a tarefa');
+    PT.func.st.tartaruga = 0;
+    // dívida de folha acumula
+    PT.func.st.devendo = 1000; PT.eco.st.caixa = -4999; PT.eco.st.cheque = 5000;
+    while (PT.tempo.st.dia % 15 !== 0) PT.tempo.pularNoite();
+    ok(PT.func.st.devendo > 1000, 'Y3 folha não paga soma na dívida (' + Math.round(PT.func.st.devendo) + ')');
+    PT.eco.st.caixa = 80000; PT.func.pagarAtrasado();
+    // funcionário preso contra parede desiste
+    const fp2 = PT.func.st.lista[0]; fp2.ausenteAte = 0; fp2.x = 66; fp2.z = 38.5;
+    const parede = { x0: 60, x1: 72, z0: 37, z1: 37.6 }; PT.mundo.paredes.push(parede);
+    const plw = PT.estoque.novaPilha('TP40', 3, 66, 35); PT.estoque.addNaPilha(plw, 1, 0);
+    fp2.tarefa = { id: 'w', tipo: 'tirarPilha', setor: 'expedicao', alvo: plw }; fp2.estado = 'deslocar';
+    PT.tempo.st.minutos = 9 * 60; let desistiu = false; for (let i = 0; i < 200 && !desistiu; i++) { rodar(0.1); if (!fp2.tarefa || fp2.tarefa.id !== 'w') desistiu = true; }
+    PT.mundo.paredes.splice(PT.mundo.paredes.indexOf(parede), 1);
+    ok(desistiu, 'Y4 funcionário preso atrás de uma parede contorna ou desiste (não fica preso para sempre)');
     // orientar
     const aj = PT.func.st.lista[1]; T.ir(aj.x, aj.z + 0.6); const ro = T.fazer(/Orientar/); ok(/^ok/.test(ro) && aj.orientadoAte > 0, 'X8 orientar o funcionário (' + ro + ' | vis ' + aj.g.visible + ' j ' + PT.mundo.jog.x.toFixed(1) + ',' + PT.mundo.jog.z.toFixed(1) + ' aj ' + aj.x.toFixed(1) + ',' + aj.z.toFixed(1) + ' carreg ' + !!PT.mundo.jog.carregando + ' ctrl ' + !!PT.mundo.jog.controlando + ')');
     // prioridade
     PT.func.st.prioridade.expedicao = 'baixa'; ok(PT.func.st.prioridade.expedicao === 'baixa', 'X9 prioridade por setor muda');
     // folha: dia 15 com dinheiro; dia 30 sem dinheiro = tartaruga
-    while (PT.tempo.st.dia < 14) PT.tempo.pularNoite();
+    while (PT.tempo.st.dia % 15 !== 14) PT.tempo.pularNoite();
     const cx = PT.eco.st.caixa; PT.tempo.pularNoite();
     ok(PT.eco.st.extrato.some(x => /Folha quinzenal/.test(x.desc)), 'X10 folha quinzenal paga no dia 15 (' + Math.round(cx - PT.eco.st.caixa) + ')');
     PT.eco.st.caixa = -4900; PT.eco.st.cheque = 5000;
-    while (PT.tempo.st.dia < 30) PT.tempo.pularNoite();
+    do { PT.tempo.pularNoite(); } while (PT.tempo.st.dia % 15 !== 0);
     ok(PT.func.st.tartaruga > 0, 'X11 sem dinheiro no dia 30 = OPERAÇÃO TARTARUGA');
     rodar(5); ok(PT.func.st.lista.every(f => f.estado === 'tartaruga'), 'X12 equipe de braços cruzados na cafeteira');
     PT.eco.st.caixa = 50000; ok(PT.func.pagarAtrasado() && PT.func.st.tartaruga === 0, 'X13 pagar a folha atrasada + multa encerra a greve');

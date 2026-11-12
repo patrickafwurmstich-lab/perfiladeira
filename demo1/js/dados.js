@@ -183,7 +183,7 @@ PT.DADOS = {
   funcionarios: {
     maxAtivos: 6, hz: 10, velocidade: 1.6, eficienciaAjudante: 0.6, energiaPorTarefa: 0.06,
     pilhaParaTirar: 40, desgasteParaGraxa: 0.4, chanceEsconderTorta: 0.25, diasOrientacao: 3, multaAtraso: 0.05,
-    cursoPreco: 400, cursoHoras: 24,
+    cursoPreco: 400, cursoHoras: 24, corredorCentralZ: 18,
     duracao: { tirarPilha: 4, limparEnrosco: 10, graxa: 5, operar: 6 },    // segundos de jogo (x eficiência)
     nomesTarefa: { tirarPilha: 'levando pilha', limparEnrosco: 'cortando enrosco', graxa: 'engraxando', operar: 'operando' },
     cargos: {
