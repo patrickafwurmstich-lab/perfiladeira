@@ -118,6 +118,8 @@ PT.mundo = (function () {
     paredes.push({ x0: M.computador.x - 0.7, x1: M.computador.x + 0.7, z0: M.computador.z - 0.35, z1: M.computador.z + 0.35 });
     const porta = PT.modelo('porta_escritorio', { semRotulo: true }); porta.position.set(E.x1, 0, M.porta.z); porta.rotation.y = Math.PI / 2; scene.add(porta);
     // quadro elétrico
+    // decoração do escritório (Grab3D, CC0): plantas nos cantos e caixas de arquivo no fundo
+    if (PT.glb) { PT.glb.decor('snake-plant-leve', E.x0 + 0.5, E.z0 + 0.6); PT.glb.decor('snake-plant-leve', E.x1 - 0.6, E.z1 - 0.5); PT.glb.decor('cardboard-box-stack-leve', E.x0 + 1.4, E.z1 - 0.4, Math.PI); PT.glb.decor('desktop-pc-leve', E.x0 + 0.4, E.z1 - 1.6, Math.PI / 2); }
     const q = PT.modelo('quadro_eletrico'); q.position.set(M.quadro.x, 0, M.quadro.z); scene.add(q);
     PT.mundo.quadroObj = q;
   }

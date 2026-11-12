@@ -35,9 +35,10 @@ PT.glb = (function () {
 
   // id do jogo → nome do arquivo .glb (quando são diferentes)
   const ARQUIVO = { caminhao_entrega: 'caminhao_carroceria' };
+  const GRATIS = '../modelos3d/gratis/grab3d/leves/';   // Grab3D (CC0), versões leves feitas no Blender
   function carregar(id) {
     if (!cache[id]) cache[id] = new Promise((ok, erro) => {
-      new THREE.GLTFLoader().load(BASE + (ARQUIVO[id] || id) + '.glb', g => { st.carregados++; adaptarMateriais(g.scene); ok(g.scene); }, undefined, e => { st.erros++; erro(e); });
+      new THREE.GLTFLoader().load(id.indexOf('/') >= 0 ? id : BASE + (ARQUIVO[id] || id) + '.glb', g => { st.carregados++; adaptarMateriais(g.scene); ok(g.scene); }, undefined, e => { st.erros++; erro(e); });
     });
     return cache[id];
   }
@@ -66,6 +67,7 @@ PT.glb = (function () {
   function aplicar(g, id, opts) {
     if (!disponivel() || opts.transparente) return;
     if (ROUPAS[id]) return aplicarPersonagem(g, id, opts);
+    if (COMPOSTOS[id]) return aplicarComposto(g, id);
     if (PT.GLB_NO_JOGO.indexOf(id) < 0) return;
     const mesh = g.userData.mesh, altura = g.userData.altura;
     carregar(id).then(cena => {
@@ -196,6 +198,26 @@ PT.glb = (function () {
     nova.reset().play(); if (velha) nova.crossFadeFrom(velha, 0.2, false);
     ser.atual = nome;
   }
+  // objetos montados com peças grátis da Grab3D (CC0)
+  const COMPOSTOS = {
+    computador_mesa: [{ arq: 'office-desk-leve' }, { arq: 'computer-monitor-leve', y: 0.74, z: -0.12 }, { arq: 'desktop-pc-leve', x: 0.62, y: 0.74, z: -0.12 }],
+    quadro_eletrico: [{ arq: 'electrical-cabinet-leve', esc: 0.87, z: -0.1 }]
+  };
+  function aplicarComposto(g, id) {
+    const mesh = g.userData.mesh, altura = g.userData.altura;
+    Promise.all(COMPOSTOS[id].map(p => carregar(GRATIS + p.arq + '.glb'))).then(cenas => {
+      if (!mesh.parent) return;
+      const grp = new THREE.Group();
+      cenas.forEach((c, i) => { const p = COMPOSTOS[id][i], m = c.clone(true); m.position.set(p.x || 0, p.y || 0, p.z || 0); if (p.esc) m.scale.setScalar(p.esc); m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); grp.add(m); });
+      grp.position.y = -altura / 2; esconderCubo(mesh); mesh.add(grp); g.userData.glb = grp; st.trocados++;
+    }).catch(() => { });
+  }
+  // decoração solta (sem colisão): vaso de planta, pilha de caixas...
+  function decor(arq, x, z, rotY, cena) {
+    if (!disponivel()) return;
+    carregar(GRATIS + arq + '.glb').then(c => { const m = c.clone(true); m.position.set(x, 0, z); m.rotation.y = rotY || 0; m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); (cena || PT.mundo.scene).add(m); }).catch(() => { });
+  }
+
   // prédios: com o jogador dentro some o teto e as paredes ficam transparentes (câmera em 3ª pessoa)
   const predios = [];
   function registrarPredio(g, m) {
@@ -238,5 +260,5 @@ PT.glb = (function () {
 
   function definirLigado(v) { try { localStorage.setItem('pt_cubos', v ? '0' : '1'); } catch (e) { } }
   return { aplicar, carregar, st, ligado: () => ligado, definirLigado, luzTorre, ativo, ALTURA_MANDRIL,
-           atualizar, carregarPersonagens, guardarPersonagens, apagarPersonagens: () => idb('apagar'), vivos };
+           atualizar, decor, carregarPersonagens, guardarPersonagens, apagarPersonagens: () => idb('apagar'), vivos };
 })();
