@@ -49,7 +49,7 @@ PT.DADOS = {
     computador: { x: 4, z: 36 },
     quadro: { x: 12, z: 39.6, capacidadeKW: 40 },
     placa: { x: 20, z: 39.8 },
-    caminhao: { xEntrada: -30, xSaida: 170, velocidade: 6, z: 6, distParada: 2 },
+    caminhao: { xEntrada: -30, xSaida: 170, velocidade: 6, z: 6, distParada: 2, esperaMaxMin: 180 },
     ponte: { capacidadeKg: 1500, alturaTrilho: 9, xIni: 20, zIni: 24,
              vel: { ponte: 3.0, carro: 2.2, gancho: 1.5 }, ganchoMin: 0.6,
              estresseSegundos: 3, raioMorte: 2.5, alcanceBotoeira: 4 }

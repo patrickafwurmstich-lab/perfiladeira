@@ -86,6 +86,7 @@ PT.pedidos = (function () {
         falta -= n; p.carregadas += n;
         // MANIFESTO: o que está fisicamente na carroceria deste caminhão
         c.manifesto = c.manifesto || []; c.manifesto.push({ produto: o.produto, comprimento: o.comprimento, n, tortas: passo === 'tortas' ? n : 0 });
+        PT.entrega.cargaVisual(c, o.comprimento, n);
         if (o.qtd <= 0) PT.ent.remover(o); else PT.estoque.atualizarPilha(o);
       }
     }

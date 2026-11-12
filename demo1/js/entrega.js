@@ -63,6 +63,7 @@ PT.entrega = (function () {
     st.caminhoes.slice().forEach(c => {
       if (c.estado === 'chegando') {
         const b = bloqueio(c);
+        c.bloqueado = !!b;
         if (b) {
           c.buzinou -= dt;
           if (c.buzinou <= 0) { c.buzinou = 12; PT.ev.emit('buzina', { de: c.e.de, texto: 'BÉÉÉÉM! Ô patrão, tira essa tranqueira da frente que eu tenho horário!' }); if (c.e.tipo === 'coleta' && PT.rep) PT.rep.efeito('pontualidade', PT.DADOS.reputacao.efeitos.caminhaoEsperando); }
@@ -79,7 +80,13 @@ PT.entrega = (function () {
         // carroceria acompanha o caminhão; quando tudo saiu, vai embora
         c.carroceria = c.carroceria.filter(o => PT.ent.lista.includes(o) && !o.preso && Math.abs(o.y - 1.2) < 0.05 && Math.abs(o.z - CM.z) < 1.5 && Math.abs(o.x - c.x) < 6.5);
         if (c.e.tipo === 'fornecedor' && c.carroceria.length === 0) partir(c);
-        if (c.e.tipo === 'fornecedor' && c.espera > 120 && !c.reclamou) { c.reclamou = true; PT.ev.emit('celular', { de: c.e.de, texto: 'Patrão, faz 2 horas que eu tô aqui parado... a diária do caminhão é cara!' }); }
+        if (c.e.tipo === 'fornecedor' && c.espera > 120 && !c.reclamou) { c.reclamou = true; PT.ev.emit('celular', { de: c.e.de, texto: 'Patrão, faz 2 horas que eu tô aqui parado... a diária do caminhão é cara! Mais 1 hora e eu levo de volta.' }); }
+        // fornecedor esquecido: leva o que sobrou na carroceria e volta amanhã (sem cobrar de novo) — ChatGPT, bug 2
+        if (c.e.tipo === 'fornecedor' && c.espera > PT.DADOS.mundo.caminhao.esperaMaxMin && c.carroceria.length) {
+          const itens = c.carroceria.map(o => o.item || o.spec); c.carroceria.forEach(o => PT.ent.remover(o)); c.carroceria = [];
+          agendar(PT.tempo.st.dia + 1, itens, c.e.de); partir(c);
+          PT.ev.emit('celular', { de: c.e.de, texto: 'Cansei. Levei ' + itens.length + ' volume(s) de volta e trago amanhã às 9h.' });
+        }
       } else if (c.estado === 'saindo') {
         c.x += CM.velocidade * sDt;
         if (c.x > CM.xSaida) { PT.mundo.scene.remove(c.g); c.g.userData.liberar(); st.caminhoes.splice(st.caminhoes.indexOf(c), 1); }
@@ -87,23 +94,41 @@ PT.entrega = (function () {
       c.g.position.set(c.x, 0, CM.z);
     });
   }
+  // carga visual na carroceria da coleta (só visual — o estoque real está no manifesto) — ChatGPT, bug 3
+  function cargaVisual(c, comprimento, n) {
+    c.visuais = c.visuais || 0;
+    const h = 0.05 + 0.02 * n, box = new THREE.Mesh(new THREE.BoxGeometry(1.05, h, Math.max(0.5, comprimento)), new THREE.MeshLambertMaterial({ color: 0x5dade2 }));
+    box.position.set(-0.6 + (c.visuais % 2) * 1.2, 1.25 + h / 2, -4 + Math.floor(c.visuais / 2) * (comprimento + 0.3)); c.g.add(box); c.visuais++;
+  }
   function partir(c) { if (c.estado !== 'saindo') { c.estado = 'saindo'; PT.ev.emit('caminhaoSaiu', c); } }
 
   // verifica a fila a cada minuto de jogo
   PT.ev.on('minuto', ({ dia, minutos }) => {
     st.caminhoes.forEach(c => { if (c.estado === 'parado') c.espera += 1; });   // espera conta em minutos de JOGO (passo fixo)
+    // caminhão travado na entrada por obstáculo: depois do limite, desiste e volta amanhã — ChatGPT, bug 1
+    st.caminhoes.slice().forEach(c => {
+      if (c.estado !== 'chegando' || !c.bloqueado) return;
+      c.esperaBloqueio = (c.esperaBloqueio || 0) + 1;
+      if (c.esperaBloqueio > PT.DADOS.mundo.caminhao.esperaMaxMin / 2) {
+        PT.ev.emit('celular', { de: c.e.de, texto: 'Não deu pra entrar, o corredor tá trancado. Volto amanhã!' });
+        agendar(PT.tempo.st.dia + 1, c.e.itens, c.e.de, { tipo: c.e.tipo, pedidoId: c.e.pedidoId, hora: c.e.tipo === 'coleta' ? 14 : 9 });
+        if (c.e.tipo === 'coleta' && PT.rep) PT.rep.efeito('pontualidade', PT.DADOS.reputacao.efeitos.caminhaoEsperando * 5);
+        PT.mundo.scene.remove(c.g); c.g.userData.liberar(); st.caminhoes.splice(st.caminhoes.indexOf(c), 1);
+      }
+    });
     const h = minutos / 60;
     st.fila.slice().forEach(e => {
       if (dia > e.dia || (dia === e.dia && h >= e.hora)) {
         // um caminhão por vez no corredor
-        if (st.caminhoes.some(c => c.estado !== 'saindo')) return;
+        // faixa livre: nenhum caminhão parado/chegando e quem está saindo já se afastou da entrada
+        if (st.caminhoes.some(c => c.estado !== 'saindo' || c.x < CM.xEntrada + 25)) return;
         st.fila.splice(st.fila.indexOf(e), 1); despachar(e);
       }
     });
   });
 
   return {
-    st, agendar, atualizar, partir, despachar,
+    st, agendar, atualizar, partir, despachar, cargaVisual,
     salvar() { return { fila: st.fila }; },     // caminhão em movimento não é salvo: volta para a fila
     carregar(o) { st.fila = o.fila || []; }
   };

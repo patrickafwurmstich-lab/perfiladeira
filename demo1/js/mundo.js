@@ -113,10 +113,13 @@ PT.mundo = (function () {
     window.addEventListener('keydown', e => {
       if (PT.ui && PT.ui.capturandoTeclado()) return;
       teclas[e.code] = true;
-      PT.ev.emit('tecla', e.code);
+      if (!e.repeat) PT.ev.emit('tecla', e.code);          // segurar ESPAÇO não alterna engatar/soltar sem parar — ChatGPT, bug 7
       if (['Tab', 'Space'].includes(e.code)) e.preventDefault();
     });
     window.addEventListener('keyup', e => { teclas[e.code] = false; });
+    // ALT+TAB ou morte com tecla apertada: nada fica "preso" — ChatGPT, bug 8
+    const limpar = () => Object.keys(teclas).forEach(k => teclas[k] = false);
+    window.addEventListener('blur', limpar); PT.ev.on('morreu', limpar); PT.ev.on('respawn', limpar);
     const cv = () => renderer.domElement;
     window.addEventListener('mousedown', e => {
       if (e.target !== cv()) return;

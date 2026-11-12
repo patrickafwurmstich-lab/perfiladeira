@@ -14,7 +14,20 @@ PT.ui = (function () {
   function modalAberto() { return !!st.modal; }
   function capturandoTeclado() { const a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'SELECT' || a.tagName === 'TEXTAREA'); }
   function abrirModal(nome) { st.modal = nome; ['computador', 'clp', 'minijogo', 'ligacao', 'progresso', 'carga'].forEach(n => $(n).style.display = n === nome ? 'flex' : 'none'); }
-  function fecharModal() { if (st.modal === 'minijogo' || st.modal === 'progresso') return; st.modal = null; ['computador', 'clp', 'ligacao', 'carga'].forEach(n => $(n).style.display = 'none'); proximaLigacao(); }
+  // fecharModal(false) = trocar de janela sem liberar a fila de ligações (ex.: CLP → minijogo) — ChatGPT, bug 5
+  function fecharModal(chamarFila) {
+    if (st.modal === 'minijogo' || st.modal === 'progresso') return;
+    if (st.modal === 'ligacao') ligacaoPerdida();
+    st.modal = null; ['computador', 'clp', 'ligacao', 'carga'].forEach(n => $(n).style.display = 'none');
+    if (chamarFila !== false) proximaLigacao();
+  }
+  // token: minijogo/progresso só executam o callback se a interação ainda for válida (morte cancela) — ChatGPT, bug 4
+  let token = 0;
+  function cancelarInteracoes() {
+    token++; if (st.modal === 'ligacao') ligacaoPerdida();
+    st.modal = null; ['computador', 'clp', 'minijogo', 'ligacao', 'progresso', 'carga'].forEach(n => $(n).style.display = 'none');
+  }
+  PT.ev.on('morreu', cancelarInteracoes);
 
   // ---------------- AVISOS / CELULAR ----------------
   function aviso(txt) {
@@ -45,16 +58,24 @@ PT.ui = (function () {
   function textoPagamento(p) { const pg = PT.DADOS.clientes[p.perfil].pagamento; return pg.entrada >= 1 ? 'Pix na hora' : Math.round(pg.entrada * 100) + '% de entrada + saldo ' + (pg.prazoSaldo ? 'em ' + pg.prazoSaldo + ' dias' : 'na entrega'); }
 
   // ---------------- LIGAÇÃO (pedreiro negocia) ----------------
+  let ligacaoAtual = null, ligTimer = null;
+  // ligação não atendida (fechou, morreu ou demorou 20 s) vira "chamada perdida" com retorno pelo e-mail — ChatGPT, bug 6
+  function ligacaoPerdida() {
+    if (!ligacaoAtual) return; const p = PT.pedidos.st.lista.find(x => x.id === ligacaoAtual); ligacaoAtual = null; clearTimeout(ligTimer);
+    if (p && p.status === 'oferta') email({ de: p.cliente, assunto: '📞 Chamada perdida — ' + p.id, pedidoId: p.id, texto: 'Te liguei e não atendeu! Preciso de ' + PT.pedidos.descricao(p) + ' até o dia ' + p.prazoDia + '. Responde aqui mesmo.' });
+  }
   function proximaLigacao() {
-    if (st.modal || !st.filaLigacoes.length) return;
+    if (st.modal || !st.filaLigacoes.length || PT.mundo.jog.morto) return;
     const p = PT.pedidos.st.lista.find(x => x.id === st.filaLigacoes.shift());
     if (!p || p.status !== 'oferta') return proximaLigacao();
+    ligacaoAtual = p.id; clearTimeout(ligTimer); ligTimer = setTimeout(() => { if (st.modal === 'ligacao' && ligacaoAtual === p.id) fecharModal(); }, 20000);
     abrirModal('ligacao');
     $('ligacao').querySelector('.caixa').innerHTML = '<h2>📞 ' + p.cliente + ' ligando...</h2><p>"Ô patrão, tudo bom? Preciso de <b>' + PT.pedidos.descricao(p) +
       '</b> até o <b>dia ' + p.prazoDia + '</b>. Pago no Pix. Fecha?"</p><div class="botoes"><button id="lgA">Aceitar</button><button id="lgC">Contraproposta (+10%)</button><button id="lgR">Recusar</button></div>';
-    $('lgA').onclick = () => { PT.pedidos.aceitar(p.id); aviso('Pedido ' + p.id + ' fechado.'); fecharModal(); };
-    $('lgC').onclick = () => { const r = PT.pedidos.contraproposta(p.id); aviso(r ? p.cliente + ': "Tá bom, tá bom... fechado!"' : p.cliente + ': "Aí não dá, patrão. Vou ver em outro lugar."'); fecharModal(); };
-    $('lgR').onclick = () => { PT.pedidos.recusar(p.id); fecharModal(); };
+    const responder = fn => () => { ligacaoAtual = null; clearTimeout(ligTimer); fn(); fecharModal(); };
+    $('lgA').onclick = responder(() => { PT.pedidos.aceitar(p.id); aviso('Pedido ' + p.id + ' fechado.'); });
+    $('lgC').onclick = responder(() => { const r = PT.pedidos.contraproposta(p.id); aviso(r ? p.cliente + ': "Tá bom, tá bom... fechado!"' : p.cliente + ': "Aí não dá, patrão. Vou ver em outro lugar."'); });
+    $('lgR').onclick = responder(() => PT.pedidos.recusar(p.id));
   }
 
   // ---------------- HUD (a cada frame, barato) ----------------
@@ -176,8 +197,8 @@ PT.ui = (function () {
   function telaSistema() {
     return '<h2>Sistema</h2><div class="botoes"><button data-acao="salvar">Salvar (K)</button><button data-acao="carregar">Carregar último save (L)</button><button data-acao="exportar">Exportar save (.json)</button>' +
       '<label class="btn">Importar save<input type="file" id="impArq" accept=".json" hidden></label><button data-acao="novo">Novo jogo</button></div>' +
-      '<h3>Teste (atalhos de desenvolvedor)</h3><div class="botoes"><button data-acao="vel">Velocidade (T): x' + PT.tempo.vel + '</button><button data-acao="pedido">Gerar pedido agora</button>' +
-      '<button data-acao="dinheiro">+R$ 20 mil (debug)</button><button data-acao="noite">Pular para o próximo dia</button><button data-acao="entregas">Entregas pendentes: ' + PT.entrega.st.fila.length + '</button></div>' +
+      (PT.DEBUG ? '<h3>Teste (atalhos de desenvolvedor)</h3><div class="botoes"><button data-acao="vel">Velocidade (T): x' + PT.tempo.vel + '</button><button data-acao="pedido">Gerar pedido agora</button>' +
+      '<button data-acao="dinheiro">+R$ 20 mil (debug)</button><button data-acao="noite">Pular para o próximo dia</button><button data-acao="entregas">Entregas pendentes: ' + PT.entrega.st.fila.length + '</button></div>' : '<p><small>Atalhos de teste: abra o jogo com <b>?debug=1</b> no endereço.</small></p>') +
       '<h3>Últimos eventos</h3><div class="log">' + PT.ev.log.slice(-25).reverse().map(l => l.t + ' — ' + l.nome).join('<br>') + '</div>';
   }
   function acaoComputador(a, arg) {
@@ -196,9 +217,9 @@ PT.ui = (function () {
     if (a === 'exportar') PT.save.exportar();
     if (a === 'novo') { if (confirmarNovo()) { try { localStorage.removeItem('parecis_demo1_save'); } catch (e) { } location.reload(); } return; }
     if (a === 'vel') PT.tempo.alternarVel();
-    if (a === 'pedido') PT.pedidos.gerar();
-    if (a === 'dinheiro') PT.eco.lancar(20000, 'DEBUG: dinheiro de teste');
-    if (a === 'noite') PT.tempo.pularNoite();
+    if (a === 'pedido' && PT.DEBUG) PT.pedidos.gerar();
+    if (a === 'dinheiro' && PT.DEBUG) PT.eco.lancar(20000, 'DEBUG: dinheiro de teste');
+    if (a === 'noite' && PT.DEBUG) PT.tempo.pularNoite();
     desenharComputador();
   }
   let pedidoNovo = 0;
@@ -241,7 +262,7 @@ PT.ui = (function () {
     $('cLig').onclick = () => { PT.maq.ligar(m, !m.ligada); desenharCLP(); };
     if ($('cAli')) $('cAli').onclick = () => {
       if (!m.bobina) { aviso('Monte uma bobina primeiro.'); return; }
-      fecharModal(); minijogo({ titulo: 'Alinhar a ponta da chapa', dica: 'ESPAÇO com a chapa no centro', dificuldade: 1 - m.def.alinhamentoBase + 0.3 }, n => { PT.maq.alinhar(m, n); aviso('Alinhamento: ' + Math.round(m.alinhamento * 100) + '%'); abrirCLP(m); });
+      fecharModal(false); minijogo({ titulo: 'Alinhar a ponta da chapa', dica: 'ESPAÇO com a chapa no centro', dificuldade: 1 - m.def.alinhamentoBase + 0.3 }, n => { PT.maq.alinhar(m, n); aviso('Alinhamento: ' + Math.round(m.alinhamento * 100) + '%'); abrirCLP(m); });
     };
     $('cIni').onclick = () => { salvarCfg(); if (PT.maq.iniciar(m)) aviso('▶ ' + m.nome + ' produzindo.'); desenharCLP(); };
     $('cPar').onclick = () => { if (m.estado === 'produzindo') PT.maq.parar(m, 'pronta'); desenharCLP(); };
@@ -249,7 +270,7 @@ PT.ui = (function () {
 
   // ---------------- MINIJOGO (bolha/alinhamento) ----------------
   function minijogo(o, cb) {
-    abrirModal('minijogo');
+    abrirModal('minijogo'); const meu = ++token;
     const c = $('minijogo').querySelector('.caixa');
     const larg = PT.util.clamp(0.28 - (o.dificuldade || 0.5) * 0.18, 0.06, 0.3);
     c.innerHTML = '<h2>' + o.titulo + '</h2><p>' + o.dica + '</p><div class="trilho"><div class="verde" style="left:' + (50 - larg * 50) + '%;width:' + (larg * 100) + '%"></div><div class="bolha" id="bolha"></div></div><p id="mjT"></p>';
@@ -259,11 +280,12 @@ PT.ui = (function () {
       if (fim) return; fim = true; window.removeEventListener('keydown', tecla);
       const d = Math.abs(pos - 0.5);
       const nota = pos < 0 ? 0.3 : PT.util.clamp(1 - Math.max(0, d - larg / 2) * 3.2, 0, 1);
-      setTimeout(() => { st.modal = null; $('minijogo').style.display = 'none'; cb(nota); }, 250);
+      setTimeout(() => { if (meu !== token) return; st.modal = null; $('minijogo').style.display = 'none'; cb(nota); proximaLigacao(); }, 250);
     }
     function tecla(e) { if (e.code === 'Space') { e.preventDefault(); terminar(0.5 + 0.5 * Math.sin(t * vel)); } }
     window.addEventListener('keydown', tecla);
     (function loop(agora) {
+      if (meu !== token) { fim = true; window.removeEventListener('keydown', tecla); return; }
       if (fim) return; t += (agora - ultimo) / 1000; ultimo = agora;
       const pos = 0.5 + 0.5 * Math.sin(t * vel);
       $('bolha').style.left = (pos * 100) + '%'; $('mjT').textContent = 'Tempo: ' + Math.max(0, 4 - t).toFixed(1) + ' s';
@@ -273,13 +295,14 @@ PT.ui = (function () {
 
   // ---------------- PROGRESSO (ações com duração) ----------------
   function progresso(titulo, seg, cb) {
-    abrirModal('progresso');
+    abrirModal('progresso'); const meu = ++token;
     const c = $('progresso').querySelector('.caixa');
     c.innerHTML = '<h3>' + titulo + '</h3><div class="trilho"><div class="enche" id="pgB"></div></div>';
     const ini = performance.now();
     (function loop(t) {
       const f = Math.min(1, (t - ini) / (seg * 1000)); $('pgB').style.width = (f * 100) + '%';
-      if (f < 1) requestAnimationFrame(loop); else { st.modal = null; $('progresso').style.display = 'none'; cb(); }
+      if (meu !== token) return;                       // morreu no meio: nada é concluído (cimento não é gasto)
+      if (f < 1) requestAnimationFrame(loop); else { st.modal = null; $('progresso').style.display = 'none'; cb(); proximaLigacao(); }
     })(ini);
   }
 
@@ -318,7 +341,7 @@ PT.ui = (function () {
   });
 
   return {
-    hud, aviso, email, modalAberto, abrirModal, capturandoTeclado, abrirComputador, abrirCLP, minijogo, progresso, fecharModal,
+    hud, aviso, email, modalAberto, abrirModal, cancelarInteracoes, capturandoTeclado, abrirComputador, abrirCLP, minijogo, progresso, fecharModal,
     salvarCorreio() { return st.correio.slice(0, 60); }, carregarCorreio(c) { st.correio = c || []; }
   };
 })();

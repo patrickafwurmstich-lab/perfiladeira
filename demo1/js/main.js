@@ -5,6 +5,7 @@
 window.PT = window.PT || {};
 
 (function () {
+  PT.DEBUG = /[?&]debug=1/.test(location.search);
   PT.mundo.init(document.getElementById('cena'));
   PT.ponte.init();
   PT.zoeira.init();

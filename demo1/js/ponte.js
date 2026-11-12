@@ -89,7 +89,7 @@ PT.ponte = (function () {
   function largarBotoeira() { PT.mundo.jog.controlando = null; }
 
   PT.ev.on('tecla', code => {
-    if (PT.mundo.jog.controlando !== controle) return;
+    if (PT.mundo.jog.controlando !== controle || PT.ui.modalAberto()) return;
     if (code === 'Space') engatarOuSoltar();
   });
 

@@ -132,7 +132,7 @@ PT.empi = (function () {
   }
 
   PT.ev.on('tecla', code => {
-    if (PT.mundo.jog.controlando !== controle) return;
+    if (PT.mundo.jog.controlando !== controle || PT.ui.modalAberto()) return;
     if (code === 'Space') pegarOuSoltar();
     if (code === 'KeyC' && atual) { atual.cinto = !atual.cinto; PT.ev.emit('aviso', atual.cinto ? '✔ Cinto colocado. Clique!' : 'Cinto solto.'); }
   });

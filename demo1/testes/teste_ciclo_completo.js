@@ -18,7 +18,7 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
       frames(n, dt) { for (let i = 0; i < n; i++) { PT.ponte.atualizar(dt || 0.05); PT.estoque.atualizar(); PT.entrega.atualizar(dt || 0.05); PT.construcao.atualizar(); } },
       ir(x, z) { const j = PT.mundo.jog; j.x = x; j.z = z; PT.estoque.atualizar(); },
       fazer(re) { const ops = PT.inter.calcular(); const o = ops.find(o => re.test(o.rotulo)); if (!o) return 'SEM OPÇÃO ' + re + ' | tem: ' + ops.map(o => o.rotulo).join(' / '); o.acao(); return 'ok: ' + o.rotulo; },
-      ponteEngatar(o) {
+      ponteEngatar(o) { PT.ui.cancelarInteracoes();
         const P = PT.ponte.st; P.x = o.x; P.z = o.z; P.y = o.y + o.g.userData.altura + 0.3; T.frames(2);
         PT.mundo.jog.controlando = PT.ponte.controle; PT.ev.emit('tecla', 'Space'); return P.carga ? 'engatou ' + (P.carga.item || P.carga.codigo) : 'nao engatou';
       },
