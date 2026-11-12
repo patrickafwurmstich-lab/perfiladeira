@@ -8,7 +8,8 @@ PT.mundo = (function () {
   const M = PT.DADOS.mundo, P = PT.DADOS.personagem, C = PT.DADOS.camera;
   let renderer, scene, camera;
   const teclas = {};
-  const cam = { yaw: 2.4, pitch: 0.5, dist: C.dist, arrastando: false, ux: 0, uy: 0 };
+  // câmera: '3p' atrás do personagem (mouse gira) ou '1p' nos olhos dele. Sem câmera livre.
+  const cam = { yaw: Math.PI, pitch: 0.3, olhar: 0, dist: C.dist, modo: '3p', travado: false, arrastando: false, ux: 0, uy: 0 };
   const paredes = [];   // AABB fixas {x0,x1,z0,z1}
 
   // ---------------- INICIALIZAÇÃO ----------------
@@ -115,6 +116,13 @@ PT.mundo = (function () {
   }
 
   // ---------------- ENTRADA ----------------
+  let mira = null;
+  function trocarModo(m) {
+    cam.modo = m;
+    if (m === '1p') { cam.olhar = PT.util.clamp(-cam.pitch * 0.6, -1.3, 1.3); }
+    else { cam.pitch = PT.util.clamp(-cam.olhar * 0.8 + 0.25, -0.12, 1.05); if (cam.dist < C.distMin + 0.3) cam.dist = C.distMin + 0.8; }
+    PT.ev.emit('aviso', m === '1p' ? 'Câmera em 1ª pessoa (V volta)' : 'Câmera em 3ª pessoa');
+  }
   function eventosEntrada() {
     window.addEventListener('keydown', e => {
       if (PT.ui && PT.ui.capturandoTeclado()) return;
@@ -127,26 +135,43 @@ PT.mundo = (function () {
     const limpar = () => Object.keys(teclas).forEach(k => teclas[k] = false);
     window.addEventListener('blur', limpar); PT.ev.on('morreu', limpar); PT.ev.on('respawn', limpar);
     const cv = () => renderer.domElement;
+    const livreParaTravar = () => !(PT.ui && PT.ui.modalAberto()) && !(PT.pc && PT.pc.aberto) && !jog.morto;
+    document.addEventListener('pointerlockchange', () => { cam.travado = document.pointerLockElement === cv(); if (mira) mira.style.display = cam.travado ? 'block' : 'none'; });
+    const girar = (dx, dy) => {
+      cam.yaw -= dx * C.sens;
+      if (cam.modo === '1p') cam.olhar = PT.util.clamp(cam.olhar - dy * C.sens, -1.3, 1.3);
+      else cam.pitch = PT.util.clamp(cam.pitch + dy * C.sens, -0.12, 1.05);
+    };
     window.addEventListener('mousedown', e => {
       if (e.target !== cv()) return;
-      cam.arrastando = true; cam.ux = e.clientX; cam.uy = e.clientY; cam.moveu = 0;
+      if (e.button === 2) { cam.arrastando = true; cam.ux = e.clientX; cam.uy = e.clientY; return; }   // botão direito: gira sem prender o mouse
+      if (!cam.travado && livreParaTravar() && !(PT.construcao && PT.construcao.st && PT.construcao.st.ativo)) { try { cv().requestPointerLock(); } catch (er) { } cam.pegouAgora = true; }
+      cam.cliqueX = e.clientX; cam.cliqueY = e.clientY;
     });
     window.addEventListener('mouseup', e => {
-      if (cam.arrastando && cam.moveu < 4 && e.target === cv()) PT.ev.emit('clique', { x: e.clientX, y: e.clientY, botao: e.button });
-      cam.arrastando = false;
+      if (e.button === 2) { cam.arrastando = false; return; }
+      if (e.target !== cv()) return;
+      if (cam.pegouAgora && !(PT.construcao && PT.construcao.st && PT.construcao.st.ativo)) { cam.pegouAgora = false; return; }   // o clique que prende o mouse não vale como ação
+      cam.pegouAgora = false;
+      const meio = cam.travado; // mouse preso: o clique vale no centro da tela (mira)
+      PT.ev.emit('clique', { x: meio ? window.innerWidth / 2 : e.clientX, y: meio ? window.innerHeight / 2 : e.clientY, botao: e.button });
     });
     window.addEventListener('mousemove', e => {
+      if (cam.travado) { girar(e.movementX, e.movementY); PT.mundo.mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 }; return; }
       PT.mundo.mouse = { x: e.clientX, y: e.clientY };
       if (!cam.arrastando) return;
-      const dx = e.clientX - cam.ux, dy = e.clientY - cam.uy; cam.ux = e.clientX; cam.uy = e.clientY;
-      cam.moveu += Math.abs(dx) + Math.abs(dy);
-      cam.yaw -= dx * 0.005; cam.pitch = PT.util.clamp(cam.pitch + dy * 0.004, 0.08, 1.35);
+      const dx = e.clientX - cam.ux, dy = e.clientY - cam.uy; cam.ux = e.clientX; cam.uy = e.clientY; girar(dx, dy);
     });
     window.addEventListener('wheel', e => {
       if (e.target !== cv()) return;
+      if (cam.modo === '1p') { if (e.deltaY > 0) { cam.modo = '3p'; cam.dist = C.distMin + 0.3; } return; }
+      if (e.deltaY < 0 && cam.dist <= C.distMin + 0.01) { trocarModo('1p'); return; }
       cam.dist = PT.util.clamp(cam.dist * (e.deltaY > 0 ? 1.12 : 0.89), C.distMin, C.distMax);
     }, { passive: true });
+    PT.ev.on('tecla', c => { if (c === 'KeyV' && !(PT.ui && PT.ui.modalAberto())) trocarModo(cam.modo === '1p' ? '3p' : '1p'); });
     window.addEventListener('contextmenu', e => { if (e.target === cv()) e.preventDefault(); });
+    mira = document.createElement('div'); mira.id = 'mira'; mira.style.cssText = 'position:fixed;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.45);pointer-events:none;display:none;z-index:5';
+    document.body.appendChild(mira);
   }
 
   // ---------------- COLISÃO ----------------
@@ -171,6 +196,7 @@ PT.mundo = (function () {
   }
 
   // ---------------- ATUALIZAÇÃO ----------------
+  function livre() { return !(PT.ui && PT.ui.modalAberto()) && !(PT.pc && PT.pc.aberto) && !jog.morto; }
   function atualizar(dt) {
     if (!jog.morto && !(PT.ui && PT.ui.modalAberto())) {
       if (jog.controlando && jog.controlando.controlar) {
@@ -193,11 +219,30 @@ PT.mundo = (function () {
     }
     jog.g.position.set(jog.x, jog.y, jog.z);
     if (!jog.morto) jog.g.rotation.set(0, jog.rot, 0);
-    // câmera 3ª pessoa
-    const alvo = new THREE.Vector3(jog.x, 1.4, jog.z);
-    const cp = Math.cos(cam.pitch);
-    camera.position.set(alvo.x + Math.sin(cam.yaw) * cp * cam.dist, alvo.y + Math.sin(cam.pitch) * cam.dist, alvo.z + Math.cos(cam.yaw) * cp * cam.dist);
-    camera.lookAt(alvo);
+    // janela aberta (PC, CLP, ligação...) ou morte: solta o mouse para usar a interface
+    if (cam.travado && !livre()) { try { document.exitPointerLock(); } catch (e) { } }
+    const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);          // frente da câmera = (-sy, -cy)
+    if (cam.modo === '1p' && !jog.morto) {
+      // 1ª pessoa: olhos do personagem; ele vira junto com o mouse e o corpo some (não tampa a visão)
+      if (!jog.controlando) jog.rot = cam.yaw + Math.PI;
+      jog.g.rotation.set(0, jog.rot, 0); jog.g.visible = false;
+      camera.position.set(jog.x - sy * 0.12, jog.y + C.olhos, jog.z - cy * 0.12);
+      const co = Math.cos(cam.olhar);
+      camera.lookAt(camera.position.x - sy * co, camera.position.y + Math.sin(cam.olhar), camera.position.z - cy * co);
+    } else {
+      // 3ª pessoa atrás do personagem, um pouco por cima do ombro; encurta se tiver parede no caminho
+      jog.g.visible = true;
+      const rx = cy, rz = -sy, om = C.ombro;                          // direita da câmera
+      const alvo = new THREE.Vector3(jog.x + rx * om, 1.55 + jog.y, jog.z + rz * om);
+      const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+      let d = cam.dist;
+      for (let t = 0.4; t <= cam.dist; t += 0.2) {
+        const px = alvo.x + sy * cp * t, py = alvo.y + sp * t, pz = alvo.z + cy * cp * t;
+        if (py < 0.25 || (py < 3.5 && paredes.some(b => px > b.x0 - 0.15 && px < b.x1 + 0.15 && pz > b.z0 - 0.15 && pz < b.z1 + 0.15))) { d = Math.max(0.6, t - 0.25); break; }
+      }
+      camera.position.set(alvo.x + sy * cp * d, alvo.y + sp * d, alvo.z + cy * cp * d);
+      camera.lookAt(alvo);
+    }
     PT.mundo.sol.position.set(jog.x + 30, 60, jog.z + 20); PT.mundo.sol.target.position.set(jog.x, 0, jog.z);
     // rótulos somem de longe
     scene.traverse(o => { if (o.userData && o.userData.ehRotulo) o.visible = o.getWorldPosition(new THREE.Vector3()).distanceTo(camera.position) < 38; });

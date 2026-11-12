@@ -230,5 +230,5 @@ PT.DADOS = {
 
   // ---------------- PERSONAGEM / CÂMERA ----------------
   personagem: { vel: 4.2, correr: 1.6, raio: 0.35, altura: 1.75, alcanceInteracao: 2.2, maxTelhasNaMao: 2 },
-  camera: { dist: 9, distMin: 3, distMax: 40, altura: 4.5 }
+  camera: { dist: 4.2, distMin: 2.2, distMax: 9, altura: 4.5, ombro: 0.45, olhos: 1.62, sens: 0.0024 }   // 3ª pessoa atrás do personagem + 1ª pessoa
 };
