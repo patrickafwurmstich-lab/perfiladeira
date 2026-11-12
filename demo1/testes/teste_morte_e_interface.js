@@ -32,7 +32,8 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
   // W4: blur limpa teclas
   r = await p.evaluate(() => { window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })); window.dispatchEvent(new Event('blur')); return PT.mundo.teclas.KeyW; });
   ok(r === false, 'W4 perder o foco da janela solta as teclas');
-  // W5: ligação fechada vira chamada perdida
+  // W5: ligação fechada vira chamada perdida (espera o respawn dos testes de morte acima)
+  await p.waitForFunction(() => !PT.mundo.jog.morto, null, { timeout: 30000 }).catch(() => {});
   r = await p.evaluate(() => {
     PT.ui.cancelarInteracoes(); let ped; for (let i = 0; i < 30 && !ped; i++) { const x = PT.pedidos.gerar(); if (x.canal === 'telefone') ped = x; }
     const aberta = PT.ui.modalAberto(); PT.ui.fecharModal();

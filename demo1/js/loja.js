@@ -27,9 +27,9 @@ PT.loja = (function () {
     const total = f.preco * qtd, frete = f.frete || 0;
     if (modo === 'finame') {
       if (!f.finame) return { ok: false, msg: 'Este item não aceita FINAME' };
-      const r = PT.eco.comprarFiname(total, f.nome);
+      const r = PT.eco.comprarFiname(total, f.nome, frete);
       if (!r.ok) return r;
-      if (frete && !PT.eco.pagar(frete, 'Frete — ' + f.nome)) return { ok: false, msg: 'Sem caixa para o frete' };
+      if (frete) PT.eco.pagar(frete, 'Frete — ' + f.nome);   // já garantido pelo comprarFiname
       agendar(f, qtd); return { ok: true, msg: r.msg + ' Entrega em ' + f.prazoDias + ' dia(s).' };
     }
     if (!PT.eco.podePagar(total + frete)) return { ok: false, msg: 'Saldo insuficiente (' + PT.util.reais(total + frete) + ').' };

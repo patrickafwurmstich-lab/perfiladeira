@@ -62,9 +62,21 @@ PT.balcao = (function () {
   }
   const saindo = [];
 
+  // colisão simples com paredes/balcão e decoração sólida (desliza no eixo livre) — ChatGPT r5
+  const RAIO = 0.25;
+  function livre(x, z) {
+    if (PT.mundo.paredes.some(p => x + RAIO > p.x0 && x - RAIO < p.x1 && z + RAIO > p.z0 && z - RAIO < p.z1)) return false;
+    return !PT.ent.lista.some(o => o.solido && !o.preso && o.aabb && x + RAIO > o.aabb.x0 && x - RAIO < o.aabb.x1 && z + RAIO > o.aabb.z0 && z - RAIO < o.aabb.z1);
+  }
   function andar(c, d, dt) {
     const dx = d.x - c.x, dz = d.z - c.z, dist = Math.hypot(dx, dz); if (dist < 0.15) return true;
-    const p = Math.min(dist, B().velocidade * dt); c.x += dx / dist * p; c.z += dz / dist * p; c.rot = Math.atan2(dx, dz); return false;
+    const p = Math.min(dist, B().velocidade * dt), nx = c.x + dx / dist * p, nz = c.z + dz / dist * p;
+    c.rot = Math.atan2(dx, dz);
+    if (livre(nx, nz) || !livre(c.x, c.z)) { c.x = nx; c.z = nz; }      // preso dentro de algo: deixa sair
+    else if (livre(nx, c.z)) c.x = nx;
+    else if (livre(c.x, nz)) c.z = nz;
+    else { c.travado = (c.travado || 0) + dt; if (c.travado > 3) { c.x = nx; c.z = nz; c.travado = 0; } }  // nunca fica preso para sempre
+    return false;
   }
   function caminho(c, alvo, dt) {
     // rua → porta sul → posição na fila (evita atravessar a parede da loja)
@@ -118,10 +130,12 @@ PT.balcao = (function () {
   // ---------------- atendimento ----------------
   function precoUnit(c) { const p = PT.DADOS.produtos[c.produto]; return p.precoBase * (1 + B().margemProntaEntrega) * (bonusLoja().mostruario ? 1 + B().bonusMostruario : 1); }
   function unidades(c) { const p = PT.DADOS.produtos[c.produto]; return c.pecas * c.comprimento * (p.unidade === 'm²' ? p.larguraUtil : 1); }
-  function disponivel(c) {
+  function emEstoque(c) {
     return PT.ent.naZona('expedicao', o => o.tipo === 'pilha' && !o.preso && o.produto === c.produto && Math.abs(o.comprimento - c.comprimento) < 1e-6)
       .reduce((a, o) => a + o.qtd - (o.tortasEscondidas ? 0 : o.defeituosas), 0);
   }
+  // pronta entrega = estoque da zona verde MENOS o que já é de pedido aceito (não vende telha da construtora)
+  function disponivel(c) { return Math.max(0, emEstoque(c) - PT.pedidos.reservado(c.produto, c.comprimento)); }
   function retirar(c) {
     let falta = c.pecas, tortas = 0;
     PT.ent.naZona('expedicao', o => o.tipo === 'pilha' && !o.preso && o.produto === c.produto && Math.abs(o.comprimento - c.comprimento) < 1e-6).forEach(o => {
@@ -179,6 +193,8 @@ PT.balcao = (function () {
     if (acao === 'vender' && c.pediuDesconto && Math.random() > B().chanceAceitarSemDesconto) {
       fechar(); PT.ev.emit('celular', { de: c.nome, texto: 'Sem desconto não dá, patrão. Vou pesquisar.' }); sair(c, false); return;
     }
+    // revalida no momento da venda: o estoque pode ter mudado com a janela aberta
+    if (disponivel(c) < c.pecas) { PT.ev.emit('aviso', 'O estoque mudou: não tem mais ' + c.pecas + ' peças livres para pronta entrega.'); abrirDialogo(c); return; }
     const valor = acao === 'desconto' ? desc : acao === 'galinha' ? Math.round(total * 0.5) : total;
     const tortas = retirar(c);
     PT.eco.lancar(valor, 'Venda no balcão — ' + c.pecas + 'x ' + PT.DADOS.produtos[c.produto].nome + ' (' + c.nome + ')');
@@ -203,5 +219,5 @@ PT.balcao = (function () {
     return [{ rotulo: 'Atender ' + c.nome + ' (' + B().tipos[c.tipo].nome.toLowerCase() + ')', prio: 1, acao: () => atender(c) }];
   });
 
-  return { st, construir, atualizar, novoCliente, atender, decidir, disponivel, bonusLoja };
+  return { st, construir, atualizar, novoCliente, atender, decidir, disponivel, emEstoque, bonusLoja, livre, ocupado: () => st.fila.length > 0 || !!st.atual };
 })();

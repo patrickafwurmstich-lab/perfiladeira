@@ -63,11 +63,12 @@ PT.eco = (function () {
 
   // ---------- FINAME (liberado por reputação) ----------
   function finameLiberado() { return PT.rep ? PT.rep.faixa() >= E.finame.faixaMinima : false; }
-  function comprarFiname(valor, desc) {
+  function comprarFiname(valor, desc, extra) {
+    extra = extra || 0;   // frete etc. — tudo ou nada (ChatGPT r5)
     if (!Number.isFinite(valor) || valor <= 0) return { ok: false, msg: 'Valor inválido.' };
     if (!finameLiberado()) return { ok: false, msg: 'FINAME liberado só na faixa ' + E.finame.faixaMinima + ' de reputação (≈10 pedidos entregues).' };
     const entrada = valor * E.finame.entrada, fin = valor - entrada;
-    if (!podePagar(entrada)) return { ok: false, msg: 'Sem caixa para a entrada de ' + PT.util.reais(entrada) };
+    if (!podePagar(entrada + extra)) return { ok: false, msg: 'Sem caixa para a entrada' + (extra ? ' + frete' : '') + ' (' + PT.util.reais(entrada + extra) + ')' };
     const i = E.finame.jurosMes, n = E.finame.parcelas;
     const parcela = fin * i / (1 - Math.pow(1 + i, -n));
     lancar(-entrada, 'Entrada FINAME — ' + desc);

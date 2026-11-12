@@ -21,6 +21,7 @@ PT.save = (function () {
     if (PT.func.st.lista.some(f => f.carregando)) return 'Um funcionário está carregando uma pilha.';
     if (PT.construcao.ativo) return 'Saia do modo construção.';
     if (PT.entrega.st.caminhoes.some(c => c.estado !== 'saindo')) return 'Tem caminhão no pátio (espere ele sair).';
+    if (PT.balcao && PT.balcao.ocupado()) return 'Tem cliente esperando no balcão da loja (atenda ou espere ele ir embora).';
     if (PT.ui.modalAberto()) return 'Feche a janela aberta.';
     return null;
   }

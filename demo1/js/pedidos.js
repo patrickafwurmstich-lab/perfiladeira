@@ -67,6 +67,11 @@ PT.pedidos = (function () {
 
   // estoque disponível na zona verde para um pedido
   function pilhasPara(p) { return PT.ent.naZona('expedicao', o => o.tipo === 'pilha' && !o.preso && o.produto === p.produto && Math.abs(o.comprimento - p.comprimento) < 1e-6); }
+  // peças da zona verde já COMPROMETIDAS com pedidos aceitos (ainda não carregadas) — fonte única de reserva (ChatGPT r5)
+  function reservado(produto, comprimento) {
+    return st.lista.filter(p => (p.status === 'aceito' || p.status === 'coleta') && p.produto === produto && Math.abs(p.comprimento - comprimento) < 1e-6)
+      .reduce((a, p) => a + Math.max(0, p.pecas - (p.carregadas || 0)), 0);
+  }
   function disponivel(p) { const ps = pilhasPara(p); return { boas: ps.reduce((a, o) => a + o.qtd - (o.tortasEscondidas ? 0 : o.defeituosas), 0), tortas: ps.reduce((a, o) => a + (o.tortasEscondidas ? 0 : o.defeituosas), 0) }; }
 
   // lim (opcional, vem da mesa de carregamento 2D): { boas, tortas, dano }
@@ -219,7 +224,7 @@ PT.pedidos = (function () {
   });
 
   return {
-    st, gerar, aceitar, recusar, contraproposta, chamarAgora, descricao, disponivel, devolverManifesto, carregarCaminhao: carregar, pilhasPara,
+    st, gerar, aceitar, recusar, contraproposta, chamarAgora, descricao, disponivel, reservado, devolverManifesto, carregarCaminhao: carregar, pilhasPara,
     salvar() { return { lista: st.lista.map(p => Object.assign({}, p, { caminhao: null, status: p.status === 'coleta' ? 'aceito' : p.status })), cont: st.cont, proxHoras: st.proxHoras }; },
     carregar(o) {
       st.lista = o.lista || []; st.cont = o.cont || 0; st.proxHoras = o.proxHoras || 2;

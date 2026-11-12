@@ -31,6 +31,7 @@ PT.pc = (function () {
   }
 
   function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; }
+  function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   function icone(nome) { return 'img/icones/' + nome + '.png'; }
 
   // ---------------- montagem ----------------
@@ -89,6 +90,7 @@ PT.pc = (function () {
     j = { id, app: a, el: e, corpo: e.querySelector('.pc-corpo'), min: false, max: false, opcoes };
     janelas.push(j);
     e.addEventListener('mousedown', () => focar(j));
+    e.addEventListener('mouseup', () => ajustarJanela(j));
     e.addEventListener('mouseenter', () => j.mouseDentro = true);
     e.addEventListener('mouseleave', () => { j.mouseDentro = false; });
     e.querySelector('.b-fechar').onclick = ev => { ev.stopPropagation(); fecharJanela(j); };
@@ -113,6 +115,16 @@ PT.pc = (function () {
     if (j.max) { j.antes = { l: j.el.style.left, t: j.el.style.top, w: j.el.style.width, h: j.el.style.height }; Object.assign(j.el.style, { left: '0px', top: '0px', width: '100%', height: 'calc(100% - 46px)' }); }
     else Object.assign(j.el.style, { left: j.antes.l, top: j.antes.t, width: j.antes.w, height: j.antes.h });
   }
+  // mantém a janela dentro da tela (resize do navegador / redimensionamento manual)
+  function ajustarJanela(j) {
+    if (j.max || j.min) return;
+    const W = window.innerWidth, H = window.innerHeight - 46;
+    const w = Math.max(320, Math.min(j.el.offsetWidth, W - 10)), h = Math.max(200, Math.min(j.el.offsetHeight, H - 4));
+    j.el.style.width = w + 'px'; j.el.style.height = h + 'px';
+    j.el.style.left = Math.max(0, Math.min(j.el.offsetLeft, W - w)) + 'px';
+    j.el.style.top = Math.max(0, Math.min(j.el.offsetTop, H - h)) + 'px';
+  }
+  window.addEventListener('resize', () => janelas.forEach(ajustarJanela));
   function fecharJanela(j) { j.el.remove(); janelas.splice(janelas.indexOf(j), 1); atualizarTarefas(); som('clique'); }
   function arrastavel(j) {
     const t = j.el.querySelector('.pc-titulo');
@@ -120,7 +132,7 @@ PT.pc = (function () {
       if (e.target.tagName === 'BUTTON' || j.max) return;
       const ox = e.clientX - j.el.offsetLeft, oy = e.clientY - j.el.offsetTop;
       const mover = m => { j.el.style.left = Math.max(-j.el.offsetWidth + 80, Math.min(window.innerWidth - 80, m.clientX - ox)) + 'px'; j.el.style.top = Math.max(0, Math.min(window.innerHeight - 80, m.clientY - oy)) + 'px'; };
-      const soltar = () => { window.removeEventListener('mousemove', mover); window.removeEventListener('mouseup', soltar); };
+      const soltar = () => { ajustarJanela(j); window.removeEventListener('mousemove', mover); window.removeEventListener('mouseup', soltar); };
       window.addEventListener('mousemove', mover); window.addEventListener('mouseup', soltar);
     });
   }
@@ -145,7 +157,7 @@ PT.pc = (function () {
     if (st.aberto) { som('notif'); desenharNotifs(); atualizarTarefas(); toast(n); }
   }
   function toast(n) {
-    const t = el('div', 'pc-toast', '<b>' + n.de + '</b><span>' + n.texto + '</span>'); raiz.appendChild(t);
+    const t = el('div', 'pc-toast', '<b>' + esc(n.de) + '</b><span>' + esc(n.texto) + '</span>'); raiz.appendChild(t);
     if (n.app) { t.style.cursor = 'pointer'; t.onclick = () => abrirApp(n.app); }
     setTimeout(() => t.classList.add('sumir'), 4200); setTimeout(() => t.remove(), 4800);
   }
@@ -155,7 +167,7 @@ PT.pc = (function () {
     const lista = raiz.querySelector('.pc-notifs');
     if (!st.notifs.length) { lista.innerHTML = '<p class="vazio">Nada por aqui. A fábrica está quieta... por enquanto.</p>'; return; }
     const grupos = {}; st.notifs.slice(0, 25).forEach(n => (grupos[n.cat] = grupos[n.cat] || []).push(n));
-    lista.innerHTML = Object.keys(grupos).map(g => '<div class="grupo">' + g + '</div>' + grupos[g].map((n, i) => '<div class="notif" data-app="' + (n.app || '') + '"><b>' + n.de + '</b> <small>' + n.quando.replace(/^Dia \d+ /, '') + '</small><br>' + n.texto + '</div>').join('')).join('');
+    lista.innerHTML = Object.keys(grupos).map(g => '<div class="grupo">' + esc(g) + '</div>' + grupos[g].map((n, i) => '<div class="notif" data-app="' + esc(n.app || '') + '"><b>' + esc(n.de) + '</b> <small>' + esc(n.quando.replace(/^Dia \d+ /, '')) + '</small><br>' + esc(n.texto) + '</div>').join('')).join('');
     lista.querySelectorAll('.notif').forEach(d => d.onclick = () => { if (d.dataset.app) { abrirApp(d.dataset.app); central.classList.remove('aberta'); } });
   }
   PT.ev.on('celular', m => notificar({ de: m.de, texto: m.texto, app: m.de === '📧 E-mail' ? 'correio' : (/Banco|luz/.test(m.de) ? 'banco' : null) }));
@@ -190,13 +202,13 @@ PT.pc = (function () {
     if (!forcar && agora - ultimo < 1500) return;
     ultimo = agora;
     // redesenha só janelas que mudam e quando o mouse NÃO está nelas (evita perder clique) — regra do ChatGPT: feedback sem atrapalhar
-    janelas.forEach(j => { if (!j.min && j.app.vivo && !j.mouseDentro && !(document.activeElement && j.el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))) desenhar(j); });
+    janelas.forEach(j => { if (!j.min && j.app.vivo && !j.mouseDentro && !(document.activeElement && document.activeElement !== document.body && j.el.contains(document.activeElement))) desenhar(j); });
   }
 
   PT.ev.on('tecla', code => { if (st.aberto && code === 'Escape') { if (menuIniciar.classList.contains('aberto')) menuIniciar.classList.remove('aberto'); else fechar(); } });
 
   return {
-    st, apps, janelas, abrir, fechar, abrirApp, fecharJanela, desenhar, atualizar, notificar, som, icone,
+    st, apps, janelas, esc, ajustarJanela, abrir, fechar, abrirApp, fecharJanela, desenhar, atualizar, notificar, som, icone,
     registrar(id, def) { apps[id] = def; },
     redesenhar(id) { const j = janelas.find(x => x.id === id); if (j) desenhar(j); },
     trocarPapel(n) { st.papel = n; if (raiz) aplicarPapel(); },

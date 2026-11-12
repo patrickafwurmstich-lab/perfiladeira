@@ -7,7 +7,8 @@
 (function () {
   const R = v => PT.util.reais(v), D = PT.DADOS, I = n => PT.pc.icone(n);
   const reg = PT.pc.registrar;
-  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const esc = s => PT.pc.esc(s);
+  const cls = s => String(s == null ? '' : s).replace(/[^a-z0-9_-]/gi, '');
   function liga(c, sel, fn) { c.querySelectorAll(sel).forEach(b => b.onclick = ev => { ev.stopPropagation(); PT.pc.som('clique'); fn(b, ev); }); }
   function msg(ok, texto) { PT.ui.aviso(texto); PT.pc.som(ok ? 'clique' : 'erro'); }
   // número "aleatório" fixo por texto (avaliações, notícias, clima não mudam a cada redesenho)
@@ -51,7 +52,14 @@
       liga(c, '[data-prod]', x => { loja.prod = x.dataset.prod; loja.qtd = 1; PT.pc.redesenhar('loja'); });
       liga(c, '[data-voltar]', () => { loja.prod = null; PT.pc.redesenhar('loja'); });
       const q = c.querySelector('[data-qtd]'); if (q) q.onchange = () => loja.qtd = +q.value;
-      liga(c, '[data-comprar]', x => { const r = PT.loja.comprar(loja.prod, x.dataset.comprar, loja.qtd); msg(r.ok, r.ok ? 'Pedido confirmado. O fornecedor já recebeu sua solicitação. ' + r.msg : r.msg); });
+      liga(c, '[data-comprar]', x => {
+        // trava contra duplo clique: um clique = uma compra (ChatGPT r5)
+        const agora = performance.now(); if (x.disabled || agora - (loja.ultCompra || 0) < 800) return;
+        loja.ultCompra = agora; c.querySelectorAll('[data-comprar]').forEach(b => b.disabled = true);
+        const r = PT.loja.comprar(loja.prod, x.dataset.comprar, loja.qtd);
+        msg(r.ok, r.ok ? 'Pedido confirmado. O fornecedor já recebeu sua solicitação. ' + r.msg : r.msg);
+        setTimeout(() => PT.pc.redesenhar('loja'), 800);
+      });
     } });
 
   // ====================== BANCO CERRADO ======================
@@ -99,7 +107,7 @@
         if (atual.pedidoId) {
           const p = PT.pedidos.st.lista.find(x => x.id === atual.pedidoId);
           if (p && p.status === 'oferta') h += '<div class="ml-acoes"><button data-ped="aceitar">Responder: aceito o pedido</button><button data-ped="recusar" class="sec">Responder: não consigo atender</button></div>';
-          else if (p) h += '<div class="ml-status">Pedido ' + p.id + ': <b>' + p.status + '</b></div>';
+          else if (p) h += '<div class="ml-status">Pedido ' + esc(p.id) + ': <b>' + esc(p.status) + '</b></div>';
         }
       } else h += '<p class="ml-vazio">Selecione uma mensagem para ler.</p>';
       c.innerHTML = h + '</div></div>';
@@ -117,12 +125,12 @@
       let h = '<div class="sc"><div class="sc-menu"><span>Arquivo</span><span>Cadastros</span><span>Pedidos</span><span>Relatórios</span><span>Ajuda</span></div>' +
         '<div class="sc-barra"><label><input type="radio" name="flt" value="ativos"' + (ped.filtro === 'ativos' ? ' checked' : '') + '> Em aberto</label><label><input type="radio" name="flt" value="todos"' + (ped.filtro === 'todos' ? ' checked' : '') + '> Todos</label><span class="sc-dica">Duplo clique na linha para detalhes</span></div>' +
         '<div class="sc-grade"><table><tr><th>Nº</th><th>Cliente</th><th>Tipo</th><th>Produto</th><th class="num">Qtd</th><th>Prazo</th><th>Pagamento</th><th>Situação</th><th class="num">Expedição</th></tr>' +
-        (L.map(p => { const d = PT.pedidos.disponivel(p); return '<tr data-p="' + p.id + '" class="' + (p.id === ped.sel ? 'sel ' : '') + 's-' + p.status + '"><td>' + p.id + '</td><td>' + esc(p.cliente) + '</td><td>' + D.clientes[p.perfil].nome + '</td><td>' + D.produtos[p.produto].nome + ' ' + p.comprimento + ' m</td><td class="num">' + p.pecas + '</td><td>Dia ' + p.prazoDia + (PT.tempo.st.dia > p.prazoDia && ['aceito', 'coleta'].includes(p.status) ? ' ⚠' : '') + '</td><td>' + PT.ui.textoPagamento(p) + '</td><td>' + SIT[p.status] + '</td><td class="num">' + d.boas + '/' + p.pecas + '</td></tr>'; }).join('') || '<tr><td colspan="9">Nenhum pedido.</td></tr>') + '</table></div>';
+        (L.map(p => { const d = PT.pedidos.disponivel(p); return '<tr data-p="' + esc(p.id) + '" class="' + (p.id === ped.sel ? 'sel ' : '') + 's-' + cls(p.status) + '"><td>' + esc(p.id) + '</td><td>' + esc(p.cliente) + '</td><td>' + D.clientes[p.perfil].nome + '</td><td>' + D.produtos[p.produto].nome + ' ' + p.comprimento + ' m</td><td class="num">' + p.pecas + '</td><td>Dia ' + p.prazoDia + (PT.tempo.st.dia > p.prazoDia && ['aceito', 'coleta'].includes(p.status) ? ' ⚠' : '') + '</td><td>' + PT.ui.textoPagamento(p) + '</td><td>' + (SIT[p.status] || esc(p.status)) + '</td><td class="num">' + d.boas + '/' + p.pecas + '</td></tr>'; }).join('') || '<tr><td colspan="9">Nenhum pedido.</td></tr>') + '</table></div>';
       const p = PT.pedidos.st.lista.find(x => x.id === ped.sel);
       if (p) {
         const d = PT.pedidos.disponivel(p);
-        h += '<fieldset class="sc-det"><legend>Pedido ' + p.id + ' — ' + esc(p.cliente) + '</legend><div class="sc-cols"><div>Produto: <b>' + PT.pedidos.descricao(p) + '</b><br>Prazo: dia ' + p.prazoDia + ', coleta 14h–16h<br>Pagamento: ' + PT.ui.textoPagamento(p) + (p.entradaPaga ? ' · entrada recebida ' + R(p.entradaPaga) : '') + '</div>' +
-          '<div>Situação: <b>' + SIT[p.status] + '</b><br>Na zona verde: ' + d.boas + ' boas' + (d.tortas ? ', ' + d.tortas + ' tortas' : '') + '<br>Carregadas: ' + p.carregadas + '/' + p.pecas + '</div></div><div class="sc-bts">' +
+        h += '<fieldset class="sc-det"><legend>Pedido ' + esc(p.id) + ' — ' + esc(p.cliente) + '</legend><div class="sc-cols"><div>Produto: <b>' + PT.pedidos.descricao(p) + '</b><br>Prazo: dia ' + p.prazoDia + ', coleta 14h–16h<br>Pagamento: ' + PT.ui.textoPagamento(p) + (p.entradaPaga ? ' · entrada recebida ' + R(p.entradaPaga) : '') + '</div>' +
+          '<div>Situação: <b>' + (SIT[p.status] || esc(p.status)) + '</b><br>Na zona verde: ' + d.boas + ' boas' + (d.tortas ? ', ' + d.tortas + ' tortas' : '') + '<br>Carregadas: ' + p.carregadas + '/' + p.pecas + '</div></div><div class="sc-bts">' +
           (p.status === 'oferta' ? '<button data-a="aceitar">Aceitar (F2)</button><button data-a="recusar">Recusar</button>' : '') + (p.status === 'aceito' ? '<button data-a="chamar">Chamar caminhão agora</button>' : '') + '</div></fieldset>';
       }
       c.innerHTML = h + '<div class="sc-status">Registros: ' + L.length + ' · Usuário: PATRÃO · Base: LOCAL</div></div>';
@@ -149,10 +157,10 @@
         (F.st.tartaruga > 0 ? '<div class="tc-greve">🪧 "SEM PIX, SEM TELHA" — a equipe está em operação tartaruga. <button data-a="folha">Pagar folha atrasada + multa</button></div>' : '') +
         '<div class="tc-abas">' + [['candidatos', 'Candidatos (' + F.st.candidatos.length + ')'], ['equipe', 'Minha equipe (' + F.st.lista.length + ')'], ['quadro', 'Quadro de tarefas']].map(a => '<a data-aba="' + a[0] + '" class="' + (emp.aba === a[0] ? 'sel' : '') + '">' + a[1] + '</a>').join('') + '</div>';
       if (emp.aba === 'candidatos') {
-        h += '<div class="tc-lista">' + F.st.candidatos.map(k => '<div class="tc-cand"><div class="tc-foto">' + k.nome[0] + '</div><div class="tc-dados"><b>' + esc(k.nome) + '</b><span>' + FD.cargos[k.cargo].nome + ' · ' + k.personalidade + '</span><q>' + esc(k.fala) + '</q></div><div class="tc-attrs">' + barra('Competência', k.atributos.competencia) + barra('Segurança', k.atributos.seguranca) + barra('Ritmo', k.atributos.ritmo) + '</div><div class="tc-sal"><small>pretensão</small>' + R(k.salario) + '<button data-contratar="' + k.id + '">Contratar</button></div></div>').join('') + '</div><p class="tc-rod">Novos currículos a cada 3 dias. Mecânicos aparecem quando a fábrica chega à faixa 2.</p>';
+        h += '<div class="tc-lista">' + F.st.candidatos.map(k => '<div class="tc-cand"><div class="tc-foto">' + esc(k.nome[0]) + '</div><div class="tc-dados"><b>' + esc(k.nome) + '</b><span>' + FD.cargos[k.cargo].nome + ' · ' + esc(k.personalidade) + '</span><q>' + esc(k.fala) + '</q></div><div class="tc-attrs">' + barra('Competência', k.atributos.competencia) + barra('Segurança', k.atributos.seguranca) + barra('Ritmo', k.atributos.ritmo) + '</div><div class="tc-sal"><small>pretensão</small>' + R(k.salario) + '<button data-contratar="' + k.id + '">Contratar</button></div></div>').join('') + '</div><p class="tc-rod">Novos currículos a cada 3 dias. Mecânicos aparecem quando a fábrica chega à faixa 2.</p>';
       }
       if (emp.aba === 'equipe') {
-        h += F.st.lista.length ? '<table class="tc-tab"><tr><th>Nome</th><th>Cargo</th><th>Jeito</th><th>Energia</th><th>Agora</th><th>Certificados</th><th></th></tr>' + F.st.lista.map(f => '<tr><td><b>' + esc(f.nome) + '</b><br><small>' + R(f.salario) + '/mês</small></td><td>' + FD.cargos[f.cargo].nome + '</td><td>' + f.personalidade + '</td><td>' + pct(f.energia) + '%</td><td>' + (f.tarefa ? FD.nomesTarefa[f.tarefa.tipo] : f.estado) + '</td><td>' + (f.certificados.join(', ') || '—') + '</td><td>' +
+        h += F.st.lista.length ? '<table class="tc-tab"><tr><th>Nome</th><th>Cargo</th><th>Jeito</th><th>Energia</th><th>Agora</th><th>Certificados</th><th></th></tr>' + F.st.lista.map(f => '<tr><td><b>' + esc(f.nome) + '</b><br><small>' + R(f.salario) + '/mês</small></td><td>' + FD.cargos[f.cargo].nome + '</td><td>' + esc(f.personalidade) + '</td><td>' + pct(f.energia) + '%</td><td>' + (f.tarefa ? FD.nomesTarefa[f.tarefa.tipo] : f.estado) + '</td><td>' + (f.certificados.join(', ') || '—') + '</td><td>' +
           ['perfiladeira', 'guilhotina', 'dobradeira'].filter(x => !f.certificados.includes(x)).map(x => '<button class="sec" data-curso="' + f.id + '|' + x + '">Curso ' + x + ' (' + R(FD.cursoPreco) + ')</button>').join('') + '<button class="sec" data-demitir="' + f.id + '">Dispensar</button></td></tr>').join('') + '</table><p class="tc-rod">Folha quinzenal: ' + R(F.folhaMensal() / 2) + ' (com encargos).</p>' : '<p class="tc-vazio">Ninguém contratado ainda. Por enquanto o dono faz tudo!</p>';
       }
       if (emp.aba === 'quadro') {
@@ -223,7 +231,7 @@
       c.innerHTML = '<div class="cf"><section><h4>Personalizar</h4><label><input type="checkbox" data-som' + (PT.pc.st.som ? ' checked' : '') + '> Sons do sistema</label>' +
         '<div class="cf-papeis">' + ['Entardecer no pátio', 'Noite na fábrica', 'Chapadão'].map((n, i) => '<button data-papel="' + i + '" class="papelmini papel' + i + (PT.pc.st.papel === i ? ' sel' : '') + '"><span>' + n + '</span></button>').join('') + '</div></section>' +
         '<section><h4>Jogo salvo</h4><div class="cf-bts"><button data-a="salvar">Salvar agora (K)</button><button data-a="carregar">Carregar último (L)</button><button data-a="exportar">Exportar arquivo</button><label class="btn">Importar arquivo<input type="file" data-imp accept=".json" hidden></label></div>' +
-        '<p class="cf-obs">O jogo só salva quando nada está acontecendo (sem carga na ponte, sem caminhão no pátio).</p><button data-a="novo" class="perigo">Novo jogo (apaga o save)</button></section>' +
+        '<p class="cf-obs">O jogo só salva quando nada está acontecendo (sem carga na ponte, sem caminhão no pátio, sem cliente no balcão).</p><button data-a="novo" class="perigo">Novo jogo (apaga o save)</button></section>' +
         '<section><h4>Tempo</h4><button data-a="vel">Velocidade do tempo: x' + PT.tempo.vel + ' (T)</button></section>' +
         (PT.DEBUG ? '<section><h4>Desenvolvedor (?debug=1)</h4><div class="cf-bts"><button data-a="pedido">Gerar pedido</button><button data-a="dinheiro">+R$ 20 mil</button><button data-a="noite">Pular a noite</button></div></section>' : '') +
         '<section class="cf-sobre"><img src="' + I('fabrica') + '" alt=""><div><b>ParecisOS</b> versão 1.0 (Demo 1)<br><small>Ícones: Fluent Emoji (Microsoft, licença MIT). Formiguinha Açucarada.</small></div></section></div>';

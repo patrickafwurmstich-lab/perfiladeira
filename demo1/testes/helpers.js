@@ -1,5 +1,7 @@
 module.exports.setup = async (p) => {
   await p.evaluate(() => {
+    // clientes do balcão só quando o teste pedir (PT.balcao.novoCliente) — não chegam sozinhos e travam o save
+    PT.DADOS.balcao.chancePorHora = 0;
     window.T = {
       min(n) { for (let i = 0; i < n; i++) { PT.tempo.st.acum = 1.2000001; PT.tempo.atualizar(0); PT.entrega.atualizar(0.05); } },
       frames(n, dt) { for (let i = 0; i < n; i++) { PT.ponte.atualizar(dt || 0.05); PT.estoque.atualizar(); PT.entrega.atualizar(dt || 0.05); PT.construcao.atualizar(); } },

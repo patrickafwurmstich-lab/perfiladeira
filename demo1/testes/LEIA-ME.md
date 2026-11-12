@@ -1,4 +1,4 @@
-# Testes automáticos da Demo 1 (95 verificações + ciclo completo)
+# Testes automáticos da Demo 1 (107 verificações + ciclo completo)
 
 | Arquivo | O que testa |
 |---|---|
@@ -8,6 +8,7 @@
 | teste_empilhadeira.js (18) | Entrega, pegar/soltar, garfo alto, tombar sem/com cinto, desvirar, bobina sem mandril, mandril, save/load |
 | teste_funcionarios.js (19) | Armários = vagas, contratar, operador roda lotes, ajudante leva pilha, tortas escondidas, inspecionar, orientar, prioridade, folha, operação tartaruga, curso, save/load |
 | teste_balcao_e_pc.js (11) | Porta da frente, cliente a pé na fila, atender, pronta entrega, encomenda, galinha do Seu Lauro, paciência, café, mostruário na loja, ParecisOS abre/fecha |
+| teste_rodada5.js (12) | Revisão 5 do ChatGPT: notificação com HTML vira texto, duplo clique compra 1 vez, FINAME tudo-ou-nada com frete, foco do teclado não é perdido, janela fora da tela volta, balcão não vende estoque reservado para pedido, revalida na venda, save bloqueado com cliente, cliente não atravessa balcão/paredes |
 | teste_morte_e_interface.js (9) | Morrer no meio do progresso/minijogo, tecla repetida, perder foco, chamada perdida, caminhão travado, fornecedor esquecido, carga visual, debug escondido |
 
 Como rodar: servir a pasta do repositório (`python3 -m http.server 8765`), colocar o `three.min.js` (r128) nesta pasta e rodar `node <arquivo>` (precisa do Playwright).
