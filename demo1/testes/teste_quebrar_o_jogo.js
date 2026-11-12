@@ -1,6 +1,6 @@
 const { chromium } = require('playwright');
 const H = require('./helpers.js');
-const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'three.min.js')) + '';
+const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'three.min.js'));
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: 1280, height: 720 } });
@@ -78,6 +78,55 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
     ok(ped4.status === 'cancelado' && Math.abs((cx4 - PT.eco.st.caixa) - (ent + Math.round(ped4.valor * 0.05))) < 2, 'K1 cancelamento devolve entrada + multa 5% (' + Math.round(cx4 - PT.eco.st.caixa) + ')');
     // L) chamar agora sem agendamento
     ok(PT.pedidos.chamarAgora(ped4.id) === false, 'L1 chamar agora em pedido cancelado retorna falso');
+    // ===== 2ª rodada (bugs do ChatGPT em máquinas/ponte/estoque/construção) =====
+    PT.ent.lista.slice().forEach(o => { if (o.tipo !== 'maquina') PT.ent.remover(o); });
+    PT.maq.lista.slice().forEach(m => { PT.construcao.desconectar(m); PT.maq.lista.splice(PT.maq.lista.indexOf(m), 1); PT.ent.remover(m); });
+    const rnd = Math.random; Math.random = () => 0.5;   // sem enrosco aleatório nesta parte
+    const m2 = T.fabrica(); m2.cfg.comprimento = 3; m2.cfg.quantidade = 500;
+    // M) mesa cheia: não consome bobina enquanto bloqueada
+    PT.maq.iniciar(m2); T.min(40);
+    const metrosCheia = m2.bobina.metros; const estCheia = m2.estado; T.min(20);
+    ok(estCheia === 'mesa_cheia' && Math.abs(m2.bobina.metros - metrosCheia) < 1e-6, 'M1 mesa cheia para a máquina sem gastar bobina (' + estCheia + ', ' + metrosCheia.toFixed(1) + ' → ' + m2.bobina.metros.toFixed(1) + ')');
+    ok(PT.maq.iniciar(m2) === false, 'M2 START com a mesa cheia é recusado');
+    // libera a mesa e continua; para no meio de uma peça
+    const cheia = m2.mesa; cheia.x = 100; cheia.z = 30; PT.ent.sync(cheia); m2.cfg.comprimento = 5;
+    ok(PT.maq.iniciar(m2) === true, 'M3 depois de tirar a pilha, START volta a funcionar');
+    PT.tempo.st.acum = 0; T.min(1); const prog = m2.progressoM;
+    // O) save no meio da peça guarda o progresso
+    const sv = PT.maq.salvar()[0];
+    ok(Math.abs(sv.progressoM - m2.progressoM) < 1e-9 && sv.progressoM > 0, 'O1 save guarda a peça pela metade (' + sv.progressoM.toFixed(2) + ' m)');
+    // N) tirar a bobina no meio da peça → retalho, sem emendar
+    PT.maq.parar(m2, 'pronta'); const suc0 = m2.sucataM || 0; PT.maq.desmontarBobina(m2.bobina);
+    ok(m2.progressoM === 0 && (m2.sucataM || 0) > suc0, 'N1 bobina retirada no meio da peça vira retalho (' + ((m2.sucataM || 0) - suc0).toFixed(2) + ' m)');
+    // P) mover e cancelar mantém o cabo
+    const bob2 = PT.ent.lista.find(o => o.tipo === 'bobina'); if (bob2) PT.ent.remover(bob2);
+    if (m2.mesa && PT.ent.lista.includes(m2.mesa)) PT.ent.remover(m2.mesa);
+    PT.maq.ligar(m2, false); PT.maq.desinstalar(m2); const movendo = !!PT.construcao.ativo; PT.construcao.cancelar();
+    const m3 = PT.maq.lista[PT.maq.lista.length - 1];
+    ok(movendo && m3 && !!m3.cabo && m3.x === 50, 'P1 cancelar a mudança devolve a máquina no lugar e com cabo');
+    // Q) carga baixa na ponte não atravessa a máquina
+    const b3 = PT.estoque.novaBobina('GL043-1T', 50, 31, 0);
+    const P2 = PT.ponte.st; P2.x = 50; P2.z = 31; P2.y = b3.g.userData.altura + 0.3; T.frames(2);
+    PT.mundo.jog.controlando = PT.ponte.controle; PT.ev.emit('tecla', 'Space');
+    P2.y = 1.2; T.frames(2);   // carga quase no chão
+    const tecl = { KeyW: true }; PT.mundo.cam.yaw = 0;   // W = andar para -Z (na direção da máquina em z=26)
+    for (let i = 0; i < 120; i++) PT.ponte.controle.controlar(0.05, tecl), PT.ponte.atualizar(0.05);
+    const parouAntes = b3.aabb.z0 > m3.aabb.z1 - 0.01;
+    P2.y = 5; T.frames(2); for (let i = 0; i < 120; i++) PT.ponte.controle.controlar(0.05, tecl), PT.ponte.atualizar(0.05);
+    ok(parouAntes && b3.z < 25, 'Q1 carga baixa bate na máquina; subindo o gancho passa por cima (z final ' + b3.z.toFixed(1) + ')');
+    PT.mundo.jog.controlando = null;
+    // R) área de operação bloqueada na construção
+    const r1 = PT.construcao.validar({ x: 50, z: 22.5, dims: [16, 2.2, 1.6], rot: 0, decor: false });
+    ok(r1.cor === 'vermelho', 'R1 não instala com a frente encostada em outra máquina (' + r1.motivo + ')');
+    // S) decoração girada 15° ocupa a área certa
+    const fp = PT.construcao.footprint(0, 0, [4, 0.5], Math.PI / 12);
+    ok(fp.z1 - fp.z0 > 1.4 && Math.abs((fp.x1 - fp.x0) - (4 * Math.cos(Math.PI / 12) + 0.5 * Math.sin(Math.PI / 12))) < 1e-6, 'S1 footprint girado 15° cresce (' + (fp.x1 - fp.x0).toFixed(2) + ' x ' + (fp.z1 - fp.z0).toFixed(2) + ')');
+    // T) soltar pilha em cima da máquina procura lugar livre
+    const pl9 = PT.estoque.novaPilha('TP40', 4, 70, 35); PT.estoque.addNaPilha(pl9, 3, 0); pl9.preso = 'paleteira';
+    PT.estoque.soltarNoChao(pl9, 50, 26);
+    const sobre = PT.construcao.cruza(pl9.aabb, m3.aabb);
+    Math.random = rnd;
+    ok(!sobre, 'T1 soltar a pilha em cima da máquina joga para o lugar livre mais perto (' + pl9.x.toFixed(1) + ',' + pl9.z.toFixed(1) + ')');
     return out;
   });
   console.log(r.join('\n'));

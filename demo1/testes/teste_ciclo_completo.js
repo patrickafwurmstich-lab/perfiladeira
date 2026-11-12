@@ -1,5 +1,5 @@
 const { chromium } = require('playwright');
-const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'three.min.js')) + '';
+const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'three.min.js'));
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: 1280, height: 720 } });

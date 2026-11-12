@@ -36,23 +36,36 @@ PT.construcao = (function () {
     if (!st.ativo) return;
     PT.mundo.scene.remove(st.ativo.grupo);
     if (st.ativo.volume && st.ativo.volume.preso === 'mao') { const j = PT.mundo.jog; j.carregando = { tipo: 'mao', ent: st.ativo.volume, lento: 0.85 }; }
-    if (st.ativo.maqSalva) PT.maq.reinstalar(st.ativo.maqSalva);      // desistiu de mover: volta para onde estava
+    if (st.ativo.maqSalva) PT.maq.reinstalar(st.ativo.maqSalva, true); // desistiu de mover: volta para onde estava, com cabo
     st.ativo = null; PT.ev.emit('construcao', false);
   }
 
   // ---------- validação ----------
+  // AABB da caixa girada em QUALQUER ângulo (decoração gira 15°) — ChatGPT, bug 10
   function footprint(x, z, dims, rot) {
-    const r = Math.round(rot / (Math.PI / 2)) % 2 !== 0;
-    const w = r ? dims[1] : dims[0], d = r ? dims[0] : dims[1];
+    const c = Math.abs(Math.cos(rot || 0)), s = Math.abs(Math.sin(rot || 0));
+    const w = c * dims[0] + s * dims[1], d = s * dims[0] + c * dims[1];
     return { x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2 };
+  }
+  // área de operação: faixa de 1,5 m na frente da máquina (lado do CLP, +Z local)
+  function areaOperacao(x, z, dims, rot) {
+    const off = dims[1] / 2 + 0.75, cx = x + Math.sin(rot) * off, cz = z + Math.cos(rot) * off;
+    return footprint(cx, cz, [dims[0], 1.5], rot);
   }
   function cruza(a, b) { return a.x0 < b.x1 && a.x1 > b.x0 && a.z0 < b.z1 && a.z1 > b.z0; }
   function validar(a) {
     const fp = footprint(a.x, a.z, a.dims, a.rot);
     if (fp.x0 < 0.3 || fp.x1 > M.L - 0.3 || fp.z0 < 0.3 || fp.z1 > M.D - 0.3) return { cor: 'vermelho', motivo: 'Fora do barracão' };
     if (PT.mundo.paredes.some(p => cruza(fp, p))) return { cor: 'vermelho', motivo: 'Bate na parede/escritório' };
-    const bate = PT.ent.lista.find(o => o !== a.volume && !o.preso && o.aabb && o.tipo !== 'decorChao' && cruza(fp, o.aabb));
+    const ignora = o => o === a.volume || o.preso === 'mao' || o.preso === 'jogador' || o.preso === 'paleteira' || o.tipo === 'decorChao' || o.tipo === 'berco';
+    const bate = PT.ent.lista.find(o => !ignora(o) && o.aabb && cruza(fp, o.aabb));
     if (bate) return { cor: 'vermelho', motivo: 'Ocupado por ' + (bate.rotulo || bate.tipo) };
+    if (!a.decor) {
+      const ao = areaOperacao(a.x, a.z, a.dims, a.rot);
+      if (PT.mundo.paredes.some(p => cruza(ao, p))) return { cor: 'vermelho', motivo: 'A frente da máquina (área de operação) bate na parede' };
+      const ba = PT.ent.lista.find(o => !ignora(o) && o.aabb && (o.tipo === 'maquina' || o.tipo === 'decor') && cruza(ao, o.aabb));
+      if (ba) return { cor: 'vermelho', motivo: 'Área de operação bloqueada por ' + (ba.rotulo || ba.tipo) };
+    }
     if (fp.z0 < M.corredor.z1 && fp.z1 > M.corredor.z0) return { cor: 'amarelo', motivo: 'No corredor do caminhão: ele não vai conseguir passar!' };
     return { cor: 'verde', motivo: 'Pode instalar' };
   }
@@ -116,7 +129,7 @@ PT.construcao = (function () {
   function trocarQuadro(kw) { st.quadroKW = Math.max(st.quadroKW, kw); PT.ev.emit('aviso', 'Quadro elétrico agora tem ' + st.quadroKW + ' kW'); }
 
   return {
-    st, iniciar, iniciarDeVolume, cancelar, atualizar, conectar, desconectar, kwLigado, trocarQuadro, footprint,
+    st, iniciar, iniciarDeVolume, cancelar, atualizar, conectar, desconectar, kwLigado, trocarQuadro, footprint, areaOperacao, cruza, validar,
     get ativo() { return st.ativo; },
     salvar() { return { quadroKW: st.quadroKW }; }, carregar(o) { st.quadroKW = o.quadroKW || M.quadro.capacidadeKW; }
   };

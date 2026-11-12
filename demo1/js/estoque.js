@@ -60,10 +60,23 @@ PT.estoque = (function () {
   // ---------------- CARREGAR ----------------
   function frente(j, dist) { return { x: j.x + Math.sin(j.rot) * dist, z: j.z + Math.cos(j.rot) * dist }; }
   function prender(o, como) { o.preso = como; }
+  // solta no chão SEM sobrepor outra coisa: procura o lugar livre mais perto (ChatGPT, bug 9)
+  function livre(o, x, z) {
+    const fp = PT.construcao.footprint(x, z, o.dims, o.rot), M = PT.DADOS.mundo;
+    if (fp.x0 < 0.2 || fp.x1 > M.L - 0.2 || fp.z0 < 0.2 || fp.z1 > M.D - 0.2) return false;
+    if (PT.mundo.paredes.some(p => PT.construcao.cruza(fp, p))) return false;
+    return !PT.ent.lista.some(e => e !== o && !e.preso && e.aabb && e.tipo !== 'berco' && PT.construcao.cruza(fp, e.aabb));
+  }
   function soltarNoChao(o, x, z) {
-    o.preso = null; o.y = 0; o.x = x; o.z = z;
-    // não deixa cair dentro de parede
-    const p = PT.mundo.empurrar(x, z, 0.1); o.x = p.x; o.z = p.z;
+    o.preso = null; o.y = 0;
+    let px = x, pz = z;
+    if (!livre(o, x, z)) {
+      achar: for (let r = 0.5; r <= 8; r += 0.5) for (let a = 0; a < 16; a++) {
+        const tx = x + Math.cos(a / 16 * 6.283) * r, tz = z + Math.sin(a / 16 * 6.283) * r;
+        if (livre(o, tx, tz)) { px = tx; pz = tz; break achar; }
+      }
+    }
+    o.x = px; o.z = pz;
     PT.ent.sync(o); PT.ev.emit('soltou', o);
   }
 

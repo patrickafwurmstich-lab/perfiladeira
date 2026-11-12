@@ -56,13 +56,15 @@ PT.maq = (function () {
     if (!m.mesa || !PT.ent.lista.includes(m.mesa) || m.mesa.preso) return false;
     const p = pontoSaida(m, m.mesa.comprimento); return Math.hypot(m.mesa.x - p.x, m.mesa.z - p.z) < 1;
   }
-  function reinstalar(salva) { const m = instalar(salva.defId, salva.x, salva.z, salva.rot, salva.extra); return m; }
+  // cancelar a mudança devolve a máquina exatamente como estava (com cabo); confirmar exige puxar o cabo de novo se mudou de lugar
+  function reinstalar(salva, cancelou) { const m = instalar(salva.defId, salva.x, salva.z, salva.rot, salva.extra); if (cancelou && salva.conectada) PT.construcao.conectar(m); return m; }
   function desinstalar(m) {
-    if (m.bobina || mesaOcupada(m) || m.ligada) { PT.ev.emit('aviso', 'Desligue, tire a bobina e esvazie a mesa antes de mover.'); return; }
+    if (m.bobina || mesaOcupada(m) || m.ligada || (m.chapas && m.chapas.qtd > 0) || m.progressoM > 1e-6) { PT.ev.emit('aviso', 'Desligue e esvazie a máquina (bobina, chapas, mesa) antes de mover.'); return; }
+    const conectada = !!m.cabo;
     PT.construcao.desconectar(m);
     lista.splice(lista.indexOf(m), 1); PT.ent.remover(m);
     const extra = { cfg: m.cfg, desgaste: m.desgaste, nivelamento: m.nivelamento, lubrificado: m.lubrificado };
-    PT.construcao.iniciar({ itemId: m.defId, dims: m.def.dims, modelo: m.def.modelo, nome: m.def.nome, maqSalva: { defId: m.defId, x: m.x, z: m.z, rot: m.rot, extra } });
+    PT.construcao.iniciar({ itemId: m.defId, dims: m.def.dims, modelo: m.def.modelo, nome: m.def.nome, maqSalva: { defId: m.defId, x: m.x, z: m.z, rot: m.rot, extra, conectada } });
   }
 
   function atualizarEstado(m) {
@@ -92,7 +94,9 @@ PT.maq = (function () {
   }
   function desmontarBobina(b) {
     const m = lista.find(m => m.bobina === b); if (!m) return;
-    if (m.estado === 'produzindo') parar(m, 'desligada');
+    if (m.estado === 'produzindo') parar(m, 'pronta');
+    // peça pela metade não pode "emendar" com a próxima bobina: vira retalho (ChatGPT, bug 1)
+    if (m.progressoM > 1e-6 && m.progressoM < m.cfg.comprimento - 1e-9) { m.sucataM = (m.sucataM || 0) + m.progressoM; PT.ev.emit('aviso', 'Bobina retirada no meio da peça: retalho de ' + m.progressoM.toFixed(2) + ' m (sucata).'); m.progressoM = 0; }
     m.bobina = null; b.montadaEm = null; m.alinhado = false; atualizarEstado(m);
   }
 
@@ -125,12 +129,25 @@ PT.maq = (function () {
     const c = m.cfg;
     if (c.comprimento < m.def.compMin || c.comprimento > m.def.compMax) { PT.ev.emit('aviso', 'Comprimento fora da faixa da máquina (' + m.def.compMin + '–' + m.def.compMax + ' m).'); return false; }
     if (m.estado === 'concluida') m.produzidas = 0;
+    const sd = saidaDisponivel(m, c.produto, c.comprimento);
+    if (sd !== 'ok') { PT.ev.emit('aviso', 'Não dá para iniciar: ' + NOMES_ESTADO[sd]); parar(m, sd); return false; }
     m.estado = 'produzindo'; atualizarEstado(m);
     PT.ev.emit('maqIniciou', m); return true;
   }
   function parar(m, motivo) { m.estado = motivo || 'pronta'; atualizarEstado(m); PT.ev.emit('maqParou', { m, motivo: m.estado }); }
 
   // ---------- saída ----------
+  // a próxima peça cabe na saída? (não cria nada — só verifica)
+  function saidaDisponivel(m, produto, comp) {
+    if (m.mesa && PT.ent.lista.includes(m.mesa) && !m.mesa.preso && m.mesa.produto === produto && Math.abs(m.mesa.comprimento - comp) < 1e-6) {
+      const p = pontoSaida(m, comp);
+      if (Math.hypot(m.mesa.x - p.x, m.mesa.z - p.z) < 0.5) return m.mesa.qtd < m.def.mesaCap ? 'ok' : 'mesa_cheia';
+    }
+    const p = pontoSaida(m, comp);
+    const fp = PT.construcao.footprint(p.x, p.z, [Math.max(0.5, comp), D.produtos[produto].larguraUtil + 0.05, 1], m.rot);
+    const bate = PT.ent.lista.find(o => o !== m && !o.preso && o.aabb && o.tipo !== 'berco' && fp.x0 < o.aabb.x1 && fp.x1 > o.aabb.x0 && fp.z0 < o.aabb.z1 && fp.z1 > o.aabb.z0);
+    return bate ? 'saida_obstruida' : 'ok';
+  }
   function pilhaDeSaida(m, produto, comp) {
     if (m.mesa && PT.ent.lista.includes(m.mesa) && !m.mesa.preso && m.mesa.produto === produto && Math.abs(m.mesa.comprimento - comp) < 1e-6) {
       const p = pontoSaida(m, comp);
@@ -155,15 +172,23 @@ PT.maq = (function () {
     if (Math.random() < pEnrosco) { m.estado = 'enroscada'; atualizarEstado(m); PT.ev.emit('enrosco', m); return; }
 
     if (def.entrada === 'bobina') {
-      const usado = PT.estoque.consumir(m.bobina, metrosMin);
-      m.progressoM += usado;
-      gastar(m, usado);
-      while (m.progressoM >= c.comprimento - 1e-9) {
-        m.progressoM -= c.comprimento;
-        if (!sairPeca(m, c.produto, c.comprimento)) return;
-        if (m.produzidas >= c.quantidade) { m.progressoM = 0; parar(m, 'concluida'); PT.ev.emit('loteConcluido', m); return; }
+      // nada é consumido se a saída não pode receber a peça (ChatGPT, bug 2)
+      const sd = saidaDisponivel(m, c.produto, c.comprimento);
+      if (sd !== 'ok') { parar(m, sd); return; }
+      let metros = metrosMin;
+      while (metros > 1e-9 && m.bobina && m.bobina.metros > 1e-6) {
+        const falta = c.comprimento - m.progressoM;
+        const usado = PT.estoque.consumir(m.bobina, Math.min(metros, falta));
+        m.progressoM += usado; metros -= usado; gastar(m, usado);
+        if (m.progressoM >= c.comprimento - 1e-9) {
+          if (!sairPeca(m, c.produto, c.comprimento)) return;      // peça pronta fica na máquina até liberar a saída
+          m.progressoM = 0;
+          if (m.produzidas >= c.quantidade) { parar(m, 'concluida'); PT.ev.emit('loteConcluido', m); return; }
+          if (saidaDisponivel(m, c.produto, c.comprimento) !== 'ok') { parar(m, saidaDisponivel(m, c.produto, c.comprimento)); return; }
+        }
+        if (usado <= 1e-9) break;
       }
-      if (m.bobina.metros <= 1e-6) {
+      if (m.bobina && m.bobina.metros <= 1e-6) {
         PT.ev.emit('celular', { de: m.nome, texto: 'Bobina ' + m.bobina.codigo + ' acabou. Sobrou só o tubete.' });
         const b = m.bobina; m.bobina = null; m.alinhado = false; PT.ent.remover(b);
         // pedaço que não completou uma peça vira RETALHO (sucata) — não continua na próxima bobina
@@ -175,10 +200,15 @@ PT.maq = (function () {
       m.progressoM += metrosMin;
       const comp = m.chapas.comprimento, porChapa = Math.max(1, Math.floor(1.2 / D.produtos[c.produto].larguraUtil));
       gastar(m, metrosMin);
+      const sd = saidaDisponivel(m, c.produto, comp);
+      if (sd !== 'ok') { m.progressoM -= metrosMin; parar(m, sd); return; }
       while (m.progressoM >= comp * porChapa && m.chapas.qtd > 0) {
         m.progressoM -= comp * porChapa;
         m.chapas.qtd -= 1; const torta = m.chapas.defeituosas > 0 ? (m.chapas.defeituosas--, true) : false;
-        for (let i = 0; i < porChapa; i++) if (!sairPeca(m, c.produto, comp, torta)) return;
+        // não passa da quantidade programada; o resto da chapa vira retalho (ChatGPT, bug 3)
+        const fazer = Math.min(porChapa, c.quantidade - m.produzidas);
+        if (fazer < porChapa) m.sucataM = (m.sucataM || 0) + comp * (porChapa - fazer) * D.produtos[c.produto].larguraUtil;
+        for (let i = 0; i < fazer; i++) if (!sairPeca(m, c.produto, comp, torta)) return;
         if (m.produzidas >= c.quantidade) { m.progressoM = 0; parar(m, 'concluida'); PT.ev.emit('loteConcluido', m); return; }
       }
       if (m.chapas.qtd <= 0) { m.chapas = null; parar(m, 'sem_material'); }
@@ -233,16 +263,17 @@ PT.maq = (function () {
 
   return {
     lista, NOMES_ESTADO, instalar, reinstalar, desinstalar, tentarMontar, desmontarBobina, ligar, alinhar, iniciar, parar,
-    chanceTorta, atualizarEstado, pontoEntrada, pontoSaida,
+    chanceTorta, atualizarEstado, pontoEntrada, pontoSaida, saidaDisponivel, mesaOcupada,
     salvar() {
       return lista.map(m => ({ defId: m.defId, x: m.x, z: m.z, rot: m.rot, ligada: m.ligada, conectada: !!m.cabo, estado: m.estado === 'produzindo' ? 'pronta' : m.estado,
         cfg: m.cfg, alinhamento: m.alinhamento, alinhado: m.alinhado, produzidas: m.produzidas, desgaste: m.desgaste, lubrificado: m.lubrificado,
-        nivelamento: m.nivelamento, bobinaCodigo: m.bobina ? m.bobina.codigo : null, chapas: m.chapas, mesaId: m.mesa ? m.mesa.id : null }));
+        nivelamento: m.nivelamento, progressoM: m.progressoM, sucataM: m.sucataM || 0, bobinaCodigo: m.bobina ? m.bobina.codigo : null, chapas: m.chapas, mesaId: m.mesa ? m.mesa.id : null }));
     },
     carregar(arr) {
       arr.forEach(s => {
         const m = instalar(s.defId, s.x, s.z, s.rot, { cfg: s.cfg, alinhamento: s.alinhamento, alinhado: s.alinhado, produzidas: s.produzidas,
-          desgaste: s.desgaste, lubrificado: s.lubrificado, nivelamento: s.nivelamento, chapas: s.chapas });
+          desgaste: s.desgaste, lubrificado: s.lubrificado, nivelamento: s.nivelamento, chapas: s.chapas,
+          progressoM: Number.isFinite(s.progressoM) && s.progressoM >= 0 ? s.progressoM : 0, sucataM: s.sucataM || 0 });
         if (s.conectada) PT.construcao.conectar(m);
         m.ligada = s.ligada; m.estado = s.estado;
         if (s.bobinaCodigo) { const b = PT.ent.lista.find(o => o.tipo === 'bobina' && o.codigo === s.bobinaCodigo); if (b) { m.bobina = b; b.montadaEm = m.id; } }

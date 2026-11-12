@@ -217,8 +217,8 @@ PT.mundo = (function () {
 PT.ent = (function () {
   const lista = [];
   function atualizarAABB(o) {
-    const d = o.dims; const rot = Math.round((o.rot || 0) / (Math.PI / 2)) % 2 !== 0;
-    const w = rot ? d[1] : d[0], p = rot ? d[0] : d[1];
+    const d = o.dims, c = Math.abs(Math.cos(o.rot || 0)), s = Math.abs(Math.sin(o.rot || 0));
+    const w = c * d[0] + s * d[1], p = s * d[0] + c * d[1];
     o.aabb = { x0: o.x - w / 2, x1: o.x + w / 2, z0: o.z - p / 2, z1: o.z + p / 2, ent: o };
   }
   function add(o) {

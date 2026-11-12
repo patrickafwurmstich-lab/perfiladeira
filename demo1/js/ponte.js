@@ -55,8 +55,10 @@ PT.ponte = (function () {
       const ax = mx * PC.vel.ponte * lento, az = mz * PC.vel.carro * lento;
       st.svx += (st.vx - ax) * 0.9; st.svz += (st.vz - az) * 0.9;   // "tranco" alimenta o balanço
       st.vx = ax; st.vz = az;
-      st.x = PT.util.clamp(st.x + st.vx * dt, 1, M.L - 1);
-      st.z = PT.util.clamp(st.z + st.vz * dt, 1, M.D - 1);
+      const nx = PT.util.clamp(st.x + st.vx * dt, 1, M.L - 1), nz = PT.util.clamp(st.z + st.vz * dt, 1, M.D - 1);
+      // a carga pendurada não atravessa máquinas, pilhas e paredes: precisa subir o gancho (ChatGPT, bug 7)
+      if (!cargaBate(nx, st.z)) st.x = nx; else avisoBate();
+      if (!cargaBate(st.x, nz)) st.z = nz; else avisoBate();
       if (st.rompida <= 0) {
         if (t.KeyR) st.y = Math.min(PC.alturaTrilho - 1.2, st.y + PC.vel.gancho * dt);
         if (t.KeyF) st.y = Math.max(alturaMinGancho(), st.y - PC.vel.gancho * dt);
@@ -69,6 +71,19 @@ PT.ponte = (function () {
       j.rot = Math.atan2(st.x - j.x, st.z - j.z);
     }
   };
+
+  function cargaBate(x, z) {
+    const o = st.carga; if (!o) return false;
+    const base = st.y - o.g.userData.altura * cargaEscala();
+    const fp = PT.construcao.footprint(x, z, o.dims, o.rot);
+    if (base < 3.3 && PT.mundo.paredes.some(p => PT.construcao.cruza(fp, p))) return true;
+    const fpAgora = PT.construcao.footprint(st.x, st.z, o.dims, o.rot);
+    const topo = e => e.y + e.g.userData.altura * (e.tipo === 'bobina' ? e.g.userData.mesh.scale.x : 1);
+    // bate se vai entrar num objeto mais alto que a base da carga (e se já não estava encostado nele — para poder sair)
+    return PT.ent.lista.some(e => e !== o && !e.preso && e.aabb && PT.construcao.cruza(fp, e.aabb) && base < topo(e) - 0.05 && !PT.construcao.cruza(fpAgora, e.aabb));
+  }
+  let ultAviso = 0;
+  function avisoBate() { const t = performance.now(); if (t - ultAviso > 2500) { ultAviso = t; PT.ev.emit('aviso', 'A carga vai bater! Suba o gancho (R).'); } }
 
   function pegarBotoeira() { PT.mundo.jog.controlando = controle; PT.ev.emit('aviso', 'Botoeira na mão: WASD move, R/F gancho, ESPAÇO engata, SHIFT precisão, E larga.'); }
   function largarBotoeira() { PT.mundo.jog.controlando = null; }
@@ -179,7 +194,7 @@ PT.ponte = (function () {
 
   return {
     st, init, atualizar, controle, emOperacao: () => !!st.carga || caindo.length > 0,
-    salvar() { return { x: st.x, z: st.z, y: st.y, capacidade: st.capacidade }; },
-    carregar(o) { Object.assign(st, o, { carga: null, estresse: 0, rompida: 0 }); }
+    salvar() { return { x: st.x, z: st.z, y: st.y, capacidade: st.capacidade, rompida: Math.max(0, st.rompida) }; },
+    carregar(o) { Object.assign(st, { rompida: 0 }, o, { carga: null, estresse: 0 }); }
   };
 })();
