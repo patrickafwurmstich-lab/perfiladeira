@@ -52,7 +52,7 @@
       g.add(pos(rot(anel(r - 0.003, r, 0.003, COR.galvEsc, 'espira', 28, 0.001), Math.PI / 2, 0, 0), 0, 0, s * (larg / 2 + 0.001)));
     }));
     // 2 cintas circunferenciais estreitas + 2 pelo furo
-    [-larg * 0.32, larg * 0.32].forEach(z => g.add(pos(rot(anel(re - 0.001, re + 0.005, 0.025, CINTA, 'cinta', 36, 0.002), Math.PI / 2, 0, 0), 0, 0, z)));
+    [[-larg * 0.32, 0.012], [larg * 0.3, -0.02]].forEach(([z, inc]) => g.add(pos(rot(anel(re - 0.001, re + 0.005, 0.025, CINTA, 'cinta', 36, 0.002), Math.PI / 2 + inc, 0, 0), 0, 0, z)));
     [Math.PI / 4, -Math.PI * 3 / 4].forEach(a => {
       const hz = larg / 2 + 0.005;
       const c = extrudar(chapaPerfil([[ri - 0.006, -hz], [re + 0.005, -hz], [re + 0.005, hz], [ri - 0.006, hz], [ri - 0.006, -hz + 0.002]], 0.005), 0.025, CINTA, 'cinta_furo');
@@ -82,10 +82,11 @@
       [-1, 1].forEach(s => {
         g.add(pos(caixa(0.1, H - 0.18, 0.1, COR.tealEsc, 'pe'), x, (H - 0.18) / 2 + 0.02, s * (W / 2 - 0.05)));
         g.add(pos(caixa(0.18, 0.03, 0.18, COR.grafite, 'sapata', 0.01), x, 0.015, s * (W / 2 - 0.05)));
+        [-0.06, 0.06].forEach(d => g.add(pos(cilindro(0.014, 0.012, COR.aco, 'parafuso', 0.004, 8), x + d, 0.034, s * (W / 2 - 0.05) + d)));
       });
       g.add(pos(caixa(0.07, 0.07, W - 0.12, COR.tealEsc, 'travessa'), x, 0.22, 0));
     }
-    for (let i = 0; i < 14; i++) g.add(pos(rot(cilindro(0.045, W - 0.24, COR.aco, 'rolo', 0.012, 10), Math.PI / 2, 0, 0), -L / 2 + 0.2 + i * (L - 0.4) / 13, H - 0.02, 0));
+    for (let i = 0; i < 14; i++) g.add(pos(rot(cilindro(0.055, W - 0.24, COR.aco, 'rolo', 0.012, 10), Math.PI / 2, 0, 0), -L / 2 + 0.2 + i * (L - 0.4) / 13, H - 0.01, 0));
     g.add(pos(caixa(0.12, 0.26, W, COR.amarelo, 'batente'), L / 2 - 0.06, H + 0.1, 0));
     for (let i = 0; i < 4; i++) g.add(pos(caixa(0.124, 0.06, 0.16, COR.preto, 'faixa', 0), L / 2 - 0.06, H + 0.1, -W / 2 + 0.2 + i * 0.34));
     return g;
@@ -139,11 +140,13 @@
       g.add(pos(caixa(0.22, 0.1, W, COR.tealEsc, 'travessa'), x, 0.05, 0));
       // sela em V: perfil no plano YZ extrudado 0,2 m em X
       const v = [[-0.78, 0.1], [0.78, 0.1], [0.78, H], [0.62, H], [0.1, 0.24], [-0.1, 0.24], [-0.62, H], [-0.78, H]];
-      const sela = extrudar(v, 0.2, COR.teal, 'sela', 0.01); rot(sela, 0, Math.PI / 2, 0); pos(sela, x, 0, 0); g.add(sela);
+      const sela = extrudar(v, 0.26, COR.teal, 'sela', 0.012); rot(sela, 0, Math.PI / 2, 0); pos(sela, x, 0, 0); g.add(sela);
       [-1, 1].forEach(s => {
-        const ang = Math.atan2(H - 0.24, 0.52), pad = caixa(0.22, 0.02, 0.54, COR.borracha, 'borracha', 0.006);
+        const ang = Math.atan2(H - 0.24, 0.52), pad = caixa(0.28, 0.025, 0.54, COR.borracha, 'borracha', 0.006);
         pad.rotation.x = -s * ang; pos(pad, x, 0.383, s * 0.36); g.add(pad);
-        g.add(pos(caixa(0.22, 0.08, 0.08, COR.amarelo, 'batente', 0.012), x, H + 0.04, s * 0.72));
+        g.add(pos(caixa(0.28, 0.08, 0.1, COR.amarelo, 'batente', 0.012), x, H + 0.04, s * 0.71));
+        g.add(pos(rot(extrudar([[0, 0], [0.22, 0], [0, 0.22]], 0.04, COR.tealEsc, 'reforco'), 0, s > 0 ? -Math.PI / 2 : Math.PI / 2, 0), x, 0.1, s * 0.56));
+        [-0.08, 0.08].forEach(dx => g.add(pos(rot(cilindro(0.016, 0.012, COR.aco, 'parafuso', 0.004, 8), 0, 0, 0), x + dx, 0.106, s * 0.55)));
       });
     });
     return g;
@@ -154,14 +157,14 @@
   M.pilha_telhas = () => {
     const g = grupo('pilha_telhas'), L = 6, n = 20;
     [-2.4, 0, 2.4].forEach(x => g.add(pos(pontalete(1.12), x, 0.03, 0)));
-    for (let i = 0; i < n; i++) g.add(pos(telha(L, i % 2 ? COR.galvEsc : COR.galvalume, 'telha'), (i % 3 - 1) * 0.006, 0.06 + i * 0.011, 0));
+    for (let i = 0; i < n; i++) { const t = telha(L, i % 2 ? COR.galvEsc : COR.galvalume, 'telha'); pos(t, ((i * 7) % 5 - 2) * 0.006 + (i === 13 ? 0.05 : 0), 0.06 + i * 0.011, ((i * 3) % 5 - 2) * 0.004); if (i === 13) t.rotation.y += 0.015; if (i === 6) t.rotation.y -= 0.01; g.add(t); }
     [-1.8, 1.8].forEach(x => g.add(cintaVertical(x, 0.06 + n * 0.011 + 0.05, 1.06)));
     return g;
   };
   M.pilha_chapas = () => {
     const g = grupo('pilha_chapas'), L = 3, W = 1.2, n = 16;
     [-1.1, 0, 1.1].forEach(x => g.add(pos(pontalete(W), x, 0.03, 0)));
-    for (let i = 0; i < n; i++) g.add(pos(caixa(L, 0.01, W, i % 2 ? COR.galvalume : COR.galvEsc, 'chapa', 0), ((i * 7) % 5 - 2) * 0.004, 0.065 + i * 0.012, ((i * 3) % 5 - 2) * 0.003));
+    for (let i = 0; i < n; i++) { const c = caixa(L, 0.01, W, i % 2 ? COR.galvalume : COR.galvEsc, 'chapa', 0); pos(c, ((i * 7) % 5 - 2) * 0.006, 0.065 + i * 0.012, ((i * 3) % 5 - 2) * 0.005); if (i === 9) c.rotation.y = 0.02; g.add(c); }
     [-0.9, 0.9].forEach(x => g.add(cintaVertical(x, 0.06 + n * 0.012 + 0.01, W)));
     return g;
   };
@@ -174,7 +177,7 @@
     };
     [-1.1, 0, 1.1].forEach(x => g.add(pos(pontalete(0.62), x, 0.03, 0)));
     [['L', -0.2], ['U', 0], ['acabamento', 0.2]].forEach(([k, z]) => {
-      for (let i = 0; i < 5; i++) { const m = extrudar(chapaPerfil(perfis[k], 0.005), L, i % 2 ? COR.galvEsc : COR.galvalume, 'rufo_' + k); rot(m, 0, Math.PI / 2, 0); pos(m, 0, 0.062 + i * 0.014, z); g.add(m); }
+      for (let i = 0; i < 5; i++) { const m = extrudar(chapaPerfil(perfis[k], 0.005), L, i % 2 ? COR.galvEsc : COR.galvalume, 'rufo_' + k); rot(m, 0, Math.PI / 2 + ((i * 5 + z * 10) % 3 - 1) * 0.006, 0); pos(m, ((i * 3) % 4 - 1.5) * 0.02, 0.062 + i * 0.014, z); g.add(m); }
     });
     [-0.9, 0.9].forEach(x => g.add(cintaVertical(x, 0.06 + 5 * 0.014 + 0.08, 0.6)));
     return g;
@@ -210,8 +213,8 @@
     });
     return g;
   };
-  M.cabo_eletrico_curva = () => {   // cotovelo de 90°: entra em +X, sai em +Z (raio 0,25 m)
-    const g = grupo('cabo_eletrico_curva'), r = 0.25, y = 0.03, pts = [[-0.15, y, 0]];
+  M.cabo_eletrico_curva = () => {   // cotovelo de 90°: entra em +X, sai em +Z (raio 0,15 m)
+    const g = grupo('cabo_eletrico_curva'), r = 0.15, y = 0.03, pts = [[-0.15, y, 0]];
     for (let i = 0; i <= 8; i++) { const a = (i / 8) * Math.PI / 2; pts.push([r * Math.sin(a), y, r * (1 - Math.cos(a))]); }
     pts.push([r, y, r + 0.15]);
     g.add(tubo(pts, 0.02, COR.cinza, 'conduite', 28));
