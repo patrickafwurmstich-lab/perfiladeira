@@ -14,6 +14,7 @@ PT.loja = (function () {
     const f = Object.assign({}, c);
     if (m) Object.assign(f, { nome: m.nome, dims: m.dims, pesoKg: m.pesoKg, kw: m.kw, vantagem: m.vantagem, defeito: m.defeito, modelo: m.modelo, tipoItem: 'maquina' });
     else if (b) Object.assign(f, { nome: b.nome, pesoKg: b.pesoKg, modelo: b.modelo, tipoItem: 'bobina' });
+    else if (c.veiculo) f.tipoItem = 'empilhadeira';
     else f.tipoItem = c.decor ? 'decor' : (c.consumivel ? 'consumivel' : (c.upgradeQuadroKW ? 'quadro' : c.id));
     return f;
   }

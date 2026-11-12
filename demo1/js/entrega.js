@@ -42,6 +42,10 @@ PT.entrega = (function () {
           dimsVisual: [Math.min(d[0], 4), d[1], d[2] + 0.2], pesoKg: f.pesoKg, icavel: true, solido: true,
           x: xs + 1.5, z: CM.z, y: 1.2 });
         c.carroceria.push(o); xs += 4;
+      } else if (f.tipoItem === 'empilhadeira') {
+        // veículo desce pela rampa do caminhão e fica na zona amarela
+        const zr = M.zonas.recebimento; PT.empi.criar(zr.x0 + 3, zr.z1 - 1.5, 0);
+        PT.ev.emit('celular', { de: c.e.de, texto: 'Desci a empilhadeira pela rampa. A chave tá no contato!' });
       } else if (f.tipoItem === 'bobina') {
         const o = PT.estoque.novaBobina(id, xs + 0.7, CM.z, 1.2); c.carroceria.push(o); xs += 1.8;
       } else {

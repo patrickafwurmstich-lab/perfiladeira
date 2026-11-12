@@ -88,6 +88,11 @@ PT.MODELOS = {
   // ---------- MOVIMENTAÇÃO ----------
   paleteira: { nome: 'Paleteira manual', categoria: 'Movimentação', dims: [1.6, 0.7, 1.2], forma: 'caixa', cor: 0xe74c3c,
     animacoes: ['garfo subindo', 'rodas'], sockets: ['mão do personagem', 'garfo (pilha)'], polys: '2–3k', prioridade: 'Demo' },
+  empilhadeira_eletrica: { nome: 'Empilhadeira elétrica 2,5 t', categoria: 'Movimentação', dims: [2.4, 1.2, 2.2], forma: 'caixa', cor: 0xf1c40f,
+    animacoes: ['rodas', 'torre subindo', 'garfo subindo', 'inclinação da torre', 'tombar de lado'], estados: ['normal', 'tombada', 'bateria fraca (luz)', 'com mandril'],
+    sockets: ['banco do motorista', 'garfos (carga)', 'acessório (mandril)', 'tomada do carregador'], polys: '12–18k', prioridade: 'Demo',
+    notas: 'Já existem empilhadeira_a/b do Blender no projeto (base). Precisa de gaiola de proteção visível (cinto = fica preso na gaiola).' },
+  mandril: { nome: 'Mandril (aríete) de bobina', categoria: 'Movimentação', dims: [1.2, 0.3, 0.3], forma: 'caixa', cor: 0x8e44ad, sockets: ['encaixe no garfo'], polys: '500', prioridade: 'Demo' },
   berco_bobina: { nome: 'Berço de bobina', categoria: 'Movimentação', dims: [1.6, 1.6, 0.5], forma: 'caixa', cor: 0x3498db,
     sockets: ['apoio da bobina', 'plaquinha metálica (texto)'], polys: '800', prioridade: 'Demo' },
   caminhao_entrega: { nome: 'Caminhão (entrega/coleta)', categoria: 'Veículos', dims: [12, 2.6, 3.6], forma: 'caixa', cor: 0xecf0f1,

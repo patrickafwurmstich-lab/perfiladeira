@@ -58,6 +58,7 @@ PT.zoeira = (function () {
       morte.rx = Math.min(Math.PI / 2, morte.rx + dt * 5);
       j.g.rotation.set(morte.rx, j.rot, morte.t * 3);
     }
+    if (morte.semHospital && morte.t > 1.8) { morte = null; j.morto = false; j.y = 0; j.g.rotation.set(0, j.rot, 0); PT.ev.emit('celular', { de: 'Você', texto: PT.util.escolha(Z.resmungos) }); return; }
     if (morte.t > Z.respawnSegundos) respawn();
   }
   function respawn() {
@@ -68,6 +69,13 @@ PT.zoeira = (function () {
       texto: 'Prezado(a) paciente, registramos mais uma visita sua ao nosso pronto-socorro. Valor simbólico: ' + PT.util.reais(PT.DADOS.economia.boletoHospitalSimbolico) +
         ' (cortesia da casa — não será cobrado). Favor não repetir o procedimento. Visitas este ano: ' + st.mortes + '.' });
     PT.ev.emit('celular', { de: 'Você', texto: PT.util.escolha(Z.resmungos) });
+  }
+
+  // ---------- arremesso (acidente sem morte: ex. tombar sem cinto) ----------
+  function arremessar(ang, texto) {
+    const j = PT.mundo.jog; if (j.morto) return;
+    j.morto = true; j.controlando = null; acidente(texto);
+    morte = { t: 0, vx: Math.sin(ang) * 7, vz: Math.cos(ang) * 7, vy: 6, rx: 0, semHospital: true };
   }
 
   // ---------- cicatrizes no piso ----------
@@ -100,7 +108,7 @@ PT.zoeira = (function () {
   PT.ev.on('enrosco', m => { st.enroscos++; PT.ev.emit('celular', { de: m.nome, texto: 'CRAAACK! A chapa virou uma mola gigante e enroscou nos rolos.' }); });
 
   return {
-    st, init, atualizar, morrer, acidente, cicatriz, consertar,
+    st, init, atualizar, morrer, acidente, cicatriz, consertar, arremessar,
     salvar() { return JSON.parse(JSON.stringify(st)); },
     carregar(o) { const cs = o.cicatrizes || []; Object.assign(st, o, { cicatrizes: [] }); cs.forEach(c => cicatriz(c.x, c.z, c.nivel, true)); desenharPlaca(); }
   };

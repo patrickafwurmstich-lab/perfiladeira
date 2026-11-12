@@ -9,7 +9,7 @@ window.PT = window.PT || {};
 
 PT.save = (function () {
   const CHAVE = 'parecis_demo1_save', CHAVE_CARREGAR = 'parecis_demo1_carregar';
-  const TIPOS_SALVOS = ['bobina', 'pilha', 'volume', 'paleteira', 'berco', 'decor'];
+  const TIPOS_SALVOS = ['bobina', 'pilha', 'volume', 'paleteira', 'berco', 'decor', 'empilhadeira'];
 
   function estavel() {
     const j = PT.mundo.jog;
@@ -17,6 +17,7 @@ PT.save = (function () {
     if (j.carregando) return 'Solte o que está carregando.';
     if (j.controlando) return 'Largue a botoeira.';
     if (PT.ponte.emOperacao()) return 'Tem carga na ponte ou caindo.';
+    if (PT.ent.lista.some(o => o.tipo === 'empilhadeira' && o.carga)) return 'Solte a carga da empilhadeira.';
     if (PT.construcao.ativo) return 'Saia do modo construção.';
     if (PT.entrega.st.caminhoes.some(c => c.estado !== 'saindo')) return 'Tem caminhão no pátio (espere ele sair).';
     if (PT.ui.modalAberto()) return 'Feche a janela aberta.';
@@ -30,6 +31,7 @@ PT.save = (function () {
       if (o.tipo === 'pilha') Object.assign(b, { produto: o.produto, comprimento: o.comprimento, qtd: o.qtd, defeituosas: o.defeituosas });
       if (o.tipo === 'volume') Object.assign(b, { item: o.item, pequeno: !!o.pequeno });
       if (o.tipo === 'decor') Object.assign(b, { item: o.item });
+      if (o.tipo === 'empilhadeira') Object.assign(b, { garfoY: o.garfoY, acessorio: o.acessorio, bateria: o.bateria, tombada: o.tombada });
       return b;
     });
     return {
@@ -98,6 +100,7 @@ PT.save = (function () {
         else PT.ent.add({ id: b.id, tipo: 'volume', modelo: 'volume_engradado', item: b.item, rotulo: 'Engradado: ' + f.nome, dimsVisual: [Math.min(f.dims[0], 4), f.dims[1], f.dims[2] + 0.2], pesoKg: f.pesoKg, icavel: true, solido: true, x: b.x, z: b.z, rot: b.rot });
       }
       else if (b.tipo === 'paleteira') PT.ent.add({ id: b.id, tipo: 'paleteira', modelo: 'paleteira', x: b.x, z: b.z, rot: b.rot, solido: false });
+      else if (b.tipo === 'empilhadeira') PT.empi.criar(b.x, b.z, b.rot, { id: b.id, garfoY: b.garfoY || 0, acessorio: b.acessorio || 'garfos', bateria: Number.isFinite(b.bateria) ? b.bateria : 1, tombada: b.tombada || 0 });
       else if (b.tipo === 'berco') PT.ent.add({ id: b.id, tipo: 'berco', modelo: 'berco_bobina', x: b.x, z: b.z, rot: b.rot, solido: false });
       else if (b.tipo === 'decor') { const f = PT.loja.ficha(b.item); PT.ent.add({ id: b.id, tipo: 'decor', item: b.item, modelo: f.modelo, rotulo: f.nome, x: b.x, z: b.z, rot: b.rot, solido: true }); }
     });

@@ -22,6 +22,7 @@ Serve para testar o código, as funções e os parâmetros antes do Godot, e par
 | maquinas.js | Classe genérica de máquina por dados (perfiladeira, guilhotina, dobradeira), CLP, desgaste, enrosco |
 | estoque.js | Bobinas, pilhas de produto, carregar na mão, paleteira, inventário |
 | pedidos.js | Clientes por perfil, negociação, coleta, entrega parcial, multa, pagamento |
+| empilhadeira.js | Empilhadeira arcade: cinto, garfo, mandril, tombamento, bateria, desvirar |
 | carregamento.js | Mesa de carregamento 2D ("Tetris prático"): pacotes, peso, equilíbrio, cintas, dano na viagem |
 | reputacao.js | 3 barras → estrelas, faixas por entregas |
 | zoeira.js | Placa de dias sem acidentes, morte/respawn, boleto simbólico, cicatrizes no piso |

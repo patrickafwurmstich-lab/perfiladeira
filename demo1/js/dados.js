@@ -108,6 +108,10 @@ PT.DADOS = {
       dims: [1.6, 1.6, 0.5], pesoKg: 80, modelo: 'berco_bobina' },
     { id: 'paleteira', categoria: 'Movimentação', nome: 'Paleteira manual', preco: 1500, estado: 'Nova', prazoDias: 2, frete: 80, volume: 'pequeno',
       dims: [1.6, 0.7, 1.2], pesoKg: 70, modelo: 'paleteira' },
+    { id: 'empilhadeira_eletrica', categoria: 'Movimentação', nome: 'Empilhadeira elétrica 2,5 t (usada)', preco: 42000, estado: 'Usada', prazoDias: 3, frete: 600, volume: 'veiculo', finame: true,
+      dims: [2.4, 1.2, 2.2], pesoKg: 3200, modelo: 'empilhadeira_eletrica', veiculo: true, vantagem: 'Bateria nova', defeito: 'Buzina não funciona' },
+    { id: 'mandril', categoria: 'Movimentação', nome: 'Mandril (aríete) para bobina', preco: 3800, estado: 'Novo', prazoDias: 2, frete: 120, volume: 'pequeno',
+      dims: [1.2, 0.3, 0.3], pesoKg: 90, modelo: 'mandril' },
     { id: 'quadro_80kw', categoria: 'Instalação', nome: 'Quadro elétrico 80 kW', preco: 6500, estado: 'Novo', prazoDias: 3, frete: 150, volume: 'pequeno',
       upgradeQuadroKW: 80, modelo: 'quadro_eletrico' },
     { id: 'saco_cimento', categoria: 'Instalação', nome: 'Saco de cimento (conserta piso)', preco: 38, estado: 'Novo', prazoDias: 1, frete: 0, volume: 'pequeno',
@@ -154,6 +158,13 @@ PT.DADOS = {
     fracaoDanoPacote: 0.15,        // % das peças do pacote que amassam
     danoDesbalanceado: 0.10,       // chance extra por pacote se a carga estiver desbalanceada
     segundosCinta: 1.2             // tempo real para passar cada cinta
+  },
+
+  // ---------------- EMPILHADEIRA (Fase 2, ordem do Gemini: 2º) ----------------
+  empilhadeira: {
+    capacidadeKg: 2500, velMax: 3.5, aceleracao: 2.2, giro: 1.6, garfoMax: 3.0, velGarfo: 0.6,
+    limiarTombo: 12,           // risco = |vel| × |giro| × (1 + garfo×fatorAltura) × (1 + peso/capacidade)
+    fatorAltura: 1.2, consumoBateriaPorSeg: 1 / 900, horasRecarga: 2, minutosDesvirar: 30
   },
 
   // ---------------- REPUTAÇÃO ----------------
