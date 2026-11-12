@@ -26,6 +26,7 @@
     L.push([0.488, 0], [0.52, h]);     // meia-onda de sobreposição
     return L;
   }
+  OF.linhaTP40 = linhaTP40;
   function telha(comp, cor, nome) {
     const m = extrudar(chapaPerfil(linhaTP40(), 0.004), comp, cor || COR.galvalume, nome || 'telha');
     m.rotation.y = Math.PI / 2;  // comprimento no eixo X

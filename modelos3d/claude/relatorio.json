@@ -258,5 +258,155 @@
    "z": 0.83,
    "minY": 0
   }
+ },
+ "perfiladeira_tp40": {
+  "id": "perfiladeira_tp40",
+  "tris": 22030,
+  "med": {
+   "x": 14.95,
+   "y": 2.17,
+   "z": 2.33,
+   "minY": 0
+  }
+ },
+ "guilhotina": {
+  "id": "guilhotina",
+  "tris": 8164,
+  "med": {
+   "x": 6.95,
+   "y": 2.07,
+   "z": 2.23,
+   "minY": 0
+  }
+ },
+ "dobradeira": {
+  "id": "dobradeira",
+  "tris": 4946,
+  "med": {
+   "x": 4.26,
+   "y": 1.655,
+   "z": 1.9,
+   "minY": -0.001
+  }
+ },
+ "pilar_consolo": {
+  "id": "pilar_consolo",
+  "tris": 520,
+  "med": {
+   "x": 1,
+   "y": 10.67,
+   "z": 1.37,
+   "minY": 0
+  }
+ },
+ "viga_rolamento": {
+  "id": "viga_rolamento",
+  "tris": 360,
+  "med": {
+   "x": 6,
+   "y": 0.615,
+   "z": 0.3,
+   "minY": 0
+  }
+ },
+ "tesoura_40m": {
+  "id": "tesoura_40m",
+  "tris": 1116,
+  "med": {
+   "x": 0.36,
+   "y": 2.15,
+   "z": 40.4,
+   "minY": -0.07
+  }
+ },
+ "terca": {
+  "id": "terca",
+  "tris": 60,
+  "med": {
+   "x": 6,
+   "y": 0.158,
+   "z": 0.066,
+   "minY": -0.004
+  }
+ },
+ "painel_fechamento": {
+  "id": "painel_fechamento",
+  "tris": 1248,
+  "med": {
+   "x": 6.03,
+   "y": 10.5,
+   "z": 0.24,
+   "minY": 0
+  }
+ },
+ "barracao_trecho": {
+  "id": "barracao_trecho",
+  "tris": 14580,
+  "med": {
+   "x": 13,
+   "y": 12.76,
+   "z": 41,
+   "minY": 0
+  }
+ },
+ "escritorio": {
+  "id": "escritorio",
+  "tris": 4670,
+  "med": {
+   "x": 8.61,
+   "y": 3.465,
+   "z": 8.3,
+   "minY": 0
+  }
+ },
+ "loja_balcao": {
+  "id": "loja_balcao",
+  "tris": 13550,
+  "med": {
+   "x": 12.4,
+   "y": 4.2,
+   "z": 9.371,
+   "minY": 0
+  }
+ },
+ "ponte_viga": {
+  "id": "ponte_viga",
+  "tris": 1726,
+  "med": {
+   "x": 2.6,
+   "y": 1.08,
+   "z": 40.6,
+   "minY": 0
+  }
+ },
+ "ponte_carro": {
+  "id": "ponte_carro",
+  "tris": 3276,
+  "med": {
+   "x": 1.4,
+   "y": 0.802,
+   "z": 1.45,
+   "minY": 0.003
+  }
+ },
+ "ponte_gancho": {
+  "id": "ponte_gancho",
+  "tris": 1008,
+  "med": {
+   "x": 0.36,
+   "y": 0.665,
+   "z": 0.231,
+   "minY": 0.045
+  }
+ },
+ "caminhao_carroceria": {
+  "id": "caminhao_carroceria",
+  "tris": 4248,
+  "med": {
+   "x": 8.905,
+   "y": 2.825,
+   "z": 2.99,
+   "minY": 0
+  }
  }
 }

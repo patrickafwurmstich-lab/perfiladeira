@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#e9edf1}</style></head><body>
+<script src="lib/three.min.js"></script><script src="lib/GLTFLoader.js"></script>
+<script>
+// vista.html?id=x&yaw=0.7&pitch=0.35&zoom=1&w=900&h=520 — renderiza um GLB para conferência
+const q = new URLSearchParams(location.search), W = +q.get('w') || 900, H = +q.get('h') || 520;
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(W, H); r.outputEncoding = THREE.sRGBEncoding; r.setClearColor(0xe9edf1); document.body.appendChild(r.domElement);
+const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.0)); const sol = new THREE.DirectionalLight(0xffffff, 0.9); sol.position.set(3, 5, 4); sc.add(sol);
+const cam = new THREE.PerspectiveCamera(30, W / H, 0.01, 1000);
+new THREE.GLTFLoader().load('glb/' + q.get('id') + '.glb', g => {
+  sc.add(g.scene); const b = new THREE.Box3().setFromObject(g.scene), c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3());
+  const R = Math.max(s.x, s.y, s.z) * 1.25 / (+q.get('zoom') || 1), yaw = +(q.get('yaw') || 0.7), pitch = +(q.get('pitch') || 0.35);
+  const alvo = new THREE.Vector3(c.x + (+q.get('dx') || 0), c.y + (+q.get('dy') || 0), c.z + (+q.get('dz') || 0));
+  cam.position.set(alvo.x + Math.sin(yaw) * Math.cos(pitch) * R, alvo.y + Math.sin(pitch) * R, alvo.z + Math.cos(yaw) * Math.cos(pitch) * R); cam.lookAt(alvo);
+  r.render(sc, cam); window.__ok = true;
+}, undefined, e => { window.__ok = 'erro'; });
+</script></body></html>
