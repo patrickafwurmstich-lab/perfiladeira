@@ -218,25 +218,39 @@ PT.glb = (function () {
     carregar(GRATIS + arq + '.glb').then(c => { const m = c.clone(true); m.position.set(x, 0, z); m.rotation.y = rotY || 0; m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); (cena || PT.mundo.scene).add(m); }).catch(() => { });
   }
 
-  // prédios: com o jogador dentro some o teto e as paredes ficam transparentes (câmera em 3ª pessoa)
-  const predios = [];
+  // prédios: com o jogador dentro some o teto, e SÓ a parede que fica entre a câmera e ele fica transparente
+  // (sugestão do ChatGPT: o resto da sala continua sólido, não vira "holograma"). Em 1ª pessoa nada fica transparente.
+  const predios = [], _ray = new THREE.Ray(), _cab = new THREE.Vector3(), _hit = new THREE.Vector3();
   function registrarPredio(g, m) {
-    const tetos = [], mats = [];
+    const tetos = [], paredes = [];
+    m.traverse(o => { if (/^teto/.test(o.name)) tetos.push(o); });
     m.traverse(o => {
-      if (/^teto|laje|platibanda/.test(o.name)) tetos.push(o);
-      if (o.isMesh) { o.material = o.material.clone(); o.material.userData.op = o.material.opacity; mats.push(o.material); }
+      if (!/^(parede|fachada)/.test(o.name) || paredes.some(p => { let x = o.parent; while (x) { if (x === p.obj) return true; x = x.parent; } return false; })) return;
+      const mats = []; o.traverse(k => { if (k.isMesh) { k.material = k.material.clone(); k.material.userData.op = k.material.opacity; mats.push(k.material); } });
+      paredes.push({ obj: o, mats, caixa: null, transp: false });
     });
-    const d = g.userData.dims; predios.push({ g, tetos, mats, meioX: d[0] / 2, meioZ: d[1] / 2, dentro: null });
+    const d = g.userData.dims; predios.push({ g, tetos, paredes, meioX: d[0] / 2, meioZ: d[1] / 2, dentro: null });
+  }
+  function transp(p, sim) {
+    if (p.transp === sim) return; p.transp = sim;
+    p.mats.forEach(m => { m.transparent = sim || m.userData.op < 1; m.opacity = sim ? Math.min(m.userData.op, 0.25) : m.userData.op; m.depthWrite = !sim; m.needsUpdate = true; });
   }
   function atualizarPredios() {
     const j = PT.mundo && PT.mundo.jog; if (!j) return;
+    const cam = PT.mundo.camera, primeira = PT.mundo.cam && PT.mundo.cam.modo === '1p';
     predios.forEach(p => {
       const dx = j.x - p.g.position.x, dz = j.z - p.g.position.z, c = Math.cos(p.g.rotation.y), s = Math.sin(p.g.rotation.y);
       const lx = dx * c - dz * s, lz = dx * s + dz * c;
       const dentro = Math.abs(lx) < p.meioX + 0.3 && Math.abs(lz) < p.meioZ + 0.3;
-      if (dentro === p.dentro) return; p.dentro = dentro;
-      p.tetos.forEach(t => { t.visible = !dentro; });
-      p.mats.forEach(m => { m.transparent = dentro || m.userData.op < 1; m.opacity = dentro ? Math.min(m.userData.op, 0.28) : m.userData.op; m.depthWrite = !dentro; m.needsUpdate = true; });
+      if (dentro !== p.dentro) { p.dentro = dentro; p.tetos.forEach(t => { t.visible = !dentro; }); }
+      if (!dentro || primeira) { p.paredes.forEach(w => transp(w, false)); return; }
+      _cab.set(j.x, j.y + 1.4, j.z); const dist = cam.position.distanceTo(_cab);
+      _ray.set(cam.position, _cab.clone().sub(cam.position).normalize());
+      p.paredes.forEach(w => {
+        if (!w.caixa) w.caixa = new THREE.Box3().setFromObject(w.obj).expandByScalar(0.05);
+        const h = _ray.intersectBox(w.caixa, _hit);
+        transp(w, !!h && cam.position.distanceTo(_hit) < dist);
+      });
     });
   }
   const _p = new THREE.Vector3();
