@@ -13,6 +13,7 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
   const log = async (fn, arg) => { const r = await p.evaluate(fn, arg); if (r) console.log(r); };
   // helpers no navegador
   await p.evaluate(() => {
+    PT.DADOS.balcao.chancePorHora = 0;   // clientes do balcão travam o save; este teste não usa a loja
     window.T = {
       min(n) { for (let i = 0; i < n; i++) { PT.tempo.st.acum = 1.2000001; PT.tempo.atualizar(0); PT.entrega.atualizar(0.05); } },
       frames(n, dt) { for (let i = 0; i < n; i++) { PT.ponte.atualizar(dt || 0.05); PT.estoque.atualizar(); PT.entrega.atualizar(dt || 0.05); PT.construcao.atualizar(); } },

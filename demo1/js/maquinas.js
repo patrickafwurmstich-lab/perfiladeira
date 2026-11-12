@@ -77,6 +77,7 @@ PT.maq = (function () {
     else if (!['mesa_cheia', 'saida_obstruida', 'concluida'].includes(m.estado)) m.estado = 'pronta';
     const cor = { produzindo: 0x2ecc71, pronta: 0x58d68d, enroscada: 0xe74c3c, mesa_cheia: 0xf39c12, saida_obstruida: 0xf39c12, sem_material: 0xf39c12, desalinhada: 0xf39c12, concluida: 0x5dade2 }[m.estado] || 0x555555;
     m.luz.material.color.setHex(cor);
+    if (PT.glb) PT.glb.luzTorre(m);   // torre de luz do CLP 3D
     if (m.g.userData.rotulo) m.g.userData.rotulo.userData.atualizar(m.nome + ' — ' + (NOMES_ESTADO[m.estado] || m.estado).split(' (')[0]);
     PT.ev.emit('maqEstado', m);
   }

@@ -165,6 +165,7 @@ PT.modelo = function (id, opts) {
   R.ativos[id] = (R.ativos[id] || 0) + 1;
   R.max[id] = Math.max(R.max[id] || 0, R.ativos[id]);
   g.userData.liberar = function () { R.ativos[id] = Math.max(0, (R.ativos[id] || 1) - 1); };
+  if (PT.glb) PT.glb.aplicar(g, id, opts);   // troca pelo modelo 3D quando ele já está aprovado
   return g;
 };
 

@@ -228,7 +228,7 @@
   let novoJogoCliques = 0;
   reg('config', { nome: 'Configurações', titulo: 'Configurações do sistema', icone: 'config', larg: 620, alt: 540,
     abrir(c) {
-      c.innerHTML = '<div class="cf"><section><h4>Personalizar</h4><label><input type="checkbox" data-som' + (PT.pc.st.som ? ' checked' : '') + '> Sons do sistema</label>' +
+      c.innerHTML = '<div class="cf"><section><h4>Personalizar</h4><label><input type="checkbox" data-som' + (PT.pc.st.som ? ' checked' : '') + '> Sons do sistema</label>' + '<label><input type="checkbox" data-glb' + (PT.glb && PT.glb.ligado() ? ' checked' : '') + '> Modelos 3D novos no lugar dos cubos (recarrega o jogo)</label>' +
         '<div class="cf-papeis">' + ['Entardecer no pátio', 'Noite na fábrica', 'Chapadão'].map((n, i) => '<button data-papel="' + i + '" class="papelmini papel' + i + (PT.pc.st.papel === i ? ' sel' : '') + '"><span>' + n + '</span></button>').join('') + '</div></section>' +
         '<section><h4>Jogo salvo</h4><div class="cf-bts"><button data-a="salvar">Salvar agora (K)</button><button data-a="carregar">Carregar último (L)</button><button data-a="exportar">Exportar arquivo</button><label class="btn">Importar arquivo<input type="file" data-imp accept=".json" hidden></label></div>' +
         '<p class="cf-obs">O jogo só salva quando nada está acontecendo (sem carga na ponte, sem caminhão no pátio, sem cliente no balcão).</p><button data-a="novo" class="perigo">Novo jogo (apaga o save)</button></section>' +
@@ -236,6 +236,7 @@
         (PT.DEBUG ? '<section><h4>Desenvolvedor (?debug=1)</h4><div class="cf-bts"><button data-a="pedido">Gerar pedido</button><button data-a="dinheiro">+R$ 20 mil</button><button data-a="noite">Pular a noite</button></div></section>' : '') +
         '<section class="cf-sobre"><img src="' + I('fabrica') + '" alt=""><div><b>ParecisOS</b> versão 1.0 (Demo 1)<br><small>Ícones: Fluent Emoji (Microsoft, licença MIT). Formiguinha Açucarada.</small></div></section></div>';
       const s = c.querySelector('[data-som]'); s.onchange = () => { PT.pc.st.som = s.checked; };
+      const gl = c.querySelector('[data-glb]'); if (gl) gl.onchange = () => { PT.glb.definirLigado(gl.checked); PT.ev.emit('aviso', 'Vale depois de recarregar a página (salve antes).'); };
       liga(c, '[data-papel]', x => { PT.pc.trocarPapel(+x.dataset.papel); PT.pc.redesenhar('config'); });
       liga(c, '[data-a]', x => {
         const a = x.dataset.a;

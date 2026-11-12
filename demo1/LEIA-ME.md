@@ -37,3 +37,8 @@ Serve para testar o código, as funções e os parâmetros antes do Godot, e par
 Revisado pela "sala" de IAs (Claude escreve; ChatGPT, Gemini e Grok revisam).
 
 Ícones do ParecisOS: Fluent Emoji (Microsoft, licença MIT) — veja img/icones/LICENCA_FLUENT_EMOJI_MIT.txt.
+
+## Modelos 3D no jogo
+- `js/modelos3d.js` troca o cubo pelo .glb dos modelos aprovados (lista `PT.GLB_NO_JOGO`). O cubo fica invisível por baixo (o jogo usa ele para escala/estado).
+- Voltar aos cubos: `index.html?cubos=1` ou PC → Configurações → desmarcar "Modelos 3D novos".
+- O CLP 3D usa a torre de luz como luz de estado da máquina.
