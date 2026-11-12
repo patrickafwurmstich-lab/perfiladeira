@@ -1,0 +1,202 @@
+{
+ "bobina_1t": {
+  "id": "bobina_1t",
+  "tris": 5664,
+  "med": {
+   "x": 1.018,
+   "y": 1.018,
+   "z": 1.217,
+   "minY": 0
+  }
+ },
+ "bobina_2t": {
+  "id": "bobina_2t",
+  "tris": 5664,
+  "med": {
+   "x": 1.318,
+   "y": 1.318,
+   "z": 1.217,
+   "minY": 0
+  }
+ },
+ "mesa_saida": {
+  "id": "mesa_saida",
+  "tris": 10692,
+  "med": {
+   "x": 6.002,
+   "y": 0.99,
+   "z": 1.46,
+   "minY": 0
+  }
+ },
+ "botoeira": {
+  "id": "botoeira",
+  "tris": 2472,
+  "med": {
+   "x": 0.115,
+   "y": 0.595,
+   "z": 0.103,
+   "minY": 0
+  }
+ },
+ "mandril": {
+  "id": "mandril",
+  "tris": 1236,
+  "med": {
+   "x": 1.25,
+   "y": 0.3,
+   "z": 0.3,
+   "minY": 0
+  }
+ },
+ "berco_bobina": {
+  "id": "berco_bobina",
+  "tris": 2156,
+  "med": {
+   "x": 1.6,
+   "y": 0.515,
+   "z": 1.6,
+   "minY": 0
+  }
+ },
+ "telha_tp40": {
+  "id": "telha_tp40",
+  "tris": 158,
+  "med": {
+   "x": 1,
+   "y": 0.05,
+   "z": 1.095,
+   "minY": -0.005
+  }
+ },
+ "pilha_telhas": {
+  "id": "pilha_telhas",
+  "tris": 5640,
+  "med": {
+   "x": 6,
+   "y": 0.453,
+   "z": 1.095,
+   "minY": 0
+  }
+ },
+ "pilha_chapas": {
+  "id": "pilha_chapas",
+  "tris": 3900,
+  "med": {
+   "x": 3.024,
+   "y": 0.29,
+   "z": 1.22,
+   "minY": 0
+  }
+ },
+ "pilha_rufos": {
+  "id": "pilha_rufos",
+  "tris": 1808,
+  "med": {
+   "x": 3,
+   "y": 0.27,
+   "z": 0.6,
+   "minY": 0
+  }
+ },
+ "piso_concreto": {
+  "id": "piso_concreto",
+  "tris": 300,
+  "med": {
+   "x": 5.98,
+   "y": 0.1,
+   "z": 5.98,
+   "minY": -0.1
+  }
+ },
+ "marcacao_zona": {
+  "id": "marcacao_zona",
+  "tris": 12,
+  "med": {
+   "x": 1,
+   "y": 0.004,
+   "z": 1,
+   "minY": 0
+  }
+ },
+ "cabo_eletrico": {
+  "id": "cabo_eletrico",
+  "tris": 2340,
+  "med": {
+   "x": 1,
+   "y": 0.049,
+   "z": 0.052,
+   "minY": -0.003
+  }
+ },
+ "placa_dias_sem_acidente": {
+  "id": "placa_dias_sem_acidente",
+  "tris": 304,
+  "med": {
+   "x": 2.48,
+   "y": 1.28,
+   "z": 0.054,
+   "minY": 1.56
+  }
+ },
+ "placa_parede": {
+  "id": "placa_parede",
+  "tris": 302,
+  "med": {
+   "x": 1.04,
+   "y": 0.74,
+   "z": 0.032,
+   "minY": 1.43
+  }
+ },
+ "porta_escritorio": {
+  "id": "porta_escritorio",
+  "tris": 2100,
+  "med": {
+   "x": 1.08,
+   "y": 2.18,
+   "z": 0.12,
+   "minY": 0
+  }
+ },
+ "sino_balcao": {
+  "id": "sino_balcao",
+  "tris": 1040,
+  "med": {
+   "x": 0.128,
+   "y": 0.123,
+   "z": 0.128,
+   "minY": 0
+  }
+ },
+ "balcao_loja": {
+  "id": "balcao_loja",
+  "tris": 10200,
+  "med": {
+   "x": 9.1,
+   "y": 1.1,
+   "z": 0.82,
+   "minY": 0
+  }
+ },
+ "mostruario": {
+  "id": "mostruario",
+  "tris": 1378,
+  "med": {
+   "x": 2,
+   "y": 1.85,
+   "z": 0.142,
+   "minY": 0
+  }
+ },
+ "clp_padrao": {
+  "id": "clp_padrao",
+  "tris": 3446,
+  "med": {
+   "x": 0.56,
+   "y": 1.652,
+   "z": 0.3,
+   "minY": 0
+  }
+ }
+}

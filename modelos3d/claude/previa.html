@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modelos do Claude — prévia</title>
+<style>
+  body { margin: 0; background: #e9edf1; font-family: system-ui, sans-serif; color: #1f2933; }
+  header { padding: 14px 18px 4px; }
+  h1 { margin: 0; font-size: 20px; }
+  p { margin: 4px 0 0; font-size: 13px; color: #52606d; }
+  #grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; padding: 12px 18px 24px; }
+  .cel { background: #fff; border: 1px solid #d3dae1; border-radius: 6px; overflow: hidden; }
+  .cel canvas { display: block; width: 100%; height: 190px; }
+  .cel div { padding: 6px 9px 8px; font-size: 13px; border-top: 1px solid #eef1f4; }
+  .cel b { display: block; } .cel small { color: #7b8794; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Modelos feitos pelo Claude (grupo 1)</h1>
+  <p>Feitos em código (three.js → GLB) no estilo do kit industrial do Grab3D. Os dois primeiros são do Grab3D, para comparar. Arraste para girar.</p>
+</header>
+<div id="grade"></div>
+<script src="lib/three.min.js"></script>
+<script src="lib/GLTFLoader.js"></script>
+<script>
+const LISTA = [
+  ['../gratis/grab3d/electrical-cabinet.glb', 'REFERÊNCIA Grab3D: quadro elétrico'], ['../gratis/grab3d/pallet-jack.glb', 'REFERÊNCIA Grab3D: paleteira'],
+  ['glb/bobina_1t.glb', 'bobina_1t'],
+  ['glb/bobina_2t.glb', 'bobina_2t'],
+  ['glb/mesa_saida.glb', 'mesa_saida'],
+  ['glb/botoeira.glb', 'botoeira'],
+  ['glb/mandril.glb', 'mandril'],
+  ['glb/berco_bobina.glb', 'berco_bobina'],
+  ['glb/telha_tp40.glb', 'telha_tp40'],
+  ['glb/pilha_telhas.glb', 'pilha_telhas'],
+  ['glb/pilha_chapas.glb', 'pilha_chapas'],
+  ['glb/pilha_rufos.glb', 'pilha_rufos'],
+  ['glb/piso_concreto.glb', 'piso_concreto'],
+  ['glb/marcacao_zona.glb', 'marcacao_zona'],
+  ['glb/cabo_eletrico.glb', 'cabo_eletrico'],
+  ['glb/placa_dias_sem_acidente.glb', 'placa_dias_sem_acidente'],
+  ['glb/placa_parede.glb', 'placa_parede'],
+  ['glb/porta_escritorio.glb', 'porta_escritorio'],
+  ['glb/sino_balcao.glb', 'sino_balcao'],
+  ['glb/balcao_loja.glb', 'balcao_loja'],
+  ['glb/mostruario.glb', 'mostruario'],
+  ['glb/clp_padrao.glb', 'clp_padrao']
+];
+const grade = document.getElementById('grade'), loader = new THREE.GLTFLoader(), cenas = [];
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.outputEncoding = THREE.sRGBEncoding;
+LISTA.forEach(([arq, id]) => {
+  const cel = document.createElement('div'); cel.className = 'cel';
+  const cv = document.createElement('canvas'); cel.appendChild(cv);
+  const info = document.createElement('div'); info.innerHTML = '<b>' + id + '</b><small>' + arq + ' · carregando…</small>'; cel.appendChild(info);
+  grade.appendChild(cel);
+  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.0));
+  const sol = new THREE.DirectionalLight(0xffffff, 0.9); sol.position.set(3, 5, 4); sc.add(sol);
+  const cam = new THREE.PerspectiveCamera(32, 1.2, 0.01, 500);
+  const item = { cv, sc, cam, ang: 0.7, alvo: null, raio: 1, pronto: false };
+  cenas.push(item);
+  loader.load(arq, g => {
+    const m = g.scene; sc.add(m);
+    const box = new THREE.Box3().setFromObject(m), tam = box.getSize(new THREE.Vector3()), cen = box.getCenter(new THREE.Vector3());
+    let tris = 0; m.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+    item.alvo = cen; item.raio = Math.max(tam.x, tam.y, tam.z) * 1.6; item.pronto = true;
+    info.querySelector('small').textContent = arq + ' · ' + tam.x.toFixed(1) + '×' + tam.z.toFixed(1) + '×' + tam.y.toFixed(1) + ' m · ' + Math.round(tris / 100) / 10 + 'k tri';
+  }, undefined, e => { info.querySelector('small').textContent = arq + ' · ERRO ao carregar'; item.erro = true; });
+  let arr = null;
+  cv.addEventListener('pointerdown', e => { arr = e.clientX; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e => { if (arr !== null) { item.ang -= (e.clientX - arr) * 0.01; arr = e.clientX; } });
+  cv.addEventListener('pointerup', () => arr = null);
+});
+function desenhar() {
+  cenas.forEach(it => {
+    const w = it.cv.clientWidth, h = it.cv.clientHeight; if (!w || !it.pronto) return;
+    if (it.cv.width !== w * renderer.getPixelRatio()) { it.cv.width = w * renderer.getPixelRatio(); it.cv.height = h * renderer.getPixelRatio(); }
+    it.cam.aspect = w / h; it.cam.updateProjectionMatrix();
+    it.cam.position.set(it.alvo.x + Math.sin(it.ang) * it.raio, it.alvo.y + it.raio * 0.45, it.alvo.z + Math.cos(it.ang) * it.raio); it.cam.lookAt(it.alvo);
+    renderer.setSize(w, h, false); renderer.render(it.sc, it.cam);
+    const ctx = it.cv.getContext('2d'); ctx.clearRect(0, 0, it.cv.width, it.cv.height); ctx.drawImage(renderer.domElement, 0, 0, it.cv.width, it.cv.height);
+  });
+  window.__prontos = cenas.filter(c => c.pronto || c.erro).length;
+  requestAnimationFrame(desenhar);
+}
+desenhar();
+</script>
+</body>
+</html>
