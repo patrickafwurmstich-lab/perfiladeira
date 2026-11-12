@@ -23,6 +23,7 @@ Serve para testar o código, as funções e os parâmetros antes do Godot, e par
 | estoque.js | Bobinas, pilhas de produto, carregar na mão, paleteira, inventário |
 | pedidos.js | Clientes por perfil, negociação, coleta, entrega parcial, multa, pagamento |
 | empilhadeira.js | Empilhadeira arcade: cinto, garfo, mandril, tombamento, bateria, desvirar |
+| funcionarios.js | Equipe: armários = vagas, contratação, quadro de tarefas por setor, agentes a 10 Hz, folha, operação tartaruga, curso |
 | carregamento.js | Mesa de carregamento 2D ("Tetris prático"): pacotes, peso, equilíbrio, cintas, dano na viagem |
 | reputacao.js | 3 barras → estrelas, faixas por entregas |
 | zoeira.js | Placa de dias sem acidentes, morte/respawn, boleto simbólico, cicatrizes no piso |

@@ -37,7 +37,7 @@ PT.estoque = (function () {
 
   // ---------------- PILHAS ----------------
   function pesoUnit(produto, comp) { const p = D.produtos[produto]; return p.larguraUtil * comp * 4.2; }   // ~4,2 kg/m² chapa 0,43
-  function rotuloPilha(o) { return D.produtos[o.produto].nome + ' ' + o.comprimento.toFixed(2) + ' m × ' + o.qtd + (o.defeituosas ? ' (' + o.defeituosas + ' tortas)' : ''); }
+  function rotuloPilha(o) { return D.produtos[o.produto].nome + ' ' + o.comprimento.toFixed(2) + ' m × ' + o.qtd + (o.defeituosas && !o.tortasEscondidas ? ' (' + o.defeituosas + ' tortas)' : ''); }
   function modeloPilha(produto) { return produto === 'TP40' ? 'pilha_telhas' : (produto === 'CHAPA' ? 'pilha_chapas' : 'pilha_rufos'); }
   function novaPilha(produto, comprimento, x, z, extra) {
     const o = Object.assign({ tipo: 'pilha', produto, comprimento, qtd: 0, defeituosas: 0, solido: true, x, z, y: 0 }, extra || {});

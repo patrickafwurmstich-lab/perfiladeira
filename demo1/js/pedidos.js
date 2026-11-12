@@ -65,7 +65,7 @@ PT.pedidos = (function () {
 
   // estoque disponível na zona verde para um pedido
   function pilhasPara(p) { return PT.ent.naZona('expedicao', o => o.tipo === 'pilha' && !o.preso && o.produto === p.produto && Math.abs(o.comprimento - p.comprimento) < 1e-6); }
-  function disponivel(p) { const ps = pilhasPara(p); return { boas: ps.reduce((a, o) => a + o.qtd - o.defeituosas, 0), tortas: ps.reduce((a, o) => a + o.defeituosas, 0) }; }
+  function disponivel(p) { const ps = pilhasPara(p); return { boas: ps.reduce((a, o) => a + o.qtd - (o.tortasEscondidas ? 0 : o.defeituosas), 0), tortas: ps.reduce((a, o) => a + (o.tortasEscondidas ? 0 : o.defeituosas), 0) }; }
 
   // lim (opcional, vem da mesa de carregamento 2D): { boas, tortas, dano }
   function carregar(c, incluirTortas, lim) {
@@ -79,8 +79,11 @@ PT.pedidos = (function () {
       if (passo === 'tortas' && !incluirTortas) break;
       for (const o of ps) {
         if (falta <= 0) break;
-        const disp = passo === 'boas' ? o.qtd - o.defeituosas : o.defeituosas;
+        // tortas ESCONDIDAS (funcionário apressado/distraído) passam como boas... e vão para a obra
+        const esc = o.tortasEscondidas ? o.defeituosas : 0;
+        const disp = passo === 'boas' ? o.qtd - o.defeituosas + esc : o.defeituosas - esc;
         const n = Math.min(disp, falta, teto[passo]); if (n <= 0) continue;
+        if (passo === 'boas' && esc > 0) { const tq = Math.min(esc, Math.round(n * o.defeituosas / o.qtd)); o.defeituosas -= tq; p.tortasEntregues += tq; }
         teto[passo] -= n; if (passo === 'boas') boasAgora += n;
         o.qtd -= n; if (passo === 'tortas') { o.defeituosas -= n; p.tortasEntregues += n; }
         falta -= n; p.carregadas += n;

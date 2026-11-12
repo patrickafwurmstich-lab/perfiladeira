@@ -34,7 +34,7 @@ PT.maq = (function () {
       ligada: false, cabo: null, estado: 'sem_energia',
       cfg: { produto: def.saida[0], comprimento: Math.min(6, def.compMax), quantidade: 20, velocidade: 1 },
       alinhamento: 0, alinhado: false, produzidas: 0, progressoM: 0, desgaste: 0, lubrificado: 0, nivelamento: 1,
-      bobina: null, chapas: null, mesa: null
+      bobina: null, chapas: null, mesa: null, autoLote: false
     }, extra || {});
     m.dims = def.dims;
     PT.ent.add(m);
@@ -267,13 +267,13 @@ PT.maq = (function () {
     salvar() {
       return lista.map(m => ({ defId: m.defId, x: m.x, z: m.z, rot: m.rot, ligada: m.ligada, conectada: !!m.cabo, estado: m.estado === 'produzindo' ? 'pronta' : m.estado,
         cfg: m.cfg, alinhamento: m.alinhamento, alinhado: m.alinhado, produzidas: m.produzidas, desgaste: m.desgaste, lubrificado: m.lubrificado,
-        nivelamento: m.nivelamento, progressoM: m.progressoM, sucataM: m.sucataM || 0, bobinaCodigo: m.bobina ? m.bobina.codigo : null, chapas: m.chapas, mesaId: m.mesa ? m.mesa.id : null }));
+        nivelamento: m.nivelamento, autoLote: !!m.autoLote, progressoM: m.progressoM, sucataM: m.sucataM || 0, bobinaCodigo: m.bobina ? m.bobina.codigo : null, chapas: m.chapas, mesaId: m.mesa ? m.mesa.id : null }));
     },
     carregar(arr) {
       arr.forEach(s => {
         const m = instalar(s.defId, s.x, s.z, s.rot, { cfg: s.cfg, alinhamento: s.alinhamento, alinhado: s.alinhado, produzidas: s.produzidas,
           desgaste: s.desgaste, lubrificado: s.lubrificado, nivelamento: s.nivelamento, chapas: s.chapas,
-          progressoM: Number.isFinite(s.progressoM) && s.progressoM >= 0 ? s.progressoM : 0, sucataM: s.sucataM || 0 });
+          progressoM: Number.isFinite(s.progressoM) && s.progressoM >= 0 ? s.progressoM : 0, sucataM: s.sucataM || 0, autoLote: !!s.autoLote });
         if (s.conectada) PT.construcao.conectar(m);
         m.ligada = s.ligada; m.estado = s.estado;
         if (s.bobinaCodigo) { const b = PT.ent.lista.find(o => o.tipo === 'bobina' && o.codigo === s.bobinaCodigo); if (b) { m.bobina = b; b.montadaEm = m.id; } }

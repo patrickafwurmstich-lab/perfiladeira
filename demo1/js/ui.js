@@ -105,15 +105,15 @@ PT.ui = (function () {
   }
 
   // ---------------- COMPUTADOR ----------------
-  const ABAS = ['Loja', 'Banco', 'E-mail', 'Pedidos', 'Reputação', 'Modelos 3D', 'Sistema'];
+  const ABAS = ['Loja', 'Banco', 'E-mail', 'Pedidos', 'Equipe', 'Reputação', 'Modelos 3D', 'Sistema'];
   function abrirComputador() { abrirModal('computador'); desenharComputador(); }
   function desenharComputador(soDados) {
     const c = $('computador').querySelector('.caixa');
-    if (soDados && ['Loja', 'Modelos 3D', 'Sistema'].includes(st.aba)) return;   // não redesenha telas com botões estáticos
+    if (soDados && (['Loja', 'Modelos 3D', 'Sistema'].includes(st.aba) || capturandoTeclado())) return;   // não redesenha telas com botões estáticos
     const naoLidos = st.correio.filter(m => !m.lido).length;
-    let h = '<div class="navegador"><div class="barra">🌐 www.' + ({ Loja: 'industriamt.com.br', Banco: 'bancocerrado.com.br', 'E-mail': 'mail.pareciste lha.com.br', Pedidos: 'sistema.pareciste lha.com.br', Reputação: 'sistema.pareciste lha.com.br/reputacao', 'Modelos 3D': 'interno/modelos', Sistema: 'interno/sistema' }[st.aba] || '').replace(/ /g, '') + '<button class="fechar" id="pcX">✕</button></div><div class="abas">' +
+    let h = '<div class="navegador"><div class="barra">🌐 www.' + ({ Loja: 'industriamt.com.br', Banco: 'bancocerrado.com.br', 'E-mail': 'mail.pareciste lha.com.br', Pedidos: 'sistema.pareciste lha.com.br', Equipe: 'trabalheconoscomt.com.br', Reputação: 'sistema.pareciste lha.com.br/reputacao', 'Modelos 3D': 'interno/modelos', Sistema: 'interno/sistema' }[st.aba] || '').replace(/ /g, '') + '<button class="fechar" id="pcX">✕</button></div><div class="abas">' +
       ABAS.map(a => '<button class="' + (a === st.aba ? 'sel' : '') + '" data-aba="' + a + '">' + a + (a === 'E-mail' && naoLidos ? ' (' + naoLidos + ')' : '') + '</button>').join('') + '</div><div class="conteudo">';
-    h += ({ 'Loja': telaLoja, 'Banco': telaBanco, 'E-mail': telaEmail, 'Pedidos': telaPedidos, 'Reputação': telaRep, 'Modelos 3D': telaModelos, 'Sistema': telaSistema }[st.aba])();
+    h += ({ 'Equipe': telaEquipe, 'Loja': telaLoja, 'Banco': telaBanco, 'E-mail': telaEmail, 'Pedidos': telaPedidos, 'Reputação': telaRep, 'Modelos 3D': telaModelos, 'Sistema': telaSistema }[st.aba])();
     h += '</div></div>';
     const scroll = c.querySelector('.conteudo') ? c.querySelector('.conteudo').scrollTop : 0;
     c.innerHTML = h;
@@ -121,6 +121,7 @@ PT.ui = (function () {
     $('pcX').onclick = fecharModal;
     c.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => { st.aba = b.dataset.aba; desenharComputador(); });
     c.querySelectorAll('[data-acao]').forEach(b => b.onclick = () => acaoComputador(b.dataset.acao, b.dataset.arg));
+    c.querySelectorAll('[data-prio]').forEach(s => s.onchange = () => { PT.func.st.prioridade[s.dataset.prio] = s.value; });
     const imp = $('impArq'); if (imp) imp.onchange = e => { if (e.target.files[0]) PT.save.importarArquivo(e.target.files[0]); };
   }
   function telaLoja() {
@@ -180,6 +181,25 @@ PT.ui = (function () {
     if (fechados.length) h += '<h3>Últimos</h3>' + fechados.map(p => '<div>' + p.id + ' ' + p.cliente + ' — ' + p.status + '</div>').join('');
     return h;
   }
+  function telaEquipe() {
+    const F = PT.func, D = PT.DADOS.funcionarios;
+    if (!F.st.candidatos.length) F.gerarCandidatos();
+    const pr = s => '<select data-prio="' + s + '">' + ['alta', 'media', 'baixa'].map(v => '<option' + (F.st.prioridade[s] === v ? ' selected' : '') + ' value="' + v + '">' + v + '</option>').join('') + '</select>';
+    let h = '<h2>Trabalhe Conosco MT — Equipe (' + F.st.lista.length + '/' + F.vagas() + ' vagas)</h2>' +
+      '<p>Cada <b>armário de vestiário</b> instalado libera 1 vaga (máx. ' + D.maxAtivos + '). Folha quinzenal: ' + R(F.folhaMensal() / 2) + '.</p>' +
+      (F.st.tartaruga > 0 ? '<p class="ruim">🪧 OPERAÇÃO TARTARUGA: "SEM PIX, SEM TELHA". <button data-acao="pagarFolha">Pagar a folha atrasada + multa</button></p>' : '') +
+      '<h3>Quadro de tarefas — prioridade por setor</h3><div class="grade"><div>Produção ' + pr('producao') + '</div><div>Expedição ' + pr('expedicao') + '</div><div>Manutenção ' + pr('manutencao') + '</div></div>' +
+      '<small>Tarefas abertas agora: ' + (F.tarefasAbertas().map(t => D.nomesTarefa[t.tipo] + ' (' + t.setor + ')').join(', ') || 'nenhuma') + '. Para o operador rodar lotes sozinho, marque a opção no CLP da máquina.</small>' +
+      '<h3>Funcionários</h3>' + (F.st.lista.map(f => '<div class="mail"><b>' + f.nome + '</b> — ' + D.cargos[f.cargo].nome + ' · ' + f.personalidade + ' · ' + R(f.salario) + '/mês<br>' +
+        'Competência ' + Math.round(f.atributos.competencia * 100) + '% · Segurança ' + Math.round(f.atributos.seguranca * 100) + '% · Ritmo ' + Math.round(f.atributos.ritmo * 100) + '% · Energia ' + Math.round(f.energia * 100) + '%<br>' +
+        'Certificados: ' + (f.certificados.join(', ') || 'nenhum') + ' · Agora: ' + (f.tarefa ? D.nomesTarefa[f.tarefa.tipo] : f.estado) +
+        '<div class="botoes">' + ['perfiladeira', 'guilhotina', 'dobradeira'].filter(c => !f.certificados.includes(c)).map(c => '<button data-acao="curso" data-arg="' + f.id + '|' + c + '">Curso de ' + c + ' (' + R(D.cursoPreco) + ')</button>').join('') +
+        '<button data-acao="demitir" data-arg="' + f.id + '">Dispensar</button></div></div>').join('') || '<p>Ninguém ainda. O dono faz tudo!</p>') +
+      '<h3>Candidatos</h3>' + F.st.candidatos.map(c => '<div class="mail"><b>' + c.nome + '</b> — ' + D.cargos[c.cargo].nome + ' · ' + c.personalidade + ' · pede ' + R(c.salario) + '/mês<br>' +
+        'Competência ' + Math.round(c.atributos.competencia * 100) + '% · Segurança ' + Math.round(c.atributos.seguranca * 100) + '% · Ritmo ' + Math.round(c.atributos.ritmo * 100) + '%<br><i>"' + c.fala + '"</i>' +
+        '<div class="botoes"><button data-acao="contratar" data-arg="' + c.id + '">Contratar</button></div></div>').join('') + '<small>Novos candidatos a cada 3 dias. Mecânico aparece na faixa 2 de reputação.</small>';
+    return h;
+  }
   function barra(nome, v) { return '<div class="barraRep"><span>' + nome + '</span><div><i style="width:' + Math.round(v * 100) + '%"></i></div><b>' + Math.round(v * 100) + '%</b></div>'; }
   function telaRep() {
     const r = PT.rep;
@@ -203,6 +223,10 @@ PT.ui = (function () {
   }
   function acaoComputador(a, arg) {
     if (a === 'cat') st.cat = arg;
+    if (a === 'contratar') aviso(PT.func.contratar(arg).msg);
+    if (a === 'demitir') { PT.func.demitir(arg); aviso('Funcionário dispensado.'); }
+    if (a === 'curso') { const [id, c] = arg.split('|'); aviso(PT.func.treinar(id, c).msg); }
+    if (a === 'pagarFolha') aviso(PT.func.pagarAtrasado() ? 'Folha paga.' : 'Sem dinheiro para pagar.');
     if (a === 'comprar') { const [id, modo] = arg.split('|'); const r = PT.loja.comprar(id, modo); aviso(r.msg); }
     if (a === 'sacar') aviso('Sacado ' + R(PT.eco.sacarCredito(+arg)));
     if (a === 'amortizar') aviso('Amortizado ' + R(PT.eco.pagarCredito(+arg)));
@@ -249,6 +273,7 @@ PT.ui = (function () {
       '<div class="form"><label>Produto <select id="cProd">' + m.def.saida.map(s => '<option value="' + s + '"' + (s === m.cfg.produto ? ' selected' : '') + '>' + PT.DADOS.produtos[s].nome + '</option>').join('') + '</select></label>' +
       (m.def.entrada === 'bobina' ? '<label>Comprimento (m) <input id="cComp" type="number" step="0.5" min="' + m.def.compMin + '" max="' + m.def.compMax + '" value="' + m.cfg.comprimento + '"></label>' : '') +
       '<label>Quantidade <input id="cQtd" type="number" min="1" max="500" value="' + m.cfg.quantidade + '"></label>' +
+      '<label class="chk"><input type="checkbox" id="cAuto"' + (m.autoLote ? ' checked' : '') + '> Operador pode rodar lotes sozinho</label>' +
       '<label>Velocidade <select id="cVel"><option value="0.6"' + (m.cfg.velocidade < 0.8 ? ' selected' : '') + '>Precisão (60%)</option><option value="1"' + (m.cfg.velocidade >= 0.8 && m.cfg.velocidade <= 1 ? ' selected' : '') + '>Normal</option><option value="1.3"' + (m.cfg.velocidade > 1 ? ' selected' : '') + '>Rápida (mais enrosco)</option></select></label></div>' +
       '<div class="botoes grandes"><button id="cLig" class="' + (m.ligada ? 'sel' : '') + '">' + (m.ligada ? '⏻ Desligar' : '⏻ Ligar') + '</button>' +
       (m.def.entrada === 'bobina' ? '<button id="cAli">↔ Alinhar chapa</button>' : '') +
@@ -256,7 +281,7 @@ PT.ui = (function () {
     $('clpX').onclick = fecharModal;
     const salvarCfg = () => {
       m.cfg.produto = $('cProd').value; if ($('cComp')) m.cfg.comprimento = PT.util.clamp(+$('cComp').value || m.def.compMin, m.def.compMin, m.def.compMax);
-      m.cfg.quantidade = Math.max(1, Math.floor(+$('cQtd').value || 1)); m.cfg.velocidade = +$('cVel').value;
+      m.cfg.quantidade = Math.max(1, Math.floor(+$('cQtd').value || 1)); m.cfg.velocidade = +$('cVel').value; m.autoLote = $('cAuto').checked;
     };
     c.querySelectorAll('select,input').forEach(i => i.onchange = salvarCfg);
     $('cLig').onclick = () => { PT.maq.ligar(m, !m.ligada); desenharCLP(); };

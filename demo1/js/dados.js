@@ -112,6 +112,8 @@ PT.DADOS = {
       dims: [2.4, 1.2, 2.2], pesoKg: 3200, modelo: 'empilhadeira_eletrica', veiculo: true, vantagem: 'Bateria nova', defeito: 'Buzina não funciona' },
     { id: 'mandril', categoria: 'Movimentação', nome: 'Mandril (aríete) para bobina', preco: 3800, estado: 'Novo', prazoDias: 2, frete: 120, volume: 'pequeno',
       dims: [1.2, 0.3, 0.3], pesoKg: 90, modelo: 'mandril' },
+    { id: 'armario', categoria: 'Instalação', nome: 'Armário de vestiário (+1 vaga de funcionário)', preco: 650, estado: 'Novo', prazoDias: 2, frete: 60, volume: 'pequeno',
+      dims: [0.6, 0.5, 1.9], pesoKg: 40, modelo: 'armario', decor: true },
     { id: 'quadro_80kw', categoria: 'Instalação', nome: 'Quadro elétrico 80 kW', preco: 6500, estado: 'Novo', prazoDias: 3, frete: 150, volume: 'pequeno',
       upgradeQuadroKW: 80, modelo: 'quadro_eletrico' },
     { id: 'saco_cimento', categoria: 'Instalação', nome: 'Saco de cimento (conserta piso)', preco: 38, estado: 'Novo', prazoDias: 1, frete: 0, volume: 'pequeno',
@@ -175,8 +177,24 @@ PT.DADOS = {
                caminhaoEsperando: -0.01, cancelado: -0.08, contaEmDia: 0.01, chequeEspecial: -0.03 }
   },
 
-  // ---------------- FUNCIONÁRIOS (fase 2) ----------------
+  // ---------------- FUNCIONÁRIOS (Fase 2, ordem do Gemini: 3º) ----------------
   salarios: { ajudante: 1900, operador: 2450, ponte: 2650, mecanico: 3200, encarregado: 3500 },
+  funcionarios: {
+    maxAtivos: 6, hz: 10, velocidade: 1.6, eficienciaAjudante: 0.6, energiaPorTarefa: 0.06,
+    pilhaParaTirar: 40, desgasteParaGraxa: 0.4, chanceEsconderTorta: 0.5, diasOrientacao: 3, multaAtraso: 0.05,
+    cursoPreco: 900, cursoHoras: 24,
+    duracao: { tirarPilha: 4, limparEnrosco: 10, graxa: 5, operar: 6 },    // segundos de jogo (x eficiência)
+    nomesTarefa: { tirarPilha: 'levando pilha', limparEnrosco: 'cortando enrosco', graxa: 'engraxando', operar: 'operando' },
+    cargos: {
+      ajudante: { nome: 'Ajudante geral', salario: 'ajudante', faixaMin: 0, setores: ['expedicao'], certificados: [], cor: 0x95a5a6 },
+      operador: { nome: 'Operador de perfiladeira', salario: 'operador', faixaMin: 0, setores: ['producao'], certificados: ['perfiladeira'], cor: 0x2e86c1 },
+      mecanico: { nome: 'Mecânico', salario: 'mecanico', faixaMin: 2, setores: ['manutencao'], certificados: ['perfiladeira', 'guilhotina', 'dobradeira'], cor: 0xe67e22 }
+    },
+    personalidades: ['caprichoso', 'organizado', 'experiente', 'prestativo', 'apressado', 'distraído', 'preguiçoso', 'teimoso'],
+    nomes: ['Júnior', 'Cleiton', 'Rosângela', 'Valdir', 'Edinei', 'Marcinha', 'Josué', 'Sirlene', 'Tião', 'Kauã'],
+    sobrenomes: ['da Silva', 'Pereira', 'Souza', 'Oliveira', 'Rodrigues', 'Ferreira'],
+    entrevistas: ['Se tiver um botão de desligar, já estamos conversando.', 'Na minha época isso funcionava com três botões e uma marreta.', 'Eu só não trabalho perto de bobina, que bobina me persegue.', 'Já operei perfiladeira até de olho fechado. Não recomendo.']
+  },
 
   // ---------------- ZOEIRA ----------------
   zoeira: {

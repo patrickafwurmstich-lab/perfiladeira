@@ -18,6 +18,7 @@ PT.save = (function () {
     if (j.controlando) return 'Largue a botoeira.';
     if (PT.ponte.emOperacao()) return 'Tem carga na ponte ou caindo.';
     if (PT.ent.lista.some(o => o.tipo === 'empilhadeira' && o.carga)) return 'Solte a carga da empilhadeira.';
+    if (PT.func.st.lista.some(f => f.carregando)) return 'Um funcionário está carregando uma pilha.';
     if (PT.construcao.ativo) return 'Saia do modo construção.';
     if (PT.entrega.st.caminhoes.some(c => c.estado !== 'saindo')) return 'Tem caminhão no pátio (espere ele sair).';
     if (PT.ui.modalAberto()) return 'Feche a janela aberta.';
@@ -40,7 +41,7 @@ PT.save = (function () {
       jogador: { x: PT.mundo.jog.x, z: PT.mundo.jog.z },
       eco: PT.eco.salvar(), rep: PT.rep.salvar(), zoeira: PT.zoeira.salvar(), estoque: PT.estoque.salvar(),
       construcao: PT.construcao.salvar(), ponte: PT.ponte.salvar(), entrega: PT.entrega.salvar(), pedidos: PT.pedidos.salvar(),
-      entidades: ents, maquinas: PT.maq.salvar(), correio: PT.ui.salvarCorreio()
+      entidades: ents, maquinas: PT.maq.salvar(), correio: PT.ui.salvarCorreio(), funcionarios: PT.func.salvar()
     };
   }
 
@@ -108,6 +109,7 @@ PT.save = (function () {
     PT.pedidos.carregar(s.pedidos);
     PT.zoeira.carregar(s.zoeira);
     PT.ui.carregarCorreio(s.correio);
+    PT.func.carregar(s.funcionarios);
     PT.mundo.jog.x = s.jogador.x; PT.mundo.jog.z = s.jogador.z;
     PT.ev.emit('aviso', 'Save carregado: ' + PT.tempo.rotulo());
     return true;

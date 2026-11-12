@@ -19,6 +19,12 @@ PT.MODELOS = {
     estados: ['normal', 'capacete', 'sujo de graxa'], sockets: ['mao_dir', 'mao_esq', 'cabeca (capacete)'], polys: '8–12k (rig humanoide)', prioridade: 'Demo',
     notas: 'Precisa de ossos simples para ragdoll (PhysicalBone3D, ~12 ossos). Já existe operador.txt do Blender como base.' },
 
+  funcionario: { nome: 'Funcionário (corpo base com crachá/uniforme por cargo)', categoria: 'Personagens', dims: [0.5, 0.35, 1.72], forma: 'cilindro', cor: 0x95a5a6,
+    animacoes: ['andar', 'carregar pilha', 'operar CLP', 'engraxar', 'esmerilhar', 'tomar café', 'braços cruzados (greve)', 'tropeçar', 'susto'],
+    estados: ['uniforme por cargo', 'plaquinha "SEM PIX, SEM TELHA"', 'cansado'], sockets: ['mãos', 'cabeça (capacete)'], polys: '6–9k (mesmo rig do personagem)', prioridade: 'Demo',
+    notas: 'Reaproveitar o rig do dono; variar só cabelo/uniforme/cor do crachá. ajudante.txt do Blender já existe como base.' },
+  armario: { nome: 'Armário de vestiário', categoria: 'Instalação', dims: [0.6, 0.5, 1.9], forma: 'caixa', cor: 0x7fb3d5, estados: ['fechado', 'aberto'], polys: '400', prioridade: 'Demo' },
+
   // ---------- ESTRUTURA ----------
   barracao_132x40: { nome: 'Barracão 132 x 40 m (casca)', categoria: 'Estrutura', dims: [132, 40, 12.5], forma: 'caixa', cor: 0x9aa4ad,
     estados: ['novo', 'abandonado (2º barracão)'], sockets: ['portão entrada', 'portão saída', 'trilhos da ponte', 'pontos de luz'],

@@ -34,6 +34,7 @@ window.PT = window.PT || {};
     PT.entrega.atualizar(dt);
     PT.construcao.atualizar(dt);
     PT.zoeira.atualizar(dt);
+    PT.func.atualizar(dt);
     PT.ui.hud(performance.now());
     PT.mundo.render();
   }
