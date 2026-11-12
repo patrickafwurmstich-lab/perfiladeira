@@ -18,7 +18,7 @@ PT.entrega = (function () {
     const g = PT.modelo('caminhao_entrega', { rotulo: e.tipo === 'coleta' ? 'Coleta — ' + e.de : 'Entrega — ' + e.de });
     const zona = e.tipo === 'coleta' ? M.zonas.expedicao : M.zonas.recebimento;
     const c = { e, g, x: CM.xEntrada, estado: 'chegando', paradaX: (zona.x0 + zona.x1) / 2, carroceria: [], espera: 0, buzinou: 0 };
-    g.position.set(c.x, 0, CM.z); g.rotation.y = Math.PI / 2;
+    g.position.set(c.x, 0, CM.z); g.rotation.y = 0;   // comprimento do caminhão ao longo do corredor (X), cabine para +X
     PT.mundo.scene.add(g); st.caminhoes.push(c);
     PT.ev.emit('celular', { de: e.de, texto: e.tipo === 'coleta' ? 'Caminhão da coleta entrando no pátio.' : 'Seu pedido chegou! Tô entrando no barracão.' });
     return c;
@@ -40,14 +40,14 @@ PT.entrega = (function () {
         const d = f.dims;
         const o = PT.ent.add({ tipo: 'volume', modelo: 'volume_engradado', item: id, rotulo: 'Engradado: ' + f.nome,
           dimsVisual: [Math.min(d[0], 4), d[1], d[2] + 0.2], pesoKg: f.pesoKg, icavel: true, solido: true,
-          x: xs + 1.5, z: CM.z, y: 1.2 });
+          x: xs + 1.5, z: CM.z, y: 1.0 });
         c.carroceria.push(o); xs += 4;
       } else if (f.tipoItem === 'empilhadeira') {
         // veículo desce pela rampa do caminhão e fica na zona amarela
         const zr = M.zonas.recebimento; PT.empi.criar(zr.x0 + 3, zr.z1 - 1.5, 0);
         PT.ev.emit('celular', { de: c.e.de, texto: 'Desci a empilhadeira pela rampa. A chave tá no contato!' });
       } else if (f.tipoItem === 'bobina') {
-        const o = PT.estoque.novaBobina(id, xs + 0.7, CM.z, 1.2); c.carroceria.push(o); xs += 1.8;
+        const o = PT.estoque.novaBobina(id, xs + 0.7, CM.z, 1.0); c.carroceria.push(o); xs += 1.8;
       } else {
         // pequeno: motorista deixa no chão da zona amarela
         const zr = M.zonas.recebimento;
@@ -78,7 +78,7 @@ PT.entrega = (function () {
         }
       } else if (c.estado === 'parado') {
         // carroceria acompanha o caminhão; quando tudo saiu, vai embora
-        c.carroceria = c.carroceria.filter(o => PT.ent.lista.includes(o) && !o.preso && Math.abs(o.y - 1.2) < 0.05 && Math.abs(o.z - CM.z) < 1.5 && Math.abs(o.x - c.x) < 6.5);
+        c.carroceria = c.carroceria.filter(o => PT.ent.lista.includes(o) && !o.preso && Math.abs(o.y - 1.0) < 0.05 && Math.abs(o.z - CM.z) < 1.5 && Math.abs(o.x - c.x) < 6.5);
         if (c.e.tipo === 'fornecedor' && c.carroceria.length === 0) partir(c);
         if (c.e.tipo === 'fornecedor' && c.espera > 120 && !c.reclamou) { c.reclamou = true; PT.ev.emit('celular', { de: c.e.de, texto: 'Patrão, faz 2 horas que eu tô aqui parado... a diária do caminhão é cara! Mais 1 hora e eu levo de volta.' }); }
         // fornecedor esquecido: leva o que sobrou na carroceria e volta amanhã (sem cobrar de novo) — ChatGPT, bug 2

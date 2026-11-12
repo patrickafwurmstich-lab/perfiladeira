@@ -111,7 +111,7 @@ PT.MODELOS = {
   mandril: { nome: 'Mandril (aríete) de bobina', categoria: 'Movimentação', dims: [1.2, 0.3, 0.3], forma: 'caixa', cor: 0x8e44ad, sockets: ['encaixe no garfo'], polys: '500', prioridade: 'Demo' },
   berco_bobina: { nome: 'Berço de bobina', categoria: 'Movimentação', dims: [1.6, 1.6, 0.5], forma: 'caixa', cor: 0x3498db,
     sockets: ['apoio da bobina', 'plaquinha metálica (texto)'], polys: '800', prioridade: 'Demo' },
-  caminhao_entrega: { nome: 'Caminhão (entrega/coleta)', categoria: 'Veículos', dims: [12, 2.6, 3.6], forma: 'caixa', cor: 0xecf0f1,
+  caminhao_entrega: { nome: 'Caminhão (entrega/coleta)', categoria: 'Veículos', dims: [9, 2.5, 2.9], forma: 'caixa', cor: 0xecf0f1,
     animacoes: ['rodas', 'pisca', 'motorista gesticulando'], estados: ['fornecedor', 'cliente'], sockets: ['carroceria (volumes/pilhas)', 'buzina (som)'],
     polys: '10–15k', prioridade: 'Demo' },
 

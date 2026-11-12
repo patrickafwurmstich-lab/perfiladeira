@@ -430,6 +430,8 @@
     g.add(pos(eixoZ(0.16, 0.36, TEAL_E, 'motor_elevacao', 16), 0, 0.6, 0.62));
     g.add(pos(caixa(0.34, 0.34, 0.2, TEAL_E, 'redutor', 0.03), 0, 0.6, -0.52));
     g.add(pos(caixa(0.3, 0.25, 0.15, COR.grafite, 'caixa_eletrica', 0.03), 0.5, 0.52, 0.4));
+    // para-choques vermelhos nas 4 pontas e limpa-trilhos na frente das rodas (guia lateral)
+    [-1, 1].forEach(s => [-1, 1].forEach(t => { g.add(pos(cilindro(0.06, 0.1, COR.vermelho, 'para_choque', 0.02, 10).rotateX(Math.PI / 2), s * 0.45, 0.3, t * 0.7)); g.add(pos(caixa(0.04, 0.12, 0.05, COR.grafite, 'limpa_trilho', 0.005), s * 0.62 + s * 0.09, 0.08, t * 0.66)); }));
     return g;
   };
   M.ponte_gancho = () => {   // moitão com 2 polias + gancho com trava (pivot = ponta de baixo do gancho)

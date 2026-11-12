@@ -11,7 +11,9 @@ window.PT = window.PT || {};
 PT.GLB_NO_JOGO = [
   'bobina_1t', 'bobina_2t', 'botoeira', 'mandril', 'berco_bobina', 'porta_escritorio', 'sino_balcao',
   'balcao_loja', 'mostruario', 'clp_padrao', 'placa_dias_sem_acidente', 'placa_parede',
-  'perfiladeira_tp40', 'dobradeira'          // complexos v2: aprovados (ChatGPT + Grok)
+  'perfiladeira_tp40', 'dobradeira', 'guilhotina',       // máquinas (complexos v2/v3)
+  'ponte_viga', 'ponte_carro', 'ponte_gancho',          // ponte rolante v3 (viga dupla)
+  'caminhao_entrega'                                    // caminhão toco v3 (arquivo caminhao_carroceria)
 ];
 
 PT.glb = (function () {
@@ -30,9 +32,11 @@ PT.glb = (function () {
   const ALTURA_MANDRIL = 1.12;         // eixo do desbobinador dos modelos (m)
   function ativo(id) { return disponivel() && PT.GLB_NO_JOGO.indexOf(id) >= 0; }
 
+  // id do jogo → nome do arquivo .glb (quando são diferentes)
+  const ARQUIVO = { caminhao_entrega: 'caminhao_carroceria' };
   function carregar(id) {
     if (!cache[id]) cache[id] = new Promise((ok, erro) => {
-      new THREE.GLTFLoader().load(BASE + id + '.glb', g => { st.carregados++; adaptarMateriais(g.scene); ok(g.scene); }, undefined, e => { st.erros++; erro(e); });
+      new THREE.GLTFLoader().load(BASE + (ARQUIVO[id] || id) + '.glb', g => { st.carregados++; adaptarMateriais(g.scene); ok(g.scene); }, undefined, e => { st.erros++; erro(e); });
     });
     return cache[id];
   }
