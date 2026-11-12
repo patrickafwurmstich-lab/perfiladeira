@@ -181,8 +181,8 @@
     // endireitador: rolos alternados em cima e embaixo, ajuste por volantes
     const end = grupo('endireitador'); pos(end, -1.35, 0, 0);
     end.add(pos(caixa(1.1, 0.7, 1.5, TEAL_E, 'base', 0.03), 0, 0.35, 0));
-    [-1, 1].forEach(s => end.add(pos(caixa(1.1, 0.75, 0.1, TEAL, 'lateral', 0.03), 0, 1.0, s * 0.72)));
-    for (let i = 0; i < 7; i++) { const sup = i % 2 === 1; const r = grupo('rolo_endireitador_' + i); r.add(eixoZ(0.055, 1.36, COR.aco, 'rolo', 12)); pos(r, -0.42 + i * 0.14, sup ? 1.0 : 0.87, 0); end.add(r); }
+    [-1, 1].forEach(s => { [-0.5, 0.5].forEach(x => end.add(pos(caixa(0.1, 0.75, 0.1, TEAL, 'coluna_lateral', 0.03), x, 1.0, s * 0.72))); end.add(pos(caixa(1.1, 0.1, 0.1, TEAL, 'travessa_lateral', 0.02), 0, 0.68, s * 0.72)); });
+    for (let i = 0; i < 7; i++) { const sup = i % 2 === 1; const r = grupo('rolo_endireitador_' + i); r.add(eixoZ(0.055, 1.36, COR.aco, 'rolo', 12)); [-1, 1].forEach(s => r.add(pos(eixoZ(0.07, 0.05, AMARELO, 'mancal_rolo', 12), 0, 0, s * 0.7))); pos(r, -0.42 + i * 0.14, sup ? 1.0 : 0.87, 0); end.add(r); }
     end.add(pos(caixa(1.12, 0.1, 1.54, TEAL, 'tampa', 0.03), 0, 1.42, 0));
     [-0.3, 0, 0.3].forEach(x => { end.add(pos(cilindro(0.02, 0.18, COR.aco, 'fuso', 0.005, 8), x, 1.55, 0)); end.add(pos(cilindro(0.09, 0.03, AMARELO, 'volante', 0.01, 14), x, 1.65, 0)); });
     g.add(end);
@@ -191,8 +191,9 @@
     ali.add(pos(caixa(0.5, 0.75, 1.4, TEAL_E, 'base', 0.03), 0, 0.375, 0));
     ali.add(pos(eixoZ(0.07, 1.3, COR.borracha, 'rolo_puxador', 14), 0, 0.86, 0));
     ali.add(pos(eixoZ(0.06, 1.3, COR.aco, 'rolo_pressor', 14), 0, 1.0, 0));
-    ali.add(pos(eixoZ(0.08, 0.04, AMARELO, 'roda_medicao', 16), 0.18, 0.99, 0.45));
-    ali.add(pos(caixa(0.12, 0.1, 0.1, COR.grafite, 'encoder', 0.02), 0.18, 1.14, 0.45));
+    ali.add(pos(eixoZ(0.1, 0.05, AMARELO, 'roda_medicao', 16), 0.2, 1.0, 0.45));
+    ali.add(pos(rot(caixa(0.04, 0.3, 0.04, COR.grafite, 'braco_encoder', 0.01), 0, 0, 0.5), 0.13, 1.16, 0.45));
+    ali.add(pos(eixoZ(0.06, 0.12, COR.grafite, 'encoder', 12), 0.2, 1.0, 0.54));
     g.add(ali);
     g.add(pos(guilhotinaHidraulica('guilhotina_corte', 1.4, 1.65), 0.6, 0, 0));
     g.add(pos(unidadeHidraulica('unidade_hidraulica'), 0.6, 0, -1.05));
@@ -474,6 +475,7 @@
     [0, 1, 2].forEach(k => car.add(pos(caixa(0.06, 0.14, 2.45, k === 1 ? COR.madeira : COR.madeiraEsc, 'tabua_traseira', 0.01), -3.2, 1.04 + k * 0.155, 0)));
     car.add(pos(caixa(0.12, 1.3, 2.45, COR.grafite, 'protetor_cabine', 0.02), 3.15, 1.6, 0));
     for (let i = 0; i < 6; i++) [-1, 1].forEach(s => car.add(pos(caixa(0.06, 0.5, 0.08, COR.grafite, 'fueiro', 0.01), -2.9 + i * 1.16, 1.22, s * 1.22)));
+    for (let i = 0; i < 6; i++) [-1, 1].forEach(s => car.add(pos(caixa(0.08, 0.1, 0.06, AMARELO, 'gancho_amarracao', 0.01), -2.9 + i * 1.16, 0.83, s * 1.25)));
     g.add(car);
     g.add(pos(caixa(0.12, 0.2, 2.2, COR.vermelho, 'para_choque_traseiro', 0.02), -4.35, 0.55, 0));
     return g;

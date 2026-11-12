@@ -271,7 +271,7 @@
  },
  "guilhotina": {
   "id": "guilhotina",
-  "tris": 8164,
+  "tris": 9316,
   "med": {
    "x": 6.95,
    "y": 2.07,
@@ -401,7 +401,7 @@
  },
  "caminhao_carroceria": {
   "id": "caminhao_carroceria",
-  "tris": 5760,
+  "tris": 7056,
   "med": {
    "x": 8.905,
    "y": 2.825,
