@@ -30,18 +30,19 @@
 <script src="js/dados.js"></script>
 <script src="js/eventos.js"></script>
 <script src="js/modelos.js"></script>
+<script src="js/producao_modelos.js"></script>
 <script>
   const fichas = PT.fichaModelos();
-  const cats = ['Todas'].concat([...new Set(fichas.map(f => f.categoria))]);
+  const cats = ['Todas', 'Grupo 1 (Claude)', 'Grupo 2 (pack/modelador)'].concat([...new Set(fichas.map(f => f.categoria))]);
   let sel = 'Todas';
   function desenhar() {
     document.getElementById('filtros').innerHTML = cats.map(c => '<button class="' + (c === sel ? 'sel' : '') + '" data-c="' + c + '">' + c + '</button>').join('');
     document.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { sel = b.dataset.c; desenhar(); });
-    const l = fichas.filter(f => sel === 'Todas' || f.categoria === sel);
+    const l = fichas.filter(f => sel === 'Todas' || f.categoria === sel || (sel[6] === '1' && f.grupo === 1) || (sel[6] === '2' && f.grupo === 2));
     document.getElementById('total').textContent = l.length + ' modelo(s)';
     const linha = (k, v) => v && (!Array.isArray(v) || v.length) ? '<dt>' + k + '</dt><dd>' + (Array.isArray(v) ? v.join(', ') : v) + '</dd>' : '';
     document.getElementById('grade').innerHTML = l.map(f => '<div class="ficha"><h2>' + f.nome + '</h2><code>' + f.id + '</code><dl>' +
-      linha('Categoria', f.categoria) + linha('Dimensões', f.dims.join(' x ') + ' m (X × Z × altura)') + linha('Pivot', f.pivot) + linha('Colisor', f.colisor) +
+      linha('Quem faz', (f.grupo === 1 ? '🟢 Grupo 1 — ' : f.grupo === 2 ? '🟠 Grupo 2 — ' : '') + f.quemFaz + (f.obs ? ' (' + f.obs + ')' : '')) + linha('Categoria', f.categoria) + linha('Dimensões', f.dims.join(' x ') + ' m (X × Z × altura)') + linha('Pivot', f.pivot) + linha('Colisor', f.colisor) +
       linha('Animações', f.animacoes) + linha('Estados', f.estados) + linha('Encaixes', f.sockets) + linha('Polígonos', f.polys) +
       linha('Prioridade', f.prioridade) + linha('Materiais', f.materiais) + linha('Arquivo', f.arquivo) + linha('Notas', f.notas) + '</dl></div>').join('');
   }

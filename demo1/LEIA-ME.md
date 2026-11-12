@@ -4,7 +4,7 @@ Protótipo no navegador (HTML + JavaScript + three.js r128) **sem modelos 3D**: 
 Serve para testar o código, as funções e os parâmetros antes do Godot, e para gerar a lista de modelos 3D necessários.
 
 - Jogar: `index.html` (H mostra os controles)
-- Lista de modelos 3D: `modelos.html` (e aba "Modelos 3D" no computador do jogo, com botão para baixar .csv)
+- Lista de modelos 3D: `modelos.html` — cada ficha diz QUEM FAZ (🟢 grupo 1: Claude modela no Blender; 🟠 grupo 2: pack ithappy, asset pronto ou modelador; regras de estilo em `js/producao_modelos.js`) (e aba "Modelos 3D" no computador do jogo, com botão para baixar .csv)
 
 ## Um arquivo por sistema (`js/`)
 | Arquivo | O que faz |

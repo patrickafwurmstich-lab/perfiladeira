@@ -211,7 +211,7 @@
   // ====================== MODELOS 3D ======================
   function baixarModelos() {
     const f = PT.fichaModelos();
-    const cols = ['id', 'nome', 'categoria', 'dims', 'forma', 'usos', 'maxInstancias', 'animacoes', 'estados', 'sockets', 'polys', 'prioridade', 'pivot', 'colisor', 'multimesh', 'materiais', 'arquivo', 'notas'];
+    const cols = ['id', 'nome', 'grupo', 'quemFaz', 'obs', 'categoria', 'dims', 'forma', 'usos', 'maxInstancias', 'animacoes', 'estados', 'sockets', 'polys', 'prioridade', 'pivot', 'colisor', 'multimesh', 'materiais', 'arquivo', 'notas'];
     const e = v => '"' + String(Array.isArray(v) ? v.join(' | ') : (v === undefined ? '' : v)).replace(/"/g, '""') + '"';
     const csv = cols.join(';') + '\n' + f.map(m => cols.map(k => e(k === 'dims' ? m.dims.join(' x ') : m[k])).join(';')).join('\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); a.download = 'modelos_3d_parecis.csv'; a.click();
@@ -219,8 +219,8 @@
   reg('modelos', { nome: 'Modelos 3D', titulo: 'Modelos 3D — ferramenta interna', icone: 'modelos', larg: 920, alt: 560,
     abrir(c) {
       const f = PT.fichaModelos();
-      c.innerHTML = '<div class="m3"><div class="m3-barra"><b>' + f.length + '</b> fichas · <b>' + f.filter(m => m.usos > 0).length + '</b> já apareceram nesta partida <button data-csv>Exportar lista (.csv)</button></div><table class="m3-tab"><tr><th>ID</th><th>Nome</th><th>Categoria</th><th>Dimensões (m)</th><th>Usos</th><th>Máx.</th><th>Animações</th><th>Estados</th></tr>' +
-        f.map(m => '<tr class="' + (m.usos ? '' : 'apagado') + '"><td><code>' + m.id + '</code></td><td>' + esc(m.nome) + '</td><td>' + m.categoria + '</td><td>' + m.dims.join(' × ') + '</td><td>' + m.usos + '</td><td>' + m.maxInstancias + '</td><td>' + (m.animacoes || []).join(', ') + '</td><td>' + (m.estados || []).join(', ') + '</td></tr>').join('') + '</table></div>';
+      c.innerHTML = '<div class="m3"><div class="m3-barra"><b>' + f.length + '</b> fichas · <b>' + f.filter(m => m.usos > 0).length + '</b> já apareceram nesta partida · 🟢 grupo 1 (Claude): <b>' + f.filter(m => m.grupo === 1).length + '</b> · 🟠 grupo 2 (pack/modelador): <b>' + f.filter(m => m.grupo === 2).length + '</b> <button data-csv>Exportar lista (.csv)</button></div><table class="m3-tab"><tr><th>ID</th><th>Nome</th><th>Quem faz</th><th>Categoria</th><th>Dimensões (m)</th><th>Usos</th><th>Máx.</th><th>Animações</th><th>Estados</th></tr>' +
+        f.map(m => '<tr class="' + (m.usos ? '' : 'apagado') + '"><td><code>' + m.id + '</code></td><td>' + esc(m.nome) + '</td><td>' + (m.grupo === 1 ? '🟢 ' : '🟠 ') + esc(m.quemFaz) + '</td><td>' + m.categoria + '</td><td>' + m.dims.join(' × ') + '</td><td>' + m.usos + '</td><td>' + m.maxInstancias + '</td><td>' + (m.animacoes || []).join(', ') + '</td><td>' + (m.estados || []).join(', ') + '</td></tr>').join('') + '</table></div>';
       liga(c, '[data-csv]', baixarModelos);
     } });
 

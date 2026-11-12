@@ -198,8 +198,8 @@ PT.fichaModelos = function () {
       footprint: m.dims[0] + ' x ' + m.dims[1] + ' m',
       colisor: m.forma === 'cilindro' ? 'cilindro simples' : 'caixa do footprint',
       multimesh: mx > 20 ? 'sim (muitas instâncias)' : 'não',
-      materiais: 'metal pintado / metal galvanizado / borracha (slots trocáveis)',
+      materiais: 'cores chapadas numa textura de paleta (estilo ithappy), sem textura realista',
       arquivo: 'models/' + id + '.glb'
-    }, m);
+    }, m, (PT.PRODUCAO_MODELOS || {})[id] || { grupo: 0, quemFaz: 'a definir', obs: '' });
   });
 };
