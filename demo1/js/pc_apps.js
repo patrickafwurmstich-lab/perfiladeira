@@ -211,8 +211,8 @@
   // ====================== MODELOS 3D ======================
   function baixarModelos() {
     const f = PT.fichaModelos();
-    const cols = ['id', 'nome', 'grupo', 'quemFaz', 'obs', 'categoria', 'dims', 'forma', 'usos', 'maxInstancias', 'animacoes', 'estados', 'sockets', 'polys', 'prioridade', 'pivot', 'colisor', 'multimesh', 'materiais', 'arquivo', 'notas'];
-    const e = v => '"' + String(Array.isArray(v) ? v.join(' | ') : (v === undefined ? '' : v)).replace(/"/g, '""') + '"';
+    const cols = ['id', 'nome', 'grupo', 'quemFaz', 'obs', 'gratis', 'categoria', 'dims', 'forma', 'usos', 'maxInstancias', 'animacoes', 'estados', 'sockets', 'polys', 'prioridade', 'pivot', 'colisor', 'multimesh', 'materiais', 'arquivo', 'notas'];
+    const e = v => '"' + String(Array.isArray(v) ? v.map(x => Array.isArray(x) ? x.join(' ') : x).join(' | ') : (v === undefined ? '' : v)).replace(/"/g, '""') + '"';
     const csv = cols.join(';') + '\n' + f.map(m => cols.map(k => e(k === 'dims' ? m.dims.join(' x ') : m[k])).join(';')).join('\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); a.download = 'modelos_3d_parecis.csv'; a.click();
   }
