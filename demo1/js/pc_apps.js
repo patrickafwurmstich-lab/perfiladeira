@@ -226,10 +226,11 @@
 
   // ====================== CONFIGURAÇÕES ======================
   let novoJogoCliques = 0;
-  reg('config', { nome: 'Configurações', titulo: 'Configurações do sistema', icone: 'config', larg: 620, alt: 540,
+  reg('config', { nome: 'Configurações', titulo: 'Configurações do sistema', icone: 'config', larg: 620, alt: 660,
     abrir(c) {
       c.innerHTML = '<div class="cf"><section><h4>Personalizar</h4><label><input type="checkbox" data-som' + (PT.pc.st.som ? ' checked' : '') + '> Sons do sistema</label>' + '<label><input type="checkbox" data-glb' + (PT.glb && PT.glb.ligado() ? ' checked' : '') + '> Modelos 3D novos no lugar dos cubos (recarrega o jogo)</label>' +
         '<div class="cf-papeis">' + ['Entardecer no pátio', 'Noite na fábrica', 'Chapadão'].map((n, i) => '<button data-papel="' + i + '" class="papelmini papel' + i + (PT.pc.st.papel === i ? ' sel' : '') + '"><span>' + n + '</span></button>').join('') + '</div></section>' +
+        '<section><h4>Personagens 3D (ithappy)</h4><p class="cf-obs">O pack Creative Characters é seu (licença Fab) e não vai para o GitHub. Escolha o arquivo <b>personagens_ithappy.glb</b> (Documentos\\ParecisTelha\\personagens). Ele fica guardado neste navegador.</p><div class="cf-bts"><label class="btn">Escolher personagens_ithappy.glb<input type="file" data-pers accept=".glb" hidden></label><button data-a="tirarpers">Voltar aos cilindros</button></div><p class="cf-obs" data-pers-st></p></section>' +
         '<section><h4>Jogo salvo</h4><div class="cf-bts"><button data-a="salvar">Salvar agora (K)</button><button data-a="carregar">Carregar último (L)</button><button data-a="exportar">Exportar arquivo</button><label class="btn">Importar arquivo<input type="file" data-imp accept=".json" hidden></label></div>' +
         '<p class="cf-obs">O jogo só salva quando nada está acontecendo (sem carga na ponte, sem caminhão no pátio, sem cliente no balcão).</p><button data-a="novo" class="perigo">Novo jogo (apaga o save)</button></section>' +
         '<section><h4>Tempo</h4><button data-a="vel">Velocidade do tempo: x' + PT.tempo.vel + ' (T)</button></section>' +
@@ -237,6 +238,11 @@
         '<section class="cf-sobre"><img src="' + I('fabrica') + '" alt=""><div><b>ParecisOS</b> versão 1.0 (Demo 1)<br><small>Ícones: Fluent Emoji (Microsoft, licença MIT). Formiguinha Açucarada.</small></div></section></div>';
       const s = c.querySelector('[data-som]'); s.onchange = () => { PT.pc.st.som = s.checked; };
       const gl = c.querySelector('[data-glb]'); if (gl) gl.onchange = () => { PT.glb.definirLigado(gl.checked); PT.ev.emit('aviso', 'Vale depois de recarregar a página (salve antes).'); };
+      const ps = c.querySelector('[data-pers]'), pst = c.querySelector('[data-pers-st]');
+      if (PT.glb && pst) PT.glb.carregarPersonagens().then(g => { pst.textContent = g ? 'Personagens 3D carregados (' + g.animations.length + ' animações).' : 'Sem personagens 3D: usando cilindros.'; });
+      if (ps) ps.onchange = () => { const f = ps.files[0]; if (!f) return; pst.textContent = 'Lendo ' + f.name + '...';
+        PT.glb.guardarPersonagens(f).then(n => { pst.textContent = 'Pronto! ' + n + ' animações. Salve o jogo e recarregue a página.'; PT.ev.emit('aviso', 'Personagens 3D guardados. Recarregue a página (salve antes).'); })
+          .catch(e => { pst.textContent = 'Não deu: ' + e.message; }); };
       liga(c, '[data-papel]', x => { PT.pc.trocarPapel(+x.dataset.papel); PT.pc.redesenhar('config'); });
       liga(c, '[data-a]', x => {
         const a = x.dataset.a;
@@ -245,6 +251,7 @@
         if (a === 'exportar') PT.save.exportar();
         if (a === 'novo') { if (++novoJogoCliques < 2) { msg(false, 'Clique de novo para confirmar: o save atual será apagado.'); return; } try { localStorage.removeItem('parecis_demo1_save'); } catch (e) { } location.reload(); }
         if (a === 'vel') PT.tempo.alternarVel();
+        if (a === 'tirarpers') PT.glb.apagarPersonagens().then(() => msg(true, 'Personagens 3D removidos. Recarregue a página.'));
         if (a === 'pedido' && PT.DEBUG) PT.pedidos.gerar();
         if (a === 'dinheiro' && PT.DEBUG) PT.eco.lancar(20000, 'DEBUG: dinheiro de teste');
         if (a === 'noite' && PT.DEBUG) PT.tempo.pularNoite();

@@ -107,7 +107,7 @@ PT.mundo = (function () {
   function criarPersonagem() {
     jog.g = PT.modelo('personagem_dono', { semRotulo: true });
     const nariz = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.3), new THREE.MeshLambertMaterial({ color: 0xffcc99 }));
-    nariz.position.set(0, 1.5, 0.3); jog.g.add(nariz);                      // mostra para onde olha
+    nariz.position.set(0, 1.5, 0.3); jog.g.add(nariz); jog.g.userData.nariz = nariz;                      // mostra para onde olha
     scene.add(jog.g);
   }
 

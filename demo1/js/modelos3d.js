@@ -42,7 +42,7 @@ PT.glb = (function () {
   }
   // a Demo usa luz simples (Lambert, saída linear): o PBR do glTF fica escuro/metálico.
   // Troca por Lambert com a cor de volta em sRGB — mesmo visual da prévia, mais leve.
-  function adaptarMateriais(cena) {
+  function adaptarMateriais(cena, comPele) {
     const feitos = new Map();
     cena.traverse(o => {
       if (!o.isMesh) return;
@@ -51,6 +51,7 @@ PT.glb = (function () {
         const n = new THREE.MeshLambertMaterial({ color: m.color ? m.color.clone().convertLinearToSRGB() : 0xffffff, transparent: m.transparent, opacity: m.opacity, side: m.side });
         if (m.map) { m.map.encoding = THREE.LinearEncoding; n.map = m.map; n.color.set(0xffffff); }
         if (m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0) { n.emissive = m.emissive.clone().convertLinearToSRGB(); n.emissiveIntensity = m.emissiveIntensity; }
+        if (comPele || o.isSkinnedMesh) n.skinning = true;
         n.name = m.name; feitos.set(m, n); return n;
       };
       o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
@@ -62,7 +63,9 @@ PT.glb = (function () {
   }
   // chamado pelo PT.modelo logo depois de criar o placeholder
   function aplicar(g, id, opts) {
-    if (!disponivel() || opts.transparente || PT.GLB_NO_JOGO.indexOf(id) < 0) return;
+    if (!disponivel() || opts.transparente) return;
+    if (ROUPAS[id]) return aplicarPersonagem(g, id, opts);
+    if (PT.GLB_NO_JOGO.indexOf(id) < 0) return;
     const mesh = g.userData.mesh, altura = g.userData.altura;
     carregar(id).then(cena => {
       if (!mesh.parent) return;                       // objeto já foi removido
@@ -96,6 +99,120 @@ PT.glb = (function () {
       o.material.emissive = on ? o.userData.base.clone() : new THREE.Color(0); o.material.emissiveIntensity = on ? 0.9 : 0;
     });
   }
+  // =================== PERSONAGENS (ithappy Creative Characters FREE) ===================
+  // O pack é do Lucas (licença Fab): NÃO vai para o GitHub. O arquivo personagens_ithappy.glb
+  // (gerado pelo pers_blender2.py) é carregado do PC dele pelo app Configurações e fica guardado
+  // no navegador (IndexedDB). Rodando local, também lê ../privado/personagens_ithappy.glb.
+  // Um corpo + peças de roupa ligadas/desligadas por personagem; 15 animações.
+  const CORPO = ['Body_010'];
+  const ROUPAS = {
+    personagem_dono: [{ pecas: ['Male_emotion_usual_001', 'T_Shirt_009', 'Pants_014', 'Shoe_Sneakers_009'], capacete: 0xf5c84b }],
+    funcionario: [{ pecas: ['Male_emotion_usual_001', 'Outerwear_036', 'Pants_014', 'Shoe_Sneakers_009', 'Gloves_014'], capacete: 'cor' }],
+    cliente_balcao: [
+      { nome: 'pedreiro', pecas: ['Male_emotion_happy_002', 'Hairstyle_male_010', 'T_Shirt_009', 'Shorts_003', 'Socks_008', 'Shoe_Slippers_005', 'Moustache_001'] },
+      { nome: 'chacareiro', pecas: ['Male_emotion_usual_001', 'Hat_010', 'Outerwear_029', 'Pants_010', 'Shoe_Slippers_002', 'Moustache_002'] },
+      { nome: 'curioso', pecas: ['Male_emotion_happy_002', 'Hairstyle_male_012', 'Glasses_006', 'T_Shirt_009', 'Pants_010', 'Shoe_Sneakers_009'] }
+    ]
+  };
+  const ALTURA_MODELO = 1.86;
+  const vivos = [], contRoupa = {};            // {g, m, mix, acoes, atual, px, pz, v}
+  let fontePers = null;
+  const IDB = { db: 'parecis_telha', loja: 'arquivos', chave: 'personagens_ithappy' };
+  function idb(modo, valor) {
+    return new Promise((ok, erro) => {
+      let req; try { req = indexedDB.open(IDB.db, 1); } catch (e) { return erro(e); }
+      req.onupgradeneeded = () => req.result.createObjectStore(IDB.loja);
+      req.onerror = () => erro(req.error);
+      req.onsuccess = () => {
+        try {
+          const tx = req.result.transaction(IDB.loja, modo === 'gravar' ? 'readwrite' : 'readonly'), st = tx.objectStore(IDB.loja);
+          const r = modo === 'gravar' ? st.put(valor, IDB.chave) : modo === 'apagar' ? st.delete(IDB.chave) : st.get(IDB.chave);
+          r.onsuccess = () => ok(r.result); r.onerror = () => erro(r.error);
+        } catch (e) { erro(e); }
+      };
+    });
+  }
+  function analisar(buf) {
+    return new Promise((ok, erro) => new THREE.GLTFLoader().parse(buf, '', g => { adaptarMateriais(g.scene, true); ok(g); }, erro));
+  }
+  function carregarPersonagens() {
+    if (!fontePers) fontePers = idb('ler').catch(() => null)
+      .then(buf => buf || fetch('../privado/personagens_ithappy.glb').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null))
+      .then(buf => buf ? analisar(buf) : null)
+      .catch(e => { console.warn('[personagens]', e); return null; });
+    return fontePers;
+  }
+  // chamado pelo app Configurações com o arquivo escolhido pelo jogador
+  function guardarPersonagens(arquivo) {
+    return arquivo.arrayBuffer().then(buf => analisar(buf).then(g => {
+      if (!g.animations.length || !g.scene.getObjectByName('Body_010')) throw new Error('arquivo não é o personagens_ithappy.glb');
+      return idb('gravar', buf).then(() => g.animations.length);
+    }));
+  }
+  function capacete(cor) {
+    const c = new THREE.Group(), mat = new THREE.MeshLambertMaterial({ color: cor });
+    const domo = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat); domo.scale.set(1, 0.9, 1.08); c.add(domo);
+    const aba = new THREE.Mesh(new THREE.CylinderGeometry(0.175, 0.18, 0.018, 18), mat); aba.scale.set(1, 1, 1.12); aba.position.set(0, 0.005, 0.02); c.add(aba);
+    const viseira = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.014, 0.08), mat); viseira.position.set(0, 0.008, 0.19); c.add(viseira);
+    const crista = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.03, 0.3), mat); crista.position.set(0, 0.135, 0); c.add(crista);
+    c.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    return c;
+  }
+  function aplicarPersonagem(g, id, opts) {
+    const mesh = g.userData.mesh, altura = g.userData.altura;
+    carregarPersonagens().then(fonte => {
+      if (!fonte || !mesh.parent) return;
+      const lista = ROUPAS[id], roupa = lista[(contRoupa[id] = ((contRoupa[id] || 0) + 1)) % lista.length];   // cada cliente com uma roupa
+      if (g.userData.nariz) g.userData.nariz.visible = false;     // marcador de frente do cilindro
+      const m = THREE.SkeletonUtils.clone(fonte.scene);
+      const usar = CORPO.concat(roupa.pecas);
+      m.traverse(o => {
+        if (!o.isMesh) return;
+        o.visible = usar.indexOf(o.name) >= 0 || (o.parent && usar.indexOf(o.parent.name) >= 0);
+        o.castShadow = true; o.frustumCulled = false;   // malha com esqueleto: a caixa não acompanha a animação
+      });
+      if (roupa.capacete) {
+        const cor = roupa.capacete === 'cor' ? (opts.cor !== undefined ? opts.cor : 0xf5c84b) : roupa.capacete;
+        const cab = m.getObjectByName('Head'); const cap = capacete(cor);
+        m.updateMatrixWorld(true); cap.position.set(0, 1.705, -0.005); m.add(cap); m.updateMatrixWorld(true);
+        if (cab) cab.attach(cap);
+      }
+      m.scale.setScalar(altura / ALTURA_MODELO); m.position.y = -altura / 2;
+      esconderCubo(mesh); mesh.add(m); g.userData.glb = m; st.trocados++;
+      const mix = new THREE.AnimationMixer(m), acoes = {};
+      fonte.animations.forEach(c => { acoes[c.name] = mix.clipAction(c); });
+      ['Death_Backward', 'Death_Forward', 'Fall', 'Hit_Reaction_Light', 'Hit_Reaction_Heavy'].forEach(n => { if (acoes[n]) { acoes[n].setLoop(THREE.LoopOnce); acoes[n].clampWhenFinished = true; } });
+      const p = new THREE.Vector3(); g.getWorldPosition(p);
+      const ser = { g, m, mix, acoes, atual: null, px: p.x, pz: p.z, v: 0, dono: id === 'personagem_dono' };
+      trocar(ser, 'Idle_Relaxed'); vivos.push(ser);
+      g.userData.liberarGlb = () => { const i = vivos.indexOf(ser); if (i >= 0) vivos.splice(i, 1); };
+    });
+  }
+  function trocar(ser, nome) {
+    if (ser.atual === nome || !ser.acoes[nome]) return;
+    const nova = ser.acoes[nome], velha = ser.atual && ser.acoes[ser.atual];
+    nova.reset().play(); if (velha) nova.crossFadeFrom(velha, 0.2, false);
+    ser.atual = nome;
+  }
+  const _p = new THREE.Vector3();
+  function atualizar(dt) {
+    if (!vivos.length || dt <= 0) return;
+    for (let i = vivos.length - 1; i >= 0; i--) {
+      const s = vivos[i];
+      if (!s.g.parent) { vivos.splice(i, 1); continue; }      // personagem saiu da cena
+      s.g.getWorldPosition(_p);
+      const inst = Math.hypot(_p.x - s.px, _p.z - s.pz) / dt; s.px = _p.x; s.pz = _p.z;
+      s.v += (Math.min(inst, 12) - s.v) * Math.min(1, dt * 10);  // velocidade suavizada (m/s)
+      const morto = s.dono && PT.mundo && PT.mundo.jog && PT.mundo.jog.morto;
+      if (morto) trocar(s, 'Death_Backward');
+      else if (s.v > 3.4) { trocar(s, 'Run_Forward'); s.acoes.Run_Forward.timeScale = Math.min(1.6, s.v / 4.5); }
+      else if (s.v > 0.3) { trocar(s, 'Walk_Forward'); s.acoes.Walk_Forward.timeScale = Math.max(0.6, Math.min(2.2, s.v / 1.4)); }
+      else trocar(s, 'Idle_Relaxed');
+      s.mix.update(dt);
+    }
+  }
+
   function definirLigado(v) { try { localStorage.setItem('pt_cubos', v ? '0' : '1'); } catch (e) { } }
-  return { aplicar, carregar, st, ligado: () => ligado, definirLigado, luzTorre, ativo, ALTURA_MANDRIL };
+  return { aplicar, carregar, st, ligado: () => ligado, definirLigado, luzTorre, ativo, ALTURA_MANDRIL,
+           atualizar, carregarPersonagens, guardarPersonagens, apagarPersonagens: () => idb('apagar'), vivos };
 })();

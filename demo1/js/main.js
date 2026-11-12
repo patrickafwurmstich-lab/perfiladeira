@@ -37,6 +37,7 @@ window.PT = window.PT || {};
     PT.zoeira.atualizar(dt);
     PT.func.atualizar(dt);
     PT.balcao.atualizar(dt);
+    if (PT.glb) PT.glb.atualizar(dt);   // animação dos personagens 3D
     PT.ui.hud(performance.now());
     PT.mundo.render();
   }
