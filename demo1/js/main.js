@@ -9,6 +9,7 @@ window.PT = window.PT || {};
   PT.mundo.init(document.getElementById('cena'));
   PT.ponte.init();
   PT.zoeira.init();
+  PT.balcao.construir();
 
   let carregou = false;
   try { carregou = PT.save.carregarPendente(); } catch (e) { console.error(e); PT.ev.emit('aviso', 'Save inválido: ' + e.message); }
@@ -35,6 +36,7 @@ window.PT = window.PT || {};
     PT.construcao.atualizar(dt);
     PT.zoeira.atualizar(dt);
     PT.func.atualizar(dt);
+    PT.balcao.atualizar(dt);
     PT.ui.hud(performance.now());
     PT.mundo.render();
   }

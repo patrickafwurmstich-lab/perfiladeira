@@ -1,0 +1,249 @@
+/* =====================================================================
+   ParecisOS — sistema operacional do computador do escritório.
+   Regras da sala (ChatGPT): grade de 8 px, tema claro, bordas finas,
+   cada app com a identidade da sua "empresa", tabelas parecem tabelas,
+   nada de neon nem cartão arredondado em tudo.
+   ===================================================================== */
+.pcos { display: none; position: fixed; inset: 0; z-index: 30; font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; font-size: 13px; color: #1f2328; user-select: none; overflow: hidden; }
+.pcos input, .pcos select, .pcos button { font-family: inherit; }
+/* zera os estilos do jogo (botões escuros) dentro do ParecisOS — :where não aumenta a especificidade */
+:where(.pcos) button { background: none; border: 0; color: inherit; padding: 0; font-size: inherit; border-radius: 0; }
+:where(.pcos) button:hover { background: none; }
+:where(.pcos) input, :where(.pcos) select { background: #fff; color: #1f2328; border: 1px solid #b4bcc4; border-radius: 3px; padding: 4px 6px; font-size: 13px; }
+
+/* ---------- papel de parede (desenhado em CSS: pátio da fábrica) ---------- */
+.pc-papel { position: absolute; inset: 0; }
+.pc-papel::after { content: ""; position: absolute; left: 0; right: 0; bottom: 46px; height: 46%; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 400' preserveAspectRatio='none'><path d='M0 400V260h120v-40h60v40h90V180l140-60 140 60v80h60V150h18v-70h14v70h18v40h30V60h16v60h20v-40h14v110h120l170-70 170 70v90h80v-30h70v30h120V230l80-40 80 40v170z' fill='%23141a22' fill-opacity='.85'/><rect x='0' y='380' width='1600' height='20' fill='%230d1117'/></svg>") bottom / 100% 100% no-repeat; }
+.papel0 { background: linear-gradient(180deg, #2b4c7e 0%, #e48b5a 58%, #f6c27a 72%, #6b7f3a 100%); }
+.papel1 { background: radial-gradient(circle at 78% 22%, #f5f3d7 0 2.5%, transparent 3%), linear-gradient(180deg, #0b1530 0%, #1d2b52 60%, #2e3b28 100%); }
+.papel2 { background: linear-gradient(180deg, #8ec5e8 0%, #cfe7f3 55%, #b9a06a 72%, #7d8f3f 100%); }
+
+/* ---------- ícones da área de trabalho (coluna à esquerda, como no Windows) ---------- */
+.pc-area { position: absolute; top: 8px; left: 8px; bottom: 54px; display: flex; flex-direction: column; flex-wrap: wrap; align-content: flex-start; gap: 4px; }
+.pc-icone { position: relative; width: 88px; padding: 6px 4px 4px; background: transparent; border: 1px solid transparent; border-radius: 3px; color: #fff; text-shadow: 0 1px 2px #000, 0 0 4px #0008; cursor: default; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pc-icone img { width: 44px; height: 44px; filter: drop-shadow(0 2px 2px #0006); pointer-events: none; }
+.pc-icone span { font-size: 12px; line-height: 1.25; text-align: center; }
+.pc-icone:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.22); }
+.pc-icone.sel { background: rgba(120,170,255,.32); border-color: rgba(160,200,255,.6); }
+.pc-badge { position: absolute; top: 2px; right: 14px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #d93025; color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; text-shadow: none; display: none; }
+
+/* ---------- barra de tarefas ---------- */
+.pc-barra { position: absolute; left: 0; right: 0; bottom: 0; height: 46px; background: #e9edf2; border-top: 1px solid #b9c2cc; display: flex; align-items: center; gap: 4px; padding: 0 6px; z-index: 100000; }
+.pc-iniciar { height: 34px; padding: 0 12px 0 8px; border: 1px solid #9aa6b2; border-radius: 4px; background: linear-gradient(#fdfdfd, #dfe5eb); font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.pc-iniciar:hover { background: #fff; }
+.pc-logo { width: 18px; height: 18px; border-radius: 3px; background: conic-gradient(#e8742f 0 25%, #f2b632 0 50%, #3d8c40 0 75%, #2d6db5 0); }
+.pc-tarefas { flex: 1; display: flex; gap: 4px; overflow: hidden; }
+.pc-tarefa { height: 34px; max-width: 180px; padding: 0 10px; border: 1px solid transparent; border-radius: 4px; background: transparent; display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.pc-tarefa img { width: 20px; height: 20px; }
+.pc-tarefa:hover { background: #fff; border-color: #c6ced6; }
+.pc-tarefa.ativa { background: #fff; border-color: #9fb3c8; box-shadow: inset 0 -2px 0 #2d6db5; }
+.pc-tarefa.piscar { animation: pc-pisca 1s 4; background: #ffd27a; }
+@keyframes pc-pisca { 50% { background: #ffefc4; } }
+.pc-bandeja { display: flex; align-items: center; gap: 6px; padding-left: 8px; border-left: 1px solid #c6ced6; height: 34px; }
+.pc-saldo { height: 30px; padding: 0 10px; border: 1px solid #b7d3b9; border-radius: 4px; background: #f1f8f1; color: #1e5b24; font-weight: 600; cursor: pointer; }
+.pc-saldo.negativo { background: #fdecea; border-color: #e6a8a2; color: #a1271c; }
+.pc-sino { position: relative; width: 34px; height: 30px; border: 1px solid transparent; border-radius: 4px; background: transparent; cursor: pointer; }
+.pc-sino img { width: 20px; height: 20px; }
+.pc-sino:hover { background: #fff; border-color: #c6ced6; }
+.pc-sino .pc-badge { top: -4px; right: -4px; }
+.pc-relogio { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; padding: 0 6px; min-width: 56px; }
+.pc-relogio b { font-size: 13px; } .pc-relogio small { font-size: 11px; color: #57606a; }
+.pc-desligar { width: 30px; height: 30px; border: 1px solid #c6ced6; border-radius: 4px; background: #fff; cursor: pointer; color: #a1271c; font-size: 15px; }
+
+/* ---------- menu Iniciar e central de notificações ---------- */
+.pc-menu { position: absolute; left: 6px; bottom: 52px; width: 320px; background: #f7f8fa; border: 1px solid #aeb8c2; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.28); display: none; z-index: 100001; overflow: hidden; }
+.pc-menu.aberto { display: block; }
+.pc-menu-topo { display: flex; gap: 10px; align-items: center; padding: 12px; background: #2d4a6b; color: #fff; }
+.pc-menu-topo img { width: 36px; } .pc-menu-topo small { display: block; opacity: .8; }
+.pc-menu-lista { padding: 6px; max-height: 60vh; overflow: auto; }
+.pc-menu-lista button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 0; background: transparent; border-radius: 4px; text-align: left; cursor: pointer; font-size: 13px; }
+.pc-menu-lista button:hover { background: #dde7f3; }
+.pc-menu-lista img { width: 24px; height: 24px; }
+.pc-menu-rodape { border-top: 1px solid #d0d7de; padding: 6px; text-align: right; }
+.pc-menu-rodape button { border: 1px solid #c6ced6; background: #fff; border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+.pc-central { position: absolute; right: 6px; bottom: 52px; width: 340px; max-height: 70vh; overflow: auto; background: #f7f8fa; border: 1px solid #aeb8c2; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.28); display: none; z-index: 100001; }
+.pc-central.aberta { display: block; }
+.pc-central h4 { margin: 0; padding: 10px 12px; border-bottom: 1px solid #d0d7de; font-size: 14px; }
+.pc-central .grupo { padding: 8px 12px 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #57606a; }
+.pc-central .notif { margin: 4px 8px; padding: 8px 10px; background: #fff; border: 1px solid #dde2e7; border-radius: 4px; cursor: pointer; line-height: 1.4; }
+.pc-central .notif:hover { border-color: #9fb3c8; }
+.pc-central .notif small { color: #6e7781; }
+.pc-central .vazio { padding: 16px; color: #57606a; }
+.pc-toast { position: absolute; right: 12px; bottom: 58px; width: 300px; background: #fff; border: 1px solid #aeb8c2; border-left: 4px solid #2d6db5; border-radius: 4px; padding: 8px 12px; box-shadow: 0 6px 18px rgba(0,0,0,.25); z-index: 100002; transition: opacity .5s; line-height: 1.4; }
+.pc-toast b { display: block; } .pc-toast.sumir { opacity: 0; }
+
+/* ---------- janela (moldura comum a todos os apps) ---------- */
+.pc-janela { position: absolute; display: flex; flex-direction: column; background: #fff; border: 1px solid #8996a3; border-radius: 6px 6px 3px 3px; box-shadow: 0 10px 30px rgba(0,0,0,.32); overflow: hidden; resize: both; min-width: 320px; min-height: 200px; user-select: text; }
+.pc-titulo { height: 32px; flex: none; display: flex; align-items: center; gap: 8px; padding-left: 8px; background: #dfe5eb; border-bottom: 1px solid #b9c2cc; cursor: default; user-select: none; }
+.pc-janela.ativa .pc-titulo { background: #f3f5f8; }
+.pc-titulo img { width: 18px; height: 18px; }
+.pc-titulo span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; }
+.pc-titulo button { width: 44px; height: 31px; border: 0; background: transparent; cursor: pointer; font-size: 13px; color: #333; }
+.pc-titulo button:hover { background: #cfd6dd; }
+.pc-titulo .b-fechar:hover { background: #d93025; color: #fff; }
+.pc-corpo { flex: 1; overflow: auto; position: relative; }
+.pcos .pc-corpo button { cursor: pointer; }
+.pcos button:disabled { opacity: .5; cursor: not-allowed; }
+.pcos .sec { background: #fff; border: 1px solid #c6ced6; color: #24292f; border-radius: 4px; padding: 5px 10px; margin: 2px; }
+.pcos .sec:hover { background: #f3f4f6; }
+
+/* =============== IndústriaMT (loja) — laranja, cara de e-commerce brasileiro =============== */
+.mt header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #f36f21; color: #fff; }
+.mt-logo { font-size: 20px; font-weight: 300; letter-spacing: -.5px; } .mt-logo b { font-weight: 800; }
+.mt-busca { flex: 1; height: 32px; border: 0; border-radius: 2px; padding: 0 10px; font-size: 13px; }
+.mt-entrega { font-size: 12px; opacity: .95; white-space: nowrap; }
+.mt-corpo { display: flex; min-height: 100%; }
+.mt nav { width: 180px; flex: none; padding: 8px 0; border-right: 1px solid #e3e3e3; background: #fafafa; }
+.mt nav a { display: flex; justify-content: space-between; padding: 8px 16px; color: #333; cursor: pointer; }
+.mt nav a:hover { background: #fff1e8; } .mt nav a.sel { color: #d4570f; font-weight: 600; background: #fff; border-left: 3px solid #f36f21; padding-left: 13px; }
+.mt nav small { color: #999; }
+.mt-selo { margin: 16px; padding: 8px; border: 1px dashed #c9c9c9; font-size: 11px; color: #666; text-align: center; } .mt-selo small { display: block; font-size: 9px; color: #aaa; }
+.mt section { flex: 1; padding: 12px 16px; }
+.mt-faixa { font-size: 16px; font-weight: 600; padding-bottom: 8px; border-bottom: 1px solid #eee; margin-bottom: 12px; }
+.mt-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0; border-top: 1px solid #eee; border-left: 1px solid #eee; }
+.mt-item { padding: 12px; border-right: 1px solid #eee; border-bottom: 1px solid #eee; cursor: pointer; background: #fff; }
+.mt-item:hover { box-shadow: 0 2px 10px rgba(0,0,0,.12); position: relative; z-index: 1; }
+.mt-mini { height: 96px; display: flex; align-items: center; justify-content: center; background: #f5f5f5; margin-bottom: 8px; }
+.mt-mini img { width: 64px; }
+.mt-nome { font-size: 13px; line-height: 1.3; height: 34px; overflow: hidden; color: #333; }
+.mt-cond2 { font-size: 11px; color: #888; margin: 2px 0 4px; }
+.mt-preco2 { font-size: 18px; font-weight: 600; color: #222; }
+.mt-prazo { font-size: 11px; color: #00a650; }
+.mt-nada { padding: 24px; color: #777; }
+.mt-bobina { width: 58px; height: 58px; border-radius: 50%; background: radial-gradient(circle, #f5f5f5 0 22%, #6d7882 23% 26%, #c7ced4 27% 60%, #8f99a2 61% 63%, #dfe4e8 64%); box-shadow: inset 0 0 0 2px #7b858e; }
+.mt-voltar { padding: 8px 16px; font-size: 12px; } .mt-voltar a { color: #3483fa; cursor: pointer; }
+.mt-prod { display: flex; gap: 24px; padding: 8px 16px 16px; }
+.mt-foto { width: 260px; height: 220px; flex: none; display: flex; align-items: center; justify-content: center; background: #f5f5f5; border: 1px solid #eee; }
+.mt-foto img { width: 140px; } .mt-foto .mt-bobina { width: 150px; height: 150px; }
+.mt-info { flex: 1; }
+.mt-cond { font-size: 12px; color: #666; } .mt-cond.usado { color: #b45309; }
+.mt-info h2 { margin: 4px 0; font-size: 20px; font-weight: 600; }
+.mt-nota { color: #f36f21; font-size: 13px; } .mt-nota span { color: #ddd; }
+.mt-preco { font-size: 30px; font-weight: 300; margin: 8px 0 0; }
+.mt-sub { color: #00a650; font-size: 12px; margin-bottom: 8px; }
+.mt-finame { font-size: 12px; padding: 6px 8px; background: #eef6ff; border-left: 3px solid #3483fa; margin: 8px 0; } .mt-finame.off { background: #f6f6f6; border-color: #bbb; color: #666; }
+.mt-qtd { margin: 8px 0; } .mt-qtd select { margin-left: 8px; padding: 3px; }
+.mt-botoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.mt-comprar { background: #3483fa; color: #fff; border: 0; border-radius: 4px; padding: 10px 22px; font-size: 14px; font-weight: 600; }
+.mt-comprar:hover { background: #2968c8; }
+.mt-sec { background: #e3edfb; color: #3483fa; border: 0; border-radius: 4px; padding: 10px 18px; font-size: 14px; font-weight: 600; }
+.mt-aviso { background: #fff8e1; border: 1px solid #f3d27a; padding: 6px 8px; font-size: 12px; }
+.mt-h3 { margin: 8px 16px; font-size: 15px; font-weight: 600; }
+.mt-ficha { margin: 0 16px 8px; border-collapse: collapse; width: calc(100% - 32px); font-size: 12.5px; }
+.mt-ficha th, .mt-ficha td { padding: 6px 10px; border-bottom: 1px solid #eee; text-align: left; } .mt-ficha th { width: 210px; background: #fafafa; font-weight: 500; color: #555; }
+.mt-ficha tr:nth-child(odd) td { background: #fcfcfc; }
+.mt-aval { margin: 0 16px 16px; } .mt-aval p { border-bottom: 1px solid #f0f0f0; padding: 6px 0; margin: 0; line-height: 1.45; } .mt-aval b { color: #444; }
+
+/* =============== Banco Cerrado — verde institucional, conservador =============== */
+.bc header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #0f5132; color: #fff; }
+.bc-logo { font-size: 19px; } .bc-logo b { font-weight: 700; }
+.bc-conta { text-align: right; font-size: 12px; line-height: 1.4; opacity: .95; }
+.bc-resumo { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; border-bottom: 1px solid #d8dee4; }
+.bc-resumo > div { padding: 12px 16px; border-right: 1px solid #e5e9ed; line-height: 1.5; font-size: 14px; } .bc-resumo > div:last-child { border-right: 0; }
+.bc-resumo small { display: block; font-size: 11px; color: #57606a; text-transform: uppercase; letter-spacing: .03em; }
+.bc-resumo em { display: block; font-style: normal; font-size: 11px; color: #6e7781; }
+.bc-saldo b { font-size: 24px; color: #0f5132; } .bc-saldo b.neg { color: #a1271c; }
+.bc-acoes { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 16px; background: #f6f8fa; border-bottom: 1px solid #d8dee4; }
+.bc-acoes input { width: 110px; padding: 4px 6px; border: 1px solid #b4bcc4; border-radius: 2px; margin-left: 4px; }
+.bc-acoes button { background: #fff; border: 1px solid #0f5132; color: #0f5132; border-radius: 2px; padding: 5px 10px; }
+.bc-acoes button:hover:not(:disabled) { background: #0f5132; color: #fff; }
+.bc-agiota { margin: 10px 16px 0; padding: 8px 12px; background: #fff4e5; border: 1px solid #f0b46a; color: #7a3e00; }
+.bc-agiota button { margin-left: 8px; background: #b45309; color: #fff; border: 0; padding: 4px 10px; border-radius: 2px; }
+.bc-abas { display: flex; gap: 0; padding: 10px 16px 0; border-bottom: 1px solid #d8dee4; }
+.bc-abas a { padding: 6px 14px; cursor: pointer; color: #0f5132; border: 1px solid transparent; border-bottom: 0; margin-bottom: -1px; }
+.bc-abas a.sel { background: #fff; border-color: #d8dee4; font-weight: 600; }
+.bc-tab { padding: 0 16px 16px; }
+.bc-tabela { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+.bc-tabela th { text-align: left; font-weight: 600; color: #57606a; border-bottom: 2px solid #d8dee4; padding: 6px; }
+.bc-tabela td { padding: 5px 6px; border-bottom: 1px solid #eef1f4; } .bc-tabela tr:nth-child(even) td { background: #fafbfc; }
+.bc .num { text-align: right; font-variant-numeric: tabular-nums; } .bc .neg { color: #a1271c; } .bc .pos { color: #1a7f37; }
+.bc-texto { padding: 8px 0; line-height: 1.6; } .bc-letra { font-size: 11px; color: #6e7781; }
+
+/* =============== Correio — cliente de e-mail tradicional (3 colunas) =============== */
+.ml { display: flex; height: 100%; }
+.ml aside { width: 190px; flex: none; background: #f3f6fb; border-right: 1px solid #d5dde7; padding: 8px 0; }
+.ml-novo { margin: 0 12px 8px; width: calc(100% - 24px); padding: 7px; background: #0b62c4; color: #fff; border: 0; border-radius: 3px; }
+.ml aside a { display: flex; justify-content: space-between; padding: 7px 14px; cursor: pointer; color: #1f2d3d; }
+.ml aside a:hover { background: #e3eaf4; } .ml aside a.sel { background: #cfe0f5; font-weight: 600; }
+.ml aside a b { background: #0b62c4; color: #fff; border-radius: 9px; padding: 0 7px; font-size: 11px; }
+.ml-lista { width: 290px; flex: none; overflow: auto; border-right: 1px solid #d5dde7; }
+.ml-msg { padding: 8px 12px; border-bottom: 1px solid #eceff3; cursor: pointer; display: grid; line-height: 1.35; }
+.ml-msg span { color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ml-msg small { color: #888; font-size: 11px; }
+.ml-msg.novo { border-left: 3px solid #0b62c4; padding-left: 9px; } .ml-msg.novo b, .ml-msg.novo span { font-weight: 700; color: #000; }
+.ml-msg:hover { background: #f5f8fc; } .ml-msg.sel { background: #dbe8f7; }
+.ml-ler { flex: 1; overflow: auto; padding: 16px 20px; }
+.ml-ler h3 { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
+.ml-de { color: #555; font-size: 12px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+.ml-texto { padding: 14px 0; line-height: 1.6; white-space: pre-wrap; font-size: 13.5px; }
+.ml-acoes button { background: #0b62c4; color: #fff; border: 0; border-radius: 3px; padding: 7px 12px; margin-right: 6px; }
+.ml-acoes button.sec { background: #fff; color: #333; border: 1px solid #bbb; }
+.ml-status { padding: 8px; background: #f3f6fb; border: 1px solid #d5dde7; }
+.ml-vazio { padding: 20px; color: #777; }
+
+/* =============== Pedidos — sistema administrativo antigo, tabela densa =============== */
+.sc { font-family: Tahoma, Verdana, "Segoe UI", sans-serif; font-size: 12px; background: #ece9d8; min-height: 100%; display: flex; flex-direction: column; }
+.sc-menu { display: flex; gap: 0; background: #f5f4ea; border-bottom: 1px solid #c8c5b0; } .sc-menu span { padding: 4px 10px; cursor: default; } .sc-menu span:hover { background: #316ac5; color: #fff; }
+.sc-barra { display: flex; gap: 16px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #c8c5b0; } .sc-dica { margin-left: auto; color: #666; }
+.sc-grade { flex: 1; overflow: auto; margin: 6px 8px; background: #fff; border: 1px solid #7f9db9; min-height: 120px; }
+.sc-grade table { border-collapse: collapse; width: 100%; }
+.sc-grade th { position: sticky; top: 0; background: #ebeadb; border: 1px solid #c8c5b0; padding: 3px 6px; text-align: left; font-weight: normal; }
+.sc-grade td { border-right: 1px solid #eee; border-bottom: 1px solid #eee; padding: 3px 6px; white-space: nowrap; }
+.sc-grade tr:nth-child(even) td { background: #f7f7f7; }
+.sc-grade tr.sel td { background: #316ac5 !important; color: #fff; }
+.sc-grade tr.s-oferta td:nth-child(8) { color: #b45309; font-weight: bold; } .sc-grade tr.s-coleta td:nth-child(8) { color: #1a7f37; font-weight: bold; }
+.sc .num { text-align: right; }
+.sc-det { margin: 0 8px 6px; border: 1px solid #c8c5b0; background: #f5f4ea; } .sc-det legend { font-weight: bold; }
+.sc-cols { display: flex; gap: 24px; line-height: 1.6; } .sc-bts { margin-top: 6px; }
+.sc-bts button { background: #f5f4ea; border: 1px solid #003c74; border-radius: 3px; padding: 3px 12px; margin-right: 6px; font-family: Tahoma, sans-serif; font-size: 12px; }
+.sc-bts button:hover { background: #fff; }
+.sc-status { border-top: 1px solid #c8c5b0; padding: 3px 8px; color: #444; background: #ece9d8; }
+
+/* =============== Trabalhe Conosco MT — amarelo/preto, site de empregos regional =============== */
+.tc header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #ffcc00; border-bottom: 3px solid #1c1c1c; }
+.tc-logo { font-size: 20px; font-weight: 800; color: #1c1c1c; } .tc-logo b { color: #fff; background: #1c1c1c; padding: 0 5px; margin-left: 2px; } .tc-logo span { font-size: 12px; margin-left: 6px; border: 2px solid #1c1c1c; padding: 0 4px; }
+.tc-vagas { font-size: 13px; }
+.tc-greve { margin: 10px 16px 0; padding: 8px 12px; background: #fdecea; border: 1px solid #e6a8a2; color: #a1271c; font-weight: 600; } .tc-greve button { margin-left: 8px; }
+.tc-abas { display: flex; padding: 10px 16px 0; gap: 4px; border-bottom: 2px solid #1c1c1c; }
+.tc-abas a { padding: 6px 12px; cursor: pointer; font-weight: 600; color: #555; } .tc-abas a.sel { background: #1c1c1c; color: #ffcc00; }
+.tc-lista { padding: 8px 16px; }
+.tc-cand { display: grid; grid-template-columns: 48px 1.3fr 1fr 120px; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid #e5e5e5; }
+.tc-foto { width: 48px; height: 48px; border-radius: 50%; background: #e8e2c8; color: #6b5e2c; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; }
+.tc-dados { display: grid; gap: 2px; } .tc-dados span { color: #666; font-size: 12px; } .tc-dados q { color: #444; font-style: italic; font-size: 12px; }
+.tc-at { display: grid; grid-template-columns: 80px 1fr 24px; gap: 6px; align-items: center; font-size: 11px; color: #555; }
+.tc-at i { height: 6px; background: #eee; } .tc-at s { display: block; height: 100%; background: #1c1c1c; } .tc-at b { text-align: right; }
+.tc-sal { text-align: right; font-weight: 700; font-size: 14px; } .tc-sal small { display: block; font-weight: 400; color: #888; font-size: 11px; }
+.tc-sal button { margin-top: 6px; background: #1c1c1c; color: #ffcc00; border: 0; padding: 6px 12px; font-weight: 700; }
+.tc-tab { width: calc(100% - 32px); margin: 8px 16px; border-collapse: collapse; font-size: 12px; } .tc-tab th { text-align: left; border-bottom: 2px solid #1c1c1c; padding: 6px; } .tc-tab td { border-bottom: 1px solid #eee; padding: 6px; vertical-align: top; }
+.tc-rod, .tc-vazio { padding: 8px 16px; color: #666; font-size: 12px; }
+.tc-quadro { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 12px 16px; } .tc-quadro > div { border: 2px solid #1c1c1c; padding: 10px; display: grid; gap: 4px; background: #fffbe6; } .tc-quadro small { color: #666; }
+.tc h4 { margin: 8px 16px 4px; } .tc-tarefas { margin: 0 16px; padding-left: 18px; line-height: 1.7; }
+
+/* =============== Reputação =============== */
+.rp { padding: 16px 20px; } .rp-topo { display: flex; gap: 20px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #eee; margin-bottom: 12px; line-height: 1.5; }
+.rp-est { font-size: 28px; color: #e8a400; white-space: nowrap; } .rp-est span { font-size: 18px; color: #333; margin-left: 6px; }
+.rp-b { display: grid; grid-template-columns: 160px 1fr 44px; gap: 10px; align-items: center; margin: 8px 0; } .rp-b i { height: 10px; background: #eef0f2; } .rp-b s { display: block; height: 100%; background: #e8a400; } .rp-b b { text-align: right; }
+.rp h4 { margin: 18px 0 6px; } .rp-mural { border-collapse: collapse; width: 100%; } .rp-mural td { padding: 5px 4px; border-bottom: 1px solid #f0f0f0; } .rp-mural td:last-child { text-align: right; font-weight: 600; }
+
+/* =============== Jornal Parecis Agora — papel de jornal, serifa =============== */
+.jn { background: #f7f3ea; min-height: 100%; padding: 12px 20px; font-family: Georgia, "Times New Roman", serif; color: #222; }
+.jn header { text-align: center; border-bottom: 3px double #222; padding-bottom: 6px; } .jn h1 { margin: 0; font-size: 34px; letter-spacing: 1px; } .jn header div { font-size: 11px; font-family: system-ui, sans-serif; color: #555; }
+.jn-man { border-bottom: 1px solid #aaa; padding: 10px 0; } .jn-man h2 { margin: 0 0 6px; font-size: 22px; line-height: 1.2; } .jn-man p { margin: 0; line-height: 1.5; }
+.jn-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; } .jn-cols article { border-bottom: 1px solid #ccc; padding: 8px 0; } .jn-cols h3 { margin: 0 0 4px; font-size: 15px; } .jn-cols p { margin: 0; font-size: 12.5px; color: #444; }
+.jn-merc { margin-top: 10px; font-family: system-ui, sans-serif; font-size: 12px; background: #222; color: #f7f3ea; padding: 6px 10px; }
+
+/* =============== Clima =============== */
+.cl { padding: 16px; background: linear-gradient(#5a9bd8, #a9d2f2); min-height: 100%; color: #fff; text-shadow: 0 1px 2px #0005; }
+.cl-hoje { display: flex; gap: 18px; align-items: center; } .cl-hoje span { font-size: 56px; } .cl-hoje b { font-size: 40px; } .cl-hoje small { opacity: .9; }
+.cl-prox { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 16px; } .cl-prox div { background: rgba(255,255,255,.18); padding: 8px; text-align: center; display: grid; gap: 2px; } .cl-prox span { font-size: 24px; }
+.cl-obs { margin-top: 12px; font-size: 12px; opacity: .95; }
+
+/* =============== Modelos 3D, Configurações, Lixeira =============== */
+.m3-barra { display: flex; gap: 12px; align-items: center; padding: 8px 12px; background: #f6f8fa; border-bottom: 1px solid #d8dee4; } .m3-barra button { margin-left: auto; background: #24292f; color: #fff; border: 0; padding: 5px 10px; border-radius: 3px; }
+.m3-tab { width: 100%; border-collapse: collapse; font-size: 12px; } .m3-tab th { text-align: left; position: sticky; top: 0; background: #fff; border-bottom: 2px solid #d8dee4; padding: 5px 8px; } .m3-tab td { border-bottom: 1px solid #eef1f4; padding: 4px 8px; vertical-align: top; } .m3-tab tr.apagado { color: #999; } .m3-tab code { font-size: 11px; }
+.cf { padding: 4px 0; } .cf section { padding: 10px 16px; border-bottom: 1px solid #eef1f4; } .cf h4 { margin: 0 0 8px; font-size: 13px; color: #57606a; text-transform: uppercase; letter-spacing: .03em; }
+.cf button, .cf .btn { background: #fff; border: 1px solid #c6ced6; border-radius: 4px; padding: 6px 10px; margin: 2px 4px 2px 0; display: inline-block; cursor: pointer; font-size: 13px; color: #1f2328; }
+.cf button:hover, .cf .btn:hover { background: #f3f4f6; } .cf .perigo { color: #a1271c; border-color: #e6a8a2; }
+.cf-obs { font-size: 12px; color: #6e7781; margin: 6px 0; }
+.cf-papeis { display: flex; gap: 8px; margin-top: 8px; } .papelmini { width: 120px; height: 70px; position: relative; border: 2px solid transparent !important; padding: 0 !important; } .papelmini.sel { border-color: #2d6db5 !important; } .papelmini span { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 11px; padding: 2px; }
+.cf-sobre { display: flex; gap: 12px; align-items: center; border-bottom: 0 !important; } .cf-sobre img { width: 40px; }
+.lx { padding: 12px; } .lx table { width: 100%; border-collapse: collapse; margin-bottom: 10px; } .lx td, .lx th { text-align: left; padding: 5px 6px; border-bottom: 1px solid #eee; font-size: 12.5px; }

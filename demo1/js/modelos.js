@@ -25,6 +25,16 @@ PT.MODELOS = {
     notas: 'Reaproveitar o rig do dono; variar só cabelo/uniforme/cor do crachá. ajudante.txt do Blender já existe como base.' },
   armario: { nome: 'Armário de vestiário', categoria: 'Instalação', dims: [0.6, 0.5, 1.9], forma: 'caixa', cor: 0x7fb3d5, estados: ['fechado', 'aberto'], polys: '400', prioridade: 'Demo' },
 
+  cliente_balcao: { nome: 'Cliente a pé (pedreiro, chacareiro, curioso)', categoria: 'Personagens', dims: [0.5, 0.35, 1.7], forma: 'cilindro', cor: 0x8e6c4a,
+    animacoes: ['andar', 'esperar impaciente', 'tocar o sino', 'pechinchar', 'ir embora bravo', 'tomar café'], estados: ['variações de roupa/chapéu'], polys: '6–9k (rig dos funcionários)', prioridade: 'Demo' },
+  galinha: { nome: 'Galinha caipira (pagamento do Seu Lauro)', categoria: 'Zoeira', dims: [0.35, 0.25, 0.4], forma: 'cilindro', cor: 0xe8c547, animacoes: ['ciscar', 'andar', 'cacarejar', 'fugir do jogador'], polys: '1–2k', prioridade: 'Demo' },
+  loja_balcao: { nome: 'Loja de balcão (prédio 12 x 8 m no pátio)', categoria: 'Estrutura', dims: [12, 8, 3.2], forma: 'caixa', cor: 0xd9c7a7,
+    sockets: ['porta da rua', 'porta para o barracão', 'parede do mostruário', 'letreiro da fachada'], polys: '6–10k', prioridade: 'Demo', notas: 'Fachada com letreiro "Parecis Telha — pronta entrega" e toldo.' },
+  balcao_loja: { nome: 'Balcão de atendimento (madeira)', categoria: 'Estrutura', dims: [9, 1.1, 0.7], forma: 'caixa', cor: 0x8b5a2b, sockets: ['sino', 'caderno de pedidos', 'garrafa de café'], polys: '1–2k', prioridade: 'Demo' },
+  sino_balcao: { nome: 'Sino de balcão', categoria: 'Estrutura', dims: [0.15, 0.15, 0.12], forma: 'cilindro', cor: 0xd4ac0d, animacoes: ['plim-plim'], polys: '300', prioridade: 'Demo' },
+  garrafa_cafe: { nome: 'Garrafa térmica + copinhos', categoria: 'Decoração', dims: [0.4, 0.4, 0.9], forma: 'cilindro', cor: 0x922b21, polys: '500', prioridade: 'Demo', notas: 'Bônus: cliente espera 30% mais.' },
+  mostruario: { nome: 'Mostruário de telhas (amostras na parede)', categoria: 'Decoração', dims: [2.0, 0.4, 1.8], forma: 'caixa', cor: 0x95a5a6, estados: ['organizado', 'caído (zoeira)'], polys: '2–3k', prioridade: 'Demo', notas: 'Pedaços de cada família de telha/perfil. Bônus: +3% no preço do balcão.' },
+
   // ---------- ESTRUTURA ----------
   barracao_132x40: { nome: 'Barracão 132 x 40 m (casca)', categoria: 'Estrutura', dims: [132, 40, 12.5], forma: 'caixa', cor: 0x9aa4ad,
     estados: ['novo', 'abandonado (2º barracão)'], sockets: ['portão entrada', 'portão saída', 'trilhos da ponte', 'pontos de luz'],

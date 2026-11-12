@@ -45,6 +45,8 @@ PT.DADOS = {
       rejeitados:  { x0: 92, x1: 100, z0: 34, z1: 40, cor: 0xc0392b, nome: 'REJEITADOS' }
     },
     escritorio: { x0: 0, x1: 8, z0: 32, z1: 40 },
+    portaFrente: { x0: 18, x1: 20 },                          // porta de pedestre na frente do barracão
+    loja: { x0: 13, x1: 25, z0: -11, z1: -3, balcaoZ: -6.5, portaX: 19 },   // loja de balcão no pátio
     porta: { x: 9, z: 36 },                // respawn
     computador: { x: 4, z: 36 },
     quadro: { x: 12, z: 39.6, capacidadeKW: 40 },
@@ -114,6 +116,10 @@ PT.DADOS = {
       dims: [1.2, 0.3, 0.3], pesoKg: 90, modelo: 'mandril' },
     { id: 'armario', categoria: 'Instalação', nome: 'Armário de vestiário (+1 vaga de funcionário)', preco: 650, estado: 'Novo', prazoDias: 2, frete: 60, volume: 'pequeno',
       dims: [0.6, 0.5, 1.9], pesoKg: 40, modelo: 'armario', decor: true },
+    { id: 'garrafa_cafe', categoria: 'Decoração', nome: 'Garrafa térmica + copinhos (cafezinho na loja)', preco: 85, estado: 'Nova', prazoDias: 1, frete: 0, volume: 'pequeno',
+      dims: [0.4, 0.4, 0.9], pesoKg: 6, modelo: 'garrafa_cafe', decor: true, aviso: 'Vendedor: "Cliente com café na mão espera mais e reclama menos!"' },
+    { id: 'mostruario', categoria: 'Decoração', nome: 'Mostruário de telhas (amostras na parede)', preco: 950, estado: 'Novo', prazoDias: 2, frete: 60, volume: 'pequeno',
+      dims: [2.0, 0.4, 1.8], pesoKg: 60, modelo: 'mostruario', decor: true },
     { id: 'quadro_80kw', categoria: 'Instalação', nome: 'Quadro elétrico 80 kW', preco: 6500, estado: 'Novo', prazoDias: 3, frete: 150, volume: 'pequeno',
       upgradeQuadroKW: 80, modelo: 'quadro_eletrico' },
     { id: 'saco_cimento', categoria: 'Instalação', nome: 'Saco de cimento (conserta piso)', preco: 38, estado: 'Novo', prazoDias: 1, frete: 0, volume: 'pequeno',
@@ -168,6 +174,21 @@ PT.DADOS = {
     limiarTombo: 12,           // risco = |vel| × |giro| × (1 + garfo×fatorAltura) × (1 + peso/capacidade)
     fatorAltura: 1.2, consumoBateriaPorSeg: 1 / 900, horasRecarga: 1, minutosDesvirar: 10,   // Gemini: recarga e desvirar mais curtos (ritmo arcade)
     alertaBateria: 0.15
+  },
+
+  // ---------------- LOJA DE BALCÃO (clientes a pé) ----------------
+  balcao: {
+    horaAbre: 8, horaFecha: 16, chancePorHora: 0.5, filaMax: 3,
+    pacienciaMin: 50, bonusCafe: 0.3, bonusMostruario: 0.03, velocidade: 1.3,
+    descontoPedido: 0.05, chanceAceitarSemDesconto: 0.5, margemProntaEntrega: 0.05,
+    tipos: {
+      pedreiro: { peso: 0.45, nome: 'Pedreiro', qtd: [6, 20], pechincha: 0.6 },
+      chacara: { peso: 0.25, nome: 'Dono de chácara', qtd: [4, 12], pechincha: 0.3 },
+      curioso: { peso: 0.15, nome: 'Curioso', qtd: [1, 1], pechincha: 0.0 },
+      escambo: { peso: 0.15, nome: 'Seu Lauro do sítio', qtd: [3, 8], pechincha: 0.0 }
+    },
+    nomes: ['Seu Dito', 'Dona Neide', 'Marcão', 'Juca da Olaria', 'Toninho', 'Dona Zefa', 'Rafa do Sítio', 'Seu Brás'],
+    falasCurioso: ['Essa telha aguenta granizo do tamanho de laranja?', 'Se eu colocar no telhado do cachorro, ele fica rico de sombra?', 'Por que é ondulada? Não podia ser reta?', 'Ô moço, isso aqui é aço mesmo ou é papel prateado?']
   },
 
   // ---------------- REPUTAÇÃO ----------------

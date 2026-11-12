@@ -70,10 +70,12 @@
   .balanca { display: flex; align-items: center; gap: 8px; font-size: 11px; margin: 8px 0; max-width: 780px; } .trilhoB { position: relative; flex: 1; height: 14px; background: #4a1c1c; border-radius: 7px; } .trilhoB .seguro { position: absolute; top: 0; bottom: 0; background: #1e8449; border-radius: 7px; } .trilhoB .ponto { position: absolute; top: -4px; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: #f4d03f; border: 2px solid #111; } .trilhoB .ponto.ruim { background: #e74c3c; }
   .cgBarra { display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; }
   #carga .caixa { overflow-x: auto; }
+  #balcao .fala { font-size: 16px; line-height: 1.5; background: #1c2833; padding: 10px 14px; border-left: 4px solid #f4d03f; } #balcao .info { font-size: 13px; color: #ccd1d1; } #balcao .botoes { flex-direction: column; } #balcao .botoes button { text-align: left; padding: 10px 14px; }
   #morte { display: none; position: fixed; inset: 0; background: radial-gradient(transparent, rgba(80,0,0,.7)); align-items: center; justify-content: center; text-align: center; z-index: 20; pointer-events: none; }
   #morte h1 { font-size: 46px; text-shadow: 0 3px 10px #000; }
   @media (max-width: 760px) { #celular { width: 200px; font-size: 11px; } #hud { font-size: 12px; min-width: 0; } }
 </style>
+<link rel="stylesheet" href="css/pcos.css">
 </head>
 <body>
 <div id="cena"></div>
@@ -88,6 +90,7 @@
   <b>E</b> ação principal · <b>1–4</b> ações extras (aparecem embaixo da tela)<br>
   <b>Ponte (botoeira):</b> WASD move · <b>R/F</b> sobe/desce gancho · <b>Espaço</b> engata/solta · <b>Shift</b> precisão · <b>E</b> larga<br>
   <b>Empilhadeira:</b> E entra/sai · <b>C</b> cinto · W/S anda · A/D vira · <b>R/F</b> garfo · <b>Espaço</b> pega/solta (bobina só com mandril)<br>
+  <b>Loja de balcão:</b> fica no pátio, na frente do barracão (porta da frente). Fique atrás do balcão e aperte E para atender.<br>
   <b>Construção:</b> mouse posiciona · <b>R</b> gira · <b>clique/Enter</b> instala · <b>Esc</b> cancela<br>
   <b>TAB</b> prancheta · <b>T</b> velocidade do tempo (x1/x5/x20/x60) · <b>P</b> pausa · <b>K</b> salvar · <b>L</b> carregar · <b>H</b> esta ajuda<br><br>
   <b>Roteiro do teste:</b> espere o caminhão do Seu Tião → tire a perfiladeira e a bobina da carroceria com a ponte → abra o engradado e instale → puxe o cabo do quadro → monte a bobina no desbobinador (solte-a com a ponte na ponta da máquina) → CLP: ligar, alinhar, START → tire a pilha com a paleteira até a zona VERDE → aceite um pedido no computador → carregue o caminhão da coleta. Para a zoeira: compre a bobina de 2 t e tente erguer com a ponte de 1,5 t.
@@ -98,6 +101,7 @@
 <div id="ligacao" class="modal"><div class="caixa"></div></div>
 <div id="progresso" class="modal"><div class="caixa"></div></div>
 <div id="carga" class="modal"><div class="caixa"></div></div>
+<div id="balcao" class="modal"><div class="caixa"></div></div>
 <div id="morte"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -119,8 +123,11 @@
 <script src="js/pedidos.js"></script>
 <script src="js/carregamento.js"></script>
 <script src="js/funcionarios.js"></script>
+<script src="js/balcao.js"></script>
 <script src="js/zoeira.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/pc.js"></script>
+<script src="js/pc_apps.js"></script>
 <script src="js/save.js"></script>
 <script src="js/main.js"></script>
 </body>

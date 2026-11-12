@@ -28,7 +28,12 @@ Serve para testar o código, as funções e os parâmetros antes do Godot, e par
 | reputacao.js | 3 barras → estrelas, faixas por entregas |
 | zoeira.js | Placa de dias sem acidentes, morte/respawn, boleto simbólico, cicatrizes no piso |
 | save.js | Save JSON com `save_version`, só em estado estável, exportar/importar |
+| pc.js | ParecisOS: área de trabalho, ícones, barra de tarefas (Iniciar, saldo, notificações, relógio), janelas arrastáveis |
+| pc_apps.js | Apps do PC, cada um com cara de empresa: IndústriaMT, Banco Cerrado, Correio, Pedidos, Trabalhe Conosco MT, Reputação, Jornal, Clima, Modelos 3D, Configurações, Lixeira |
+| balcao.js | Loja de balcão no pátio: clientes a pé, fila, paciência, pronta entrega, encomenda, desconto, escambo, café e mostruário |
 | ui.js | HUD, celular, computador (Loja/Banco/E-mail/Pedidos/Reputação/Modelos 3D/Sistema), CLP, prancheta, minijogos |
 | main.js | Inicialização e laço principal |
 
 Revisado pela "sala" de IAs (Claude escreve; ChatGPT, Gemini e Grok revisam).
+
+Ícones do ParecisOS: Fluent Emoji (Microsoft, licença MIT) — veja img/icones/LICENCA_FLUENT_EMOJI_MIT.txt.

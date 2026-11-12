@@ -39,7 +39,7 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
     const mail = PT.ui.salvarCorreio().find(m => m.pedidoId === ped.id && /Chamada perdida/.test(m.assunto));
     return { aberta, mail: !!mail, status: ped.status };
   });
-  ok(r.aberta && r.mail && r.status === 'oferta', 'W5 ligação fechada sem responder vira "chamada perdida" no e-mail e o pedido continua em aberto');
+  ok(r.aberta && r.mail && r.status === 'oferta', 'W5 ' + JSON.stringify(r) + ' ligação fechada sem responder vira "chamada perdida" no e-mail e o pedido continua em aberto');
   await p.evaluate(() => PT.ui.cancelarInteracoes());
   // W6: caminhão travado pelo corredor desiste e volta amanhã
   r = await p.evaluate(() => {
@@ -67,7 +67,7 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
   r = await p.evaluate(() => { T.frames(400, 0.1); PT.entrega.st.fila = []; T.pilhaVerde(10, 4); const ped = T.pedido(20, 4); PT.pedidos.aceitar(ped.id); const c = T.coletaChegar(ped.id); const n0 = c.g.children.length; T.ir(115, 9); T.fazer(/direto/); return c.g.children.length - n0; });
   ok(r > 0, 'W8 coleta mostra a carga na carroceria (' + r + ' volume(s) visuais)');
   // W9: debug escondido
-  r = await p.evaluate(() => { PT.ui.abrirComputador(); document.querySelector('[data-aba="Sistema"]').click(); return !!document.querySelector('[data-acao="dinheiro"]'); });
+  r = await p.evaluate(() => { PT.ui.cancelarInteracoes(); PT.pc.abrir(); PT.pc.abrirApp('config'); return !!document.querySelector('.pcos [data-a="dinheiro"]'); });
   ok(r === false, 'W9 botão de dinheiro de teste escondido sem ?debug=1');
   console.log(out.join('\n'));
   console.log('ERROS:\n' + erros.join('\n'));

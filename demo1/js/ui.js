@@ -13,19 +13,20 @@ PT.ui = (function () {
   function el(tag, attrs, html) { const e = document.createElement(tag); Object.assign(e, attrs || {}); if (html !== undefined) e.innerHTML = html; return e; }
   function modalAberto() { return !!st.modal; }
   function capturandoTeclado() { const a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'SELECT' || a.tagName === 'TEXTAREA'); }
-  function abrirModal(nome) { st.modal = nome; ['computador', 'clp', 'minijogo', 'ligacao', 'progresso', 'carga'].forEach(n => $(n).style.display = n === nome ? 'flex' : 'none'); }
+  function abrirModal(nome) { st.modal = nome; ['computador', 'clp', 'minijogo', 'ligacao', 'progresso', 'carga', 'balcao'].forEach(n => $(n).style.display = n === nome ? 'flex' : 'none'); }
   // fecharModal(false) = trocar de janela sem liberar a fila de ligações (ex.: CLP → minijogo) — ChatGPT, bug 5
   function fecharModal(chamarFila) {
     if (st.modal === 'minijogo' || st.modal === 'progresso') return;
     if (st.modal === 'ligacao') ligacaoPerdida();
-    st.modal = null; ['computador', 'clp', 'ligacao', 'carga'].forEach(n => $(n).style.display = 'none');
+    st.modal = null; ['computador', 'clp', 'ligacao', 'carga', 'balcao'].forEach(n => $(n).style.display = 'none');
     if (chamarFila !== false) proximaLigacao();
   }
   // token: minijogo/progresso só executam o callback se a interação ainda for válida (morte cancela) — ChatGPT, bug 4
   let token = 0;
   function cancelarInteracoes() {
     token++; if (st.modal === 'ligacao') ligacaoPerdida();
-    st.modal = null; ['computador', 'clp', 'minijogo', 'ligacao', 'progresso', 'carga'].forEach(n => $(n).style.display = 'none');
+    st.modal = null; ['computador', 'clp', 'minijogo', 'ligacao', 'progresso', 'carga', 'balcao'].forEach(n => $(n).style.display = 'none');
+    if (PT.pc && PT.pc.aberto) PT.pc.fechar();
   }
   PT.ev.on('morreu', cancelarInteracoes);
 
@@ -99,162 +100,14 @@ PT.ui = (function () {
       const teclas = ['E', '1', '2', '3', '4'];
       $('dica').innerHTML = ops.slice(0, 5).map((o, i) => '<span><b>[' + teclas[i] + ']</b> ' + o.rotulo + '</span>').join('<br>');
     }
-    if (st.modal === 'computador' && t - ultPc > 1500) { ultPc = t; desenharComputador(true); }
+    if (PT.pc) PT.pc.atualizar();
     if (st.modal === 'clp') desenharCLP(true);
     if (st.prancheta) desenharPrancheta();
   }
 
   // ---------------- COMPUTADOR ----------------
-  const ABAS = ['Loja', 'Banco', 'E-mail', 'Pedidos', 'Equipe', 'Reputação', 'Modelos 3D', 'Sistema'];
-  function abrirComputador() { abrirModal('computador'); desenharComputador(); }
-  function desenharComputador(soDados) {
-    const c = $('computador').querySelector('.caixa');
-    if (soDados && (['Loja', 'Modelos 3D', 'Sistema'].includes(st.aba) || capturandoTeclado())) return;   // não redesenha telas com botões estáticos
-    const naoLidos = st.correio.filter(m => !m.lido).length;
-    let h = '<div class="navegador"><div class="barra">🌐 www.' + ({ Loja: 'industriamt.com.br', Banco: 'bancocerrado.com.br', 'E-mail': 'mail.pareciste lha.com.br', Pedidos: 'sistema.pareciste lha.com.br', Equipe: 'trabalheconoscomt.com.br', Reputação: 'sistema.pareciste lha.com.br/reputacao', 'Modelos 3D': 'interno/modelos', Sistema: 'interno/sistema' }[st.aba] || '').replace(/ /g, '') + '<button class="fechar" id="pcX">✕</button></div><div class="abas">' +
-      ABAS.map(a => '<button class="' + (a === st.aba ? 'sel' : '') + '" data-aba="' + a + '">' + a + (a === 'E-mail' && naoLidos ? ' (' + naoLidos + ')' : '') + '</button>').join('') + '</div><div class="conteudo">';
-    h += ({ 'Equipe': telaEquipe, 'Loja': telaLoja, 'Banco': telaBanco, 'E-mail': telaEmail, 'Pedidos': telaPedidos, 'Reputação': telaRep, 'Modelos 3D': telaModelos, 'Sistema': telaSistema }[st.aba])();
-    h += '</div></div>';
-    const scroll = c.querySelector('.conteudo') ? c.querySelector('.conteudo').scrollTop : 0;
-    c.innerHTML = h;
-    c.querySelector('.conteudo').scrollTop = scroll;
-    $('pcX').onclick = fecharModal;
-    c.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => { st.aba = b.dataset.aba; desenharComputador(); });
-    c.querySelectorAll('[data-acao]').forEach(b => b.onclick = () => acaoComputador(b.dataset.acao, b.dataset.arg));
-    c.querySelectorAll('[data-prio]').forEach(s => s.onchange = () => { PT.func.st.prioridade[s.dataset.prio] = s.value; });
-    const imp = $('impArq'); if (imp) imp.onchange = e => { if (e.target.files[0]) PT.save.importarArquivo(e.target.files[0]); };
-  }
-  function telaLoja() {
-    let h = '<div class="cats">' + PT.DADOS.categorias.map(k => '<button class="' + (k === st.cat ? 'sel' : '') + '" data-acao="cat" data-arg="' + k + '">' + k + '</button>').join('') + '</div><div class="cards">';
-    PT.loja.itens(st.cat).forEach(f => {
-      const finOk = PT.eco.finameLiberado();
-      h += '<div class="card"><h3>' + f.nome + '</h3><div class="estado">' + f.estado + '</div><div class="preco">' + R(f.preco) + '</div>' +
-        '<small>Frete ' + R(f.frete || 0) + ' · entrega em ' + f.prazoDias + ' dia(s)</small>' +
-        (f.dims ? '<small>Dimensões ' + f.dims.join(' x ') + ' m</small>' : '') + (f.pesoKg ? '<small>Peso ' + f.pesoKg + ' kg</small>' : '') + (f.kw ? '<small>Potência ' + f.kw + ' kW</small>' : '') +
-        (f.vantagem ? '<small class="bom">+ ' + f.vantagem + '</small>' : '') + (f.defeito ? '<small class="ruim">− ' + f.defeito + '</small>' : '') +
-        '<div class="botoes"><button data-acao="comprar" data-arg="' + f.id + '|vista">Comprar à vista</button>' +
-        (f.finame ? '<button data-acao="comprar" data-arg="' + f.id + '|finame" ' + (finOk ? '' : 'title="Liberado na faixa 1 de reputação"') + ' class="' + (finOk ? '' : 'off') + '">FINAME 30%</button>' : '') + '</div></div>';
-    });
-    return h + '</div>';
-  }
-  function telaBanco() {
-    const e = PT.eco.st, E = PT.DADOS.economia;
-    const rec = e.receber.reduce((a, r) => a + r.valor, 0);
-    return '<h2>Banco Cerrado — Conta Empresa</h2><div class="grade">' +
-      '<div><b>Saldo</b><br>' + R(e.caixa) + '</div><div><b>Capital de giro</b><br>' + R(e.creditoUsado) + ' de ' + R(E.limiteCredito) + ' (2%/mês)</div>' +
-      '<div><b>Cheque especial (agiota)</b><br><span class="' + (e.cheque ? 'ruim' : '') + '">' + R(e.cheque) + ' de ' + R(E.chequeEspecial) + ' (5% a cada 7 dias)</span></div>' +
-      '<div><b>A receber</b><br>' + R(rec) + ' em ' + e.receber.length + ' boleto(s)</div></div>' +
-      '<div class="botoes"><button data-acao="sacar" data-arg="5000">Sacar R$ 5 mil</button><button data-acao="sacar" data-arg="10000">Sacar R$ 10 mil</button>' +
-      '<button data-acao="amortizar" data-arg="5000">Amortizar R$ 5 mil</button><button data-acao="agiota">Pagar o agiota</button>' +
-      '<button data-acao="antecipar">Antecipar recebíveis (−3%)</button></div>' +
-      '<h3>Previsão de caixa</h3><div class="grade"><div>7 dias: ' + R(PT.eco.previsao(7)) + '</div><div>14 dias: ' + R(PT.eco.previsao(14)) + '</div><div>30 dias: ' + R(PT.eco.previsao(30)) + '</div>' +
-      '<div>FINAME: ' + (PT.eco.finameLiberado() ? '<span class="bom">liberado</span>' : 'faixa 1 (faltam ' + PT.rep.proximaFaixa() + ' entregas)') + '</div></div>' +
-      (e.financiamentos.length ? '<h3>Financiamentos</h3>' + e.financiamentos.map(f => '<div>' + f.desc + ': ' + f.restantes + 'x ' + R(f.parcela) + '</div>').join('') : '') +
-      (e.receber.length ? '<h3>Contas a receber</h3>' + e.receber.map(r => '<div>Dia ' + r.dia + ' — ' + r.desc + ': ' + R(r.valor) + '</div>').join('') : '') +
-      '<h3>Extrato</h3><table>' + e.extrato.slice(0, 40).map(x => '<tr><td>' + x.quando + '</td><td>' + x.desc + '</td><td class="' + (x.valor < 0 ? 'ruim' : 'bom') + '">' + R(x.valor) + '</td><td>' + R(x.saldo) + '</td></tr>').join('') + '</table>';
-  }
-  function telaEmail() {
-    if (!st.correio.length) return '<p>Caixa de entrada vazia.</p>';
-    return st.correio.slice(0, 40).map(m => {
-      m.lido = true;
-      let acoes = '';
-      if (m.pedidoId) {
-        const p = PT.pedidos.st.lista.find(x => x.id === m.pedidoId);
-        if (p && p.status === 'oferta') acoes = '<div class="botoes"><button data-acao="aceitar" data-arg="' + p.id + '">Aceitar pedido</button><button data-acao="recusar" data-arg="' + p.id + '">Recusar</button></div>';
-        else if (p) acoes = '<small>Status: ' + p.status + '</small>';
-      }
-      return '<div class="mail"><b>' + m.de + '</b> — ' + m.assunto + ' <small>' + m.quando + '</small><p>' + m.texto + '</p>' + acoes + '</div>';
-    }).join('');
-  }
-  function telaPedidos() {
-    const ativos = PT.pedidos.st.lista.filter(p => ['oferta', 'aceito', 'coleta'].includes(p.status));
-    const fechados = PT.pedidos.st.lista.filter(p => !['oferta', 'aceito', 'coleta'].includes(p.status)).slice(-10).reverse();
-    let h = '<h2>Pedidos ativos</h2>';
-    if (!ativos.length) h += '<p>Nenhum. Os clientes ligam e mandam e-mail ao longo do dia.</p>';
-    ativos.forEach(p => {
-      const d = PT.pedidos.disponivel(p);
-      h += '<div class="mail"><b>' + p.id + '</b> — ' + p.cliente + ' (' + PT.DADOS.clientes[p.perfil].nome + ')<br>' + PT.pedidos.descricao(p) + '<br>Prazo: dia ' + p.prazoDia + ' · coleta 14h–16h · ' + textoPagamento(p) +
-        '<br>Status: <b>' + p.status + '</b> · na zona verde: ' + d.boas + ' boas' + (d.tortas ? ', ' + d.tortas + ' tortas' : '') + ' de ' + p.pecas +
-        (p.status === 'aceito' ? '<div class="botoes"><button data-acao="chamar" data-arg="' + p.id + '">Chamar caminhão agora</button></div>' : '') +
-        (p.status === 'oferta' ? '<div class="botoes"><button data-acao="aceitar" data-arg="' + p.id + '">Aceitar</button><button data-acao="recusar" data-arg="' + p.id + '">Recusar</button></div>' : '') + '</div>';
-    });
-    if (fechados.length) h += '<h3>Últimos</h3>' + fechados.map(p => '<div>' + p.id + ' ' + p.cliente + ' — ' + p.status + '</div>').join('');
-    return h;
-  }
-  function telaEquipe() {
-    const F = PT.func, D = PT.DADOS.funcionarios;
-    if (!F.st.candidatos.length) F.gerarCandidatos();
-    const pr = s => '<select data-prio="' + s + '">' + ['alta', 'media', 'baixa'].map(v => '<option' + (F.st.prioridade[s] === v ? ' selected' : '') + ' value="' + v + '">' + v + '</option>').join('') + '</select>';
-    let h = '<h2>Trabalhe Conosco MT — Equipe (' + F.st.lista.length + '/' + F.vagas() + ' vagas)</h2>' +
-      '<p>Cada <b>armário de vestiário</b> instalado libera 1 vaga (máx. ' + D.maxAtivos + '). Folha quinzenal: ' + R(F.folhaMensal() / 2) + '.</p>' +
-      (F.st.tartaruga > 0 ? '<p class="ruim">🪧 OPERAÇÃO TARTARUGA: "SEM PIX, SEM TELHA". <button data-acao="pagarFolha">Pagar a folha atrasada + multa</button></p>' : '') +
-      '<h3>Quadro de tarefas — prioridade por setor</h3><div class="grade"><div>Produção ' + pr('producao') + '</div><div>Expedição ' + pr('expedicao') + '</div><div>Manutenção ' + pr('manutencao') + '</div></div>' +
-      '<small>Tarefas abertas agora: ' + (F.tarefasAbertas().map(t => D.nomesTarefa[t.tipo] + ' (' + t.setor + ')').join(', ') || 'nenhuma') + '. Para o operador rodar lotes sozinho, marque a opção no CLP da máquina.</small>' +
-      '<h3>Funcionários</h3>' + (F.st.lista.map(f => '<div class="mail"><b>' + f.nome + '</b> — ' + D.cargos[f.cargo].nome + ' · ' + f.personalidade + ' · ' + R(f.salario) + '/mês<br>' +
-        'Competência ' + Math.round(f.atributos.competencia * 100) + '% · Segurança ' + Math.round(f.atributos.seguranca * 100) + '% · Ritmo ' + Math.round(f.atributos.ritmo * 100) + '% · Energia ' + Math.round(f.energia * 100) + '%<br>' +
-        'Certificados: ' + (f.certificados.join(', ') || 'nenhum') + ' · Agora: ' + (f.tarefa ? D.nomesTarefa[f.tarefa.tipo] : f.estado) +
-        '<div class="botoes">' + ['perfiladeira', 'guilhotina', 'dobradeira'].filter(c => !f.certificados.includes(c)).map(c => '<button data-acao="curso" data-arg="' + f.id + '|' + c + '">Curso de ' + c + ' (' + R(D.cursoPreco) + ')</button>').join('') +
-        '<button data-acao="demitir" data-arg="' + f.id + '">Dispensar</button></div></div>').join('') || '<p>Ninguém ainda. O dono faz tudo!</p>') +
-      '<h3>Candidatos</h3>' + F.st.candidatos.map(c => '<div class="mail"><b>' + c.nome + '</b> — ' + D.cargos[c.cargo].nome + ' · ' + c.personalidade + ' · pede ' + R(c.salario) + '/mês<br>' +
-        'Competência ' + Math.round(c.atributos.competencia * 100) + '% · Segurança ' + Math.round(c.atributos.seguranca * 100) + '% · Ritmo ' + Math.round(c.atributos.ritmo * 100) + '%<br><i>"' + c.fala + '"</i>' +
-        '<div class="botoes"><button data-acao="contratar" data-arg="' + c.id + '">Contratar</button></div></div>').join('') + '<small>Novos candidatos a cada 3 dias. Mecânico aparece na faixa 2 de reputação.</small>';
-    return h;
-  }
-  function barra(nome, v) { return '<div class="barraRep"><span>' + nome + '</span><div><i style="width:' + Math.round(v * 100) + '%"></i></div><b>' + Math.round(v * 100) + '%</b></div>'; }
-  function telaRep() {
-    const r = PT.rep;
-    return '<h2>Reputação: ' + r.estrelas().toFixed(1) + ' ⭐ · faixa ' + r.faixa() + '</h2>' + barra('Pontualidade', r.st.pontualidade) + barra('Qualidade', r.st.qualidade) + barra('Confiança financeira', r.st.financeira) +
-      '<p>Pedidos entregues: ' + r.st.entregues + '. Próxima faixa em ' + r.proximaFaixa() + ' entrega(s). Faixa 1 libera FINAME, construtoras e agro.</p>' +
-      '<h3>Mural dos desastres</h3><div>Mortes: ' + PT.zoeira.st.mortes + ' · Cabos rompidos: ' + PT.zoeira.st.cabosRompidos + ' · Enroscos: ' + PT.zoeira.st.enroscos + ' · Quedas de carga: ' + PT.zoeira.st.quedas + ' · Recorde sem acidentes: ' + PT.zoeira.st.recorde + ' dias</div>';
-  }
-  function telaModelos() {
-    const f = PT.fichaModelos();
-    const usados = f.filter(m => m.usos > 0).length;
-    return '<h2>Modelos 3D necessários (' + f.length + ' fichas · ' + usados + ' já apareceram no jogo)</h2><p>Lista gerada pelo código: cada cubo/cilindro declara qual modelo vai substituí-lo. Abra <b>modelos.html</b> para a versão completa e para baixar.</p>' +
-      '<div class="botoes"><button data-acao="baixarModelos">Baixar lista (.csv)</button></div><table><tr><th>ID</th><th>Nome</th><th>Categoria</th><th>Dimensões (m)</th><th>Usos</th><th>Máx. na cena</th><th>Animações</th><th>Estados</th></tr>' +
-      f.map(m => '<tr class="' + (m.usos ? '' : 'apagado') + '"><td>' + m.id + '</td><td>' + m.nome + '</td><td>' + m.categoria + '</td><td>' + m.dims.join(' x ') + '</td><td>' + m.usos + '</td><td>' + m.maxInstancias + '</td><td>' + (m.animacoes || []).join(', ') + '</td><td>' + (m.estados || []).join(', ') + '</td></tr>').join('') + '</table>';
-  }
-  function telaSistema() {
-    return '<h2>Sistema</h2><div class="botoes"><button data-acao="salvar">Salvar (K)</button><button data-acao="carregar">Carregar último save (L)</button><button data-acao="exportar">Exportar save (.json)</button>' +
-      '<label class="btn">Importar save<input type="file" id="impArq" accept=".json" hidden></label><button data-acao="novo">Novo jogo</button></div>' +
-      (PT.DEBUG ? '<h3>Teste (atalhos de desenvolvedor)</h3><div class="botoes"><button data-acao="vel">Velocidade (T): x' + PT.tempo.vel + '</button><button data-acao="pedido">Gerar pedido agora</button>' +
-      '<button data-acao="dinheiro">+R$ 20 mil (debug)</button><button data-acao="noite">Pular para o próximo dia</button><button data-acao="entregas">Entregas pendentes: ' + PT.entrega.st.fila.length + '</button></div>' : '<p><small>Atalhos de teste: abra o jogo com <b>?debug=1</b> no endereço.</small></p>') +
-      '<h3>Últimos eventos</h3><div class="log">' + PT.ev.log.slice(-25).reverse().map(l => l.t + ' — ' + l.nome).join('<br>') + '</div>';
-  }
-  function acaoComputador(a, arg) {
-    if (a === 'cat') st.cat = arg;
-    if (a === 'contratar') aviso(PT.func.contratar(arg).msg);
-    if (a === 'demitir') { PT.func.demitir(arg); aviso('Funcionário dispensado.'); }
-    if (a === 'curso') { const [id, c] = arg.split('|'); aviso(PT.func.treinar(id, c).msg); }
-    if (a === 'pagarFolha') aviso(PT.func.pagarAtrasado() ? 'Folha paga.' : 'Sem dinheiro para pagar.');
-    if (a === 'comprar') { const [id, modo] = arg.split('|'); const r = PT.loja.comprar(id, modo); aviso(r.msg); }
-    if (a === 'sacar') aviso('Sacado ' + R(PT.eco.sacarCredito(+arg)));
-    if (a === 'amortizar') aviso('Amortizado ' + R(PT.eco.pagarCredito(+arg)));
-    if (a === 'agiota') aviso('Pago ao agiota ' + R(PT.eco.pagarAgiota()));
-    if (a === 'antecipar') aviso('Antecipado ' + R(PT.eco.anteciparTudo()));
-    if (a === 'aceitar') { if (PT.pedidos.aceitar(arg)) aviso('Pedido ' + arg + ' aceito.'); }
-    if (a === 'recusar') PT.pedidos.recusar(arg);
-    if (a === 'chamar') PT.pedidos.chamarAgora(arg);
-    if (a === 'baixarModelos') baixarModelos();
-    if (a === 'salvar') PT.save.salvar();
-    if (a === 'carregar') PT.save.pedirCarregar();
-    if (a === 'exportar') PT.save.exportar();
-    if (a === 'novo') { if (confirmarNovo()) { try { localStorage.removeItem('parecis_demo1_save'); } catch (e) { } location.reload(); } return; }
-    if (a === 'vel') PT.tempo.alternarVel();
-    if (a === 'pedido' && PT.DEBUG) PT.pedidos.gerar();
-    if (a === 'dinheiro' && PT.DEBUG) PT.eco.lancar(20000, 'DEBUG: dinheiro de teste');
-    if (a === 'noite' && PT.DEBUG) PT.tempo.pularNoite();
-    desenharComputador();
-  }
-  let pedidoNovo = 0;
-  function confirmarNovo() { pedidoNovo++; if (pedidoNovo < 2) { aviso('Clique de novo em "Novo jogo" para confirmar (apaga o save).'); return false; } return true; }
-  function baixarModelos() {
-    const f = PT.fichaModelos();
-    const cols = ['id', 'nome', 'categoria', 'dims', 'forma', 'usos', 'maxInstancias', 'animacoes', 'estados', 'sockets', 'polys', 'prioridade', 'pivot', 'colisor', 'multimesh', 'materiais', 'arquivo', 'notas'];
-    const esc = v => '"' + String(Array.isArray(v) ? v.join(' | ') : (v === undefined ? '' : v)).replace(/"/g, '""') + '"';
-    const csv = cols.join(';') + '\n' + f.map(m => cols.map(c => esc(c === 'dims' ? m.dims.join(' x ') : m[c])).join(';')).join('\n');
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); a.download = 'modelos_3d_parecis.csv'; a.click();
-  }
+  // O computador virou o "ParecisOS" (pc.js + pc_apps.js). Aqui só ficam os atalhos.
+  function abrirComputador() { PT.pc.abrir(); }
 
   // ---------------- CLP ----------------
   let clpMaq = null;
@@ -366,6 +219,7 @@ PT.ui = (function () {
   });
 
   return {
+    textoPagamento, correio: () => st.correio, correioNaoLidos: () => st.correio.filter(m => !m.lido).length,
     hud, aviso, email, modalAberto, abrirModal, cancelarInteracoes, capturandoTeclado, abrirComputador, abrirCLP, minijogo, progresso, fecharModal,
     salvarCorreio() { return st.correio.slice(0, 60); }, carregarCorreio(c) { st.correio = c || []; }
   };

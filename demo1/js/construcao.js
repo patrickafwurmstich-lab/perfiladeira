@@ -55,7 +55,8 @@ PT.construcao = (function () {
   function cruza(a, b) { return a.x0 < b.x1 && a.x1 > b.x0 && a.z0 < b.z1 && a.z1 > b.z0; }
   function validar(a) {
     const fp = footprint(a.x, a.z, a.dims, a.rot);
-    if (fp.x0 < 0.3 || fp.x1 > M.L - 0.3 || fp.z0 < 0.3 || fp.z1 > M.D - 0.3) return { cor: 'vermelho', motivo: 'Fora do barracão' };
+    const lj = M.loja, naLoja = a.decor && fp.x0 >= lj.x0 + 0.2 && fp.x1 <= lj.x1 - 0.2 && fp.z0 >= lj.z0 + 0.2 && fp.z1 <= lj.z1 - 0.2;   // decoração pode ir na loja de balcão
+    if (!naLoja && (fp.x0 < 0.3 || fp.x1 > M.L - 0.3 || fp.z0 < 0.3 || fp.z1 > M.D - 0.3)) return { cor: 'vermelho', motivo: 'Fora do barracão' };
     if (PT.mundo.paredes.some(p => cruza(fp, p))) return { cor: 'vermelho', motivo: 'Bate na parede/escritório' };
     const ignora = o => o === a.volume || o.preso === 'mao' || o.preso === 'jogador' || o.preso === 'paleteira' || o.tipo === 'decorChao' || o.tipo === 'berco';
     const bate = PT.ent.lista.find(o => !ignora(o) && o.aabb && cruza(fp, o.aabb));

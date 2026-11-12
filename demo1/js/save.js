@@ -31,7 +31,7 @@ PT.save = (function () {
       if (o.tipo === 'bobina') Object.assign(b, { spec: o.spec, codigo: o.codigo, pesoKg: o.pesoKg, metros: o.metros });
       if (o.tipo === 'pilha') Object.assign(b, { produto: o.produto, comprimento: o.comprimento, qtd: o.qtd, defeituosas: o.defeituosas });
       if (o.tipo === 'volume') Object.assign(b, { item: o.item, pequeno: !!o.pequeno });
-      if (o.tipo === 'decor') Object.assign(b, { item: o.item });
+      if (o.tipo === 'decor') Object.assign(b, { item: o.item, modelo: o.modelo, rotulo: o.rotulo });
       if (o.tipo === 'empilhadeira') Object.assign(b, { garfoY: o.garfoY, acessorio: o.acessorio, bateria: o.bateria, tombada: o.tombada });
       return b;
     });
@@ -103,7 +103,7 @@ PT.save = (function () {
       else if (b.tipo === 'paleteira') PT.ent.add({ id: b.id, tipo: 'paleteira', modelo: 'paleteira', x: b.x, z: b.z, rot: b.rot, solido: false });
       else if (b.tipo === 'empilhadeira') PT.empi.criar(b.x, b.z, b.rot, { id: b.id, garfoY: b.garfoY || 0, acessorio: b.acessorio || 'garfos', bateria: Number.isFinite(b.bateria) ? b.bateria : 1, tombada: b.tombada || 0 });
       else if (b.tipo === 'berco') PT.ent.add({ id: b.id, tipo: 'berco', modelo: 'berco_bobina', x: b.x, z: b.z, rot: b.rot, solido: false });
-      else if (b.tipo === 'decor') { const f = PT.loja.ficha(b.item); PT.ent.add({ id: b.id, tipo: 'decor', item: b.item, modelo: f.modelo, rotulo: f.nome, x: b.x, z: b.z, rot: b.rot, solido: true }); }
+      else if (b.tipo === 'decor') { const f = PT.loja.ficha(b.item) || {}; PT.ent.add({ id: b.id, tipo: 'decor', item: b.item, modelo: f.modelo || b.modelo, rotulo: f.nome || b.rotulo, x: b.x, z: b.z, rot: b.rot, solido: b.item !== 'galinha' }); }
     });
     PT.maq.carregar(s.maquinas);
     PT.pedidos.carregar(s.pedidos);

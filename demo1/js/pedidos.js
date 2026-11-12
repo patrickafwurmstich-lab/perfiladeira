@@ -14,7 +14,8 @@ PT.pedidos = (function () {
     const p = D.produtos[produto];
     return p.unidade === 'm²' ? Math.max(1, Math.ceil(qtdUnid / (comp * p.larguraUtil))) : Math.max(1, Math.ceil(qtdUnid / comp));
   }
-  function gerar() {
+  // extra (opcional): campos fixos — usado pela loja de balcão; { silencioso: true } não manda e-mail/ligação
+  function gerar(extra) {
     const faixa = PT.rep.faixa();
     const perfis = {}; Object.keys(D.clientes).forEach(k => { if (D.clientes[k].faixaMin <= faixa) perfis[k] = D.clientes[k]; });
     const k = PT.util.escolhaPeso(perfis), C = D.clientes[k];
@@ -28,6 +29,7 @@ PT.pedidos = (function () {
     const ped = { id: 'PED-' + String(++st.cont).padStart(3, '0'), perfil: k, cliente: PT.util.escolha(C.nomes), canal: C.canal,
       produto, comprimento: comp, pecas, qtdUnid, unidade: prod.unidade, precoUnit, valor: Math.round(qtdUnid * precoUnit),
       prazoDia: PT.tempo.st.dia + prazo, status: 'oferta', criadoH: PT.tempo.agoraHoras(), entradaPaga: 0, carregadas: 0, tortasEntregues: 0 };
+    if (extra) { Object.assign(ped, extra); const pp = D.produtos[ped.produto]; ped.unidade = pp.unidade; ped.qtdUnid = ped.pecas * ped.comprimento * (pp.unidade === 'm²' ? pp.larguraUtil : 1); ped.valor = Math.round(ped.qtdUnid * ped.precoUnit); }
     st.lista.push(ped);
     PT.ev.emit('pedidoNovo', ped);
     return ped;

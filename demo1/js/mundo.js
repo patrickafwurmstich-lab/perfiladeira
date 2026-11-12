@@ -60,8 +60,11 @@ PT.mundo = (function () {
     const h = 3.2, cw = 0x9aa4ad;
     caixa(M.L, h, 0.3, cw, M.L / 2, h / 2, M.D);                       // fundo
     paredes.push({ x0: 0, x1: M.L, z0: M.D - 0.2, z1: M.D + 0.5 });
-    caixa(M.L, h, 0.3, cw, M.L / 2, h / 2, 0);                         // frente
-    paredes.push({ x0: 0, x1: M.L, z0: -0.5, z1: 0.2 });
+    // frente, com porta de pedestre para a loja de balcão
+    const pf = M.portaFrente;
+    caixa(pf.x0, h, 0.3, cw, pf.x0 / 2, h / 2, 0); paredes.push({ x0: 0, x1: pf.x0, z0: -0.5, z1: 0.2 });
+    caixa(M.L - pf.x1, h, 0.3, cw, (pf.x1 + M.L) / 2, h / 2, 0); paredes.push({ x0: pf.x1, x1: M.L, z0: -0.5, z1: 0.2 });
+    caixa(pf.x1 - pf.x0, 0.6, 0.3, cw, (pf.x0 + pf.x1) / 2, h - 0.3, 0);   // verga da porta
     // laterais com portão (abertura no corredor)
     [0, M.L].forEach(x => {
       const zA = M.corredor.z1, len = M.D - zA;
