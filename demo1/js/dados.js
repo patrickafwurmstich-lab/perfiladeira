@@ -138,7 +138,10 @@ PT.DADOS = {
                    pagamento: { entrada: 0.40, prazoSaldo: 0 }, produto: ['TP40'], qtd: [300, 800], prazo: [10, 20],
                    nomes: ['Fazenda Três Marias', 'Agro Parecis', 'Sítio Boa Safra'] }
   },
-  pedidos: { intervaloHoras: [3, 6], maxAbertos: 6, janelaColetaHoras: 2, toleranciaAtrasoHoras: 1 },
+  pedidos: { intervaloHoras: [3, 6], maxAbertos: 6, janelaColetaHoras: 2, toleranciaAtrasoHoras: 1,
+             cargaParcial: 'entregaParcial',     // 'entregaParcial' (motorista leva o que carregou) | 'devolver' (descarrega de volta)
+             multaCancelamento: 0.05,            // cancelamento por atraso da fábrica: devolve a entrada + multa
+             prazoMinimoAceite: true },
 
   // ---------------- REPUTAÇÃO ----------------
   reputacao: {

@@ -43,14 +43,16 @@ PT.eco = (function () {
   }
 
   function podePagar(v) { return st.caixa + (E.chequeEspecial - st.cheque) >= v; }
-  function pagar(v, desc) { if (!podePagar(v)) return false; lancar(-v, desc); return true; }
+  function pagar(v, desc) { if (!Number.isFinite(v) || v <= 0 || !podePagar(v)) return false; lancar(-v, desc); return true; }
 
   // ---------- capital de giro ----------
   function sacarCredito(v) {
+    if (!Number.isFinite(v) || v <= 0) return 0;
     v = Math.min(v, E.limiteCredito - st.creditoUsado); if (v <= 0) return 0;
     st.creditoUsado += v; lancar(v, 'Saque do capital de giro'); return v;
   }
   function pagarCredito(v) {
+    if (!Number.isFinite(v) || v <= 0) return 0;
     v = Math.min(v, st.creditoUsado, Math.max(0, st.caixa)); if (v <= 0) return 0;
     st.creditoUsado -= v; lancar(-v, 'Amortização do capital de giro'); return v;
   }
@@ -62,13 +64,14 @@ PT.eco = (function () {
   // ---------- FINAME (liberado por reputação) ----------
   function finameLiberado() { return PT.rep ? PT.rep.faixa() >= E.finame.faixaMinima : false; }
   function comprarFiname(valor, desc) {
+    if (!Number.isFinite(valor) || valor <= 0) return { ok: false, msg: 'Valor inválido.' };
     if (!finameLiberado()) return { ok: false, msg: 'FINAME liberado só na faixa ' + E.finame.faixaMinima + ' de reputação (≈10 pedidos entregues).' };
     const entrada = valor * E.finame.entrada, fin = valor - entrada;
     if (!podePagar(entrada)) return { ok: false, msg: 'Sem caixa para a entrada de ' + PT.util.reais(entrada) };
     const i = E.finame.jurosMes, n = E.finame.parcelas;
     const parcela = fin * i / (1 - Math.pow(1 + i, -n));
     lancar(-entrada, 'Entrada FINAME — ' + desc);
-    st.financiamentos.push({ desc, parcela, restantes: n });
+    st.financiamentos.push({ desc, parcela, restantes: n, proximoVencimento: PT.tempo.st.dia + E.diasDoMes });
     return { ok: true, msg: 'Financiado: ' + n + 'x de ' + PT.util.reais(parcela) };
   }
 
@@ -93,7 +96,8 @@ PT.eco = (function () {
     const fixos = Object.values(E.custosFixosMes).reduce((a, b) => a + b, 0);
     v -= fixos * dias / E.diasDoMes;
     v -= PT.func ? PT.func.folhaMensal() * dias / E.diasDoMes : 0;
-    st.financiamentos.forEach(f => v -= f.parcela * Math.min(f.restantes, dias / E.diasDoMes));
+    // parcelas pelo vencimento REAL dentro da janela (ChatGPT: antes diluía a parcela)
+    st.financiamentos.forEach(f => { let venc = f.proximoVencimento, n = f.restantes; while (n > 0 && venc <= hoje + dias) { v -= f.parcela; venc += E.diasDoMes; n--; } });
     return v;
   }
 
@@ -112,7 +116,10 @@ PT.eco = (function () {
       PT.ev.emit('agiotaJuros', { juros: j, total: st.cheque });
     }
     // mensal (dia 30, 60, ...): fixos, energia, juros do crédito, parcelas
-    if ((dia - 1) % E.diasDoMes === 0 && dia > 1) {
+    // parcelas do FINAME no vencimento de cada uma
+    st.financiamentos.forEach(f => { if (f.restantes > 0 && f.proximoVencimento <= dia) { lancar(-f.parcela, 'Parcela FINAME — ' + f.desc); f.restantes--; f.proximoVencimento += E.diasDoMes; } });
+    st.financiamentos = st.financiamentos.filter(f => f.restantes > 0);
+    if (dia % E.diasDoMes === 0) {
       const F = E.custosFixosMes;
       lancar(-F.energiaBase, 'Energia — taxa básica');
       const kwh = st.energiaKWhMes; st.energiaKWhMes = 0;
@@ -120,8 +127,6 @@ PT.eco = (function () {
       lancar(-F.contadorInternetManut, 'Contador, internet e manutenção');
       lancar(-F.outros, 'Outros custos fixos');
       if (st.creditoUsado > 0) lancar(-st.creditoUsado * E.jurosCreditoMes, 'Juros do capital de giro');
-      st.financiamentos.forEach(f => { if (f.restantes > 0) { lancar(-f.parcela, 'Parcela FINAME — ' + f.desc); f.restantes--; } });
-      st.financiamentos = st.financiamentos.filter(f => f.restantes > 0);
       if (PT.rep && st.cheque === 0) PT.rep.efeito('financeira', PT.DADOS.reputacao.efeitos.contaEmDia);
     }
   });

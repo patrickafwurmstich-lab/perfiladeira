@@ -37,6 +37,7 @@ PT.ui = (function () {
   // ---------------- E-MAIL ----------------
   function email(m) { st.correio.unshift(Object.assign({ id: PT.util.id('mail'), quando: PT.tempo.rotulo(), lido: false }, m)); celular({ de: '📧 E-mail', texto: m.assunto }); }
   PT.ev.on('pedidoNovo', p => {
+    if (p.silencioso) return;
     if (p.canal === 'telefone') { st.filaLigacoes.push(p.id); proximaLigacao(); }
     else email({ de: p.cliente, assunto: 'Pedido ' + p.id + ' — ' + PT.DADOS.clientes[p.perfil].nome, pedidoId: p.id,
       texto: 'Bom dia! Precisamos de ' + PT.pedidos.descricao(p) + '. Prazo: dia ' + p.prazoDia + '. Pagamento: ' + textoPagamento(p) + '.' });

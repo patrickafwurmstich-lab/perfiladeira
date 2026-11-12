@@ -51,9 +51,14 @@ PT.maq = (function () {
     return m;
   }
   // re-instala uma máquina movida (mantém configuração e desgaste)
+  // a pilha da saída só "prende" a máquina se ainda estiver na mesa (não se a paleteira já levou)
+  function mesaOcupada(m) {
+    if (!m.mesa || !PT.ent.lista.includes(m.mesa) || m.mesa.preso) return false;
+    const p = pontoSaida(m, m.mesa.comprimento); return Math.hypot(m.mesa.x - p.x, m.mesa.z - p.z) < 1;
+  }
   function reinstalar(salva) { const m = instalar(salva.defId, salva.x, salva.z, salva.rot, salva.extra); return m; }
   function desinstalar(m) {
-    if (m.bobina || (m.mesa && PT.ent.lista.includes(m.mesa)) || m.ligada) { PT.ev.emit('aviso', 'Desligue, tire a bobina e esvazie a mesa antes de mover.'); return; }
+    if (m.bobina || mesaOcupada(m) || m.ligada) { PT.ev.emit('aviso', 'Desligue, tire a bobina e esvazie a mesa antes de mover.'); return; }
     PT.construcao.desconectar(m);
     lista.splice(lista.indexOf(m), 1); PT.ent.remover(m);
     const extra = { cfg: m.cfg, desgaste: m.desgaste, nivelamento: m.nivelamento, lubrificado: m.lubrificado };
@@ -161,6 +166,8 @@ PT.maq = (function () {
       if (m.bobina.metros <= 1e-6) {
         PT.ev.emit('celular', { de: m.nome, texto: 'Bobina ' + m.bobina.codigo + ' acabou. Sobrou só o tubete.' });
         const b = m.bobina; m.bobina = null; m.alinhado = false; PT.ent.remover(b);
+        // pedaço que não completou uma peça vira RETALHO (sucata) — não continua na próxima bobina
+        if (m.progressoM > 1e-6) { PT.ev.emit('aviso', 'Fim de chapa: sobrou um retalho de ' + m.progressoM.toFixed(2) + ' m (sucata).'); m.sucataM = (m.sucataM || 0) + m.progressoM; m.progressoM = 0; }
         parar(m, 'sem_material');
       }
     } else {

@@ -37,6 +37,7 @@ PT.pedidos = (function () {
 
   function aceitar(id, ajustePreco) {
     const p = st.lista.find(x => x.id === id); if (!p || p.status !== 'oferta') return false;
+    if (ajustePreco !== undefined && !(Number.isFinite(ajustePreco) && ajustePreco >= 0.5 && ajustePreco <= 2)) return false;
     if (ajustePreco) { p.precoUnit = Math.round(p.precoUnit * ajustePreco * 100) / 100; p.valor = Math.round(p.qtdUnid * p.precoUnit); }
     const pg = D.clientes[p.perfil].pagamento;
     p.status = 'aceito';
@@ -51,13 +52,15 @@ PT.pedidos = (function () {
   function contraproposta(id) {
     const p = st.lista.find(x => x.id === id); if (!p || p.status !== 'oferta') return null;
     if (Math.random() < 0.5) { aceitar(id, 1.10); return true; }
-    p.status = 'recusado'; PT.ev.emit('pedidoAtualizado', p); return false;
+    p.status = 'recusado'; PT.ev.emit('pedidoAtualizado', p); return false;   // (ChatGPT: faltava o evento)
   }
   function chamarAgora(id) {
-    const p = st.lista.find(x => x.id === id); if (!p || p.status !== 'aceito') return;
+    const p = st.lista.find(x => x.id === id); if (!p || p.status !== 'aceito') { PT.ev.emit('aviso', 'Esse pedido não está aguardando coleta.'); return false; }
+    if (PT.entrega.st.caminhoes.some(c => c.e.pedidoId === id)) { PT.ev.emit('aviso', 'O caminhão desse pedido já está em trânsito.'); return false; }
     const f = PT.entrega.st.fila.find(e => e.pedidoId === id);
-    if (f) { f.dia = PT.tempo.st.dia; f.hora = 0; }
-    PT.ev.emit('aviso', 'Caminhão de ' + p.cliente + ' a caminho.');
+    if (!f) { PT.ev.emit('aviso', 'Não há coleta agendada para ' + id + '.'); return false; }
+    f.dia = PT.tempo.st.dia; f.hora = 0;
+    PT.ev.emit('aviso', 'Caminhão de ' + p.cliente + ' a caminho.'); return true;
   }
 
   // estoque disponível na zona verde para um pedido
@@ -77,6 +80,8 @@ PT.pedidos = (function () {
         const n = Math.min(disp, falta); if (n <= 0) continue;
         o.qtd -= n; if (passo === 'tortas') { o.defeituosas -= n; p.tortasEntregues += n; }
         falta -= n; p.carregadas += n;
+        // MANIFESTO: o que está fisicamente na carroceria deste caminhão
+        c.manifesto = c.manifesto || []; c.manifesto.push({ produto: o.produto, comprimento: o.comprimento, n, tortas: passo === 'tortas' ? n : 0 });
         if (o.qtd <= 0) PT.ent.remover(o); else PT.estoque.atualizarPilha(o);
       }
     }
@@ -104,6 +109,41 @@ PT.pedidos = (function () {
     PT.ev.emit('pedidoEntregue', p);
   }
 
+  // coleta não concluída: o que já foi carregado volta para a zona verde (preserva as tortas)
+  function devolverManifesto(p, c) {
+    const m = c.manifesto || []; if (!m.length) return;
+    const z = PT.DADOS.mundo.zonas.expedicao;
+    m.forEach((it, i) => {
+      const pl = PT.estoque.novaPilha(it.produto, it.comprimento, z.x0 + 3 + (i % 3) * 6.5, z.z0 + 1.2 + Math.floor(i / 3) * 1.6);
+      PT.estoque.addNaPilha(pl, it.n, it.tortas);
+      p.carregadas -= it.n; p.tortasEntregues -= it.tortas;
+    });
+    c.manifesto = [];
+    PT.ev.emit('aviso', 'O motorista descarregou de volta o que já estava no caminhão (' + m.reduce((a, x) => a + x.n, 0) + ' peças).');
+  }
+
+  // motorista cansou de esperar com carga pela metade (sala: Gemini + Claude):
+  // leva o que já carregou como ENTREGA PARCIAL (cliente paga proporcional) e o
+  // resto vira um sub-pedido para amanhã às 14h, com perda de pontualidade.
+  function entregaParcial(p, c) {
+    const resto = p.pecas - p.carregadas, frac = p.carregadas / p.pecas;
+    const valorParte = Math.round(p.valor * frac);
+    const sub = Object.assign({}, p, {
+      id: p.id + '-B', pecas: resto, qtdUnid: p.qtdUnid * (1 - frac), valor: p.valor - valorParte,
+      carregadas: 0, tortasEntregues: 0, status: 'aceito', prazoDia: PT.tempo.st.dia + 1, entradaPaga: 0, caminhao: null,
+      criadoH: PT.tempo.agoraHoras(), janelaH: PT.tempo.st.dia * 24 + 14 });
+    // entrada já paga acima do valor entregue passa para o sub-pedido (pedreiro paga 100% no Pix)
+    if (p.entradaPaga > valorParte) { sub.entradaPaga = p.entradaPaga - valorParte; p.entradaPaga = valorParte; }
+    p.pecas = p.carregadas; p.qtdUnid = p.qtdUnid * frac; p.valor = valorParte;
+    st.lista.push(sub);
+    PT.entrega.agendar(sub.prazoDia, [], sub.cliente, { tipo: 'coleta', pedidoId: sub.id, hora: 14 });
+    PT.rep.efeito('pontualidade', D.reputacao.efeitos.caminhaoEsperando * 5);
+    PT.ev.emit('celular', { de: p.cliente, texto: 'Cansei de esperar! Levei as ' + p.carregadas + ' que estavam no caminhão. As outras ' + resto + ' eu busco amanhã às 14h (' + sub.id + ').' });
+    p.caminhao = null; p.status = 'coleta';
+    concluir(p, c);
+    PT.ev.emit('pedidoNovo', Object.assign({}, sub, { silencioso: true }));
+  }
+
   // caminhão da coleta chegou
   PT.ev.on('coletaChegou', c => {
     const p = st.lista.find(x => x.id === c.e.pedidoId); if (!p || p.status !== 'aceito') { PT.entrega.partir(c); return; }
@@ -114,7 +154,10 @@ PT.pedidos = (function () {
   PT.ev.on('minuto', () => {
     st.lista.forEach(p => {
       if (p.status === 'coleta' && p.caminhao && p.caminhao.espera > p.caminhao.esperaMax) {
-        PT.entrega.partir(p.caminhao); p.caminhao = null; p.status = 'aceito';
+        const c = p.caminhao;
+        if (D.pedidos.cargaParcial === 'entregaParcial' && p.carregadas > 0) { entregaParcial(p, c); return; }
+        devolverManifesto(p, c);
+        PT.entrega.partir(c); p.caminhao = null; p.status = 'aceito';
         PT.rep.efeito('pontualidade', D.reputacao.efeitos.caminhaoEsperando * 5);
         PT.ev.emit('celular', { de: p.cliente, texto: 'Cansei de esperar. Volto amanhã às 14h e é bom estar pronto!' });
         PT.entrega.agendar(PT.tempo.st.dia + 1, [], p.cliente, { tipo: 'coleta', pedidoId: p.id, hora: 14 });
@@ -129,6 +172,9 @@ PT.pedidos = (function () {
     st.lista.forEach(p => {
       if ((p.status === 'aceito') && dia > p.prazoDia + 3) {
         p.status = 'cancelado'; PT.rep.efeito('pontualidade', D.reputacao.efeitos.cancelado);
+        if (p.entradaPaga > 0) { PT.eco.lancar(-p.entradaPaga, 'Estorno da entrada (cancelado por atraso) — ' + p.id); p.entradaPaga = 0; }
+        const multa = Math.round(p.valor * D.pedidos.multaCancelamento);
+        if (multa > 0) PT.eco.lancar(-multa, 'Multa contratual ' + Math.round(D.pedidos.multaCancelamento * 100) + '% (atraso) — ' + p.id);
         PT.entrega.st.fila = PT.entrega.st.fila.filter(e => e.pedidoId !== p.id);
         PT.ev.emit('celular', { de: p.cliente, texto: 'Cancelei o ' + p.id + '. Comprei do concorrente.' });
         PT.ev.emit('pedidoAtualizado', p);
@@ -159,7 +205,7 @@ PT.pedidos = (function () {
   });
 
   return {
-    st, gerar, aceitar, recusar, contraproposta, chamarAgora, descricao, disponivel,
+    st, gerar, aceitar, recusar, contraproposta, chamarAgora, descricao, disponivel, devolverManifesto,
     salvar() { return { lista: st.lista.map(p => Object.assign({}, p, { caminhao: null, status: p.status === 'coleta' ? 'aceito' : p.status })), cont: st.cont, proxHoras: st.proxHoras }; },
     carregar(o) {
       st.lista = o.lista || []; st.cont = o.cont || 0; st.proxHoras = o.proxHoras || 2;

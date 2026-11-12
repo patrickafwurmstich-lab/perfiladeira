@@ -18,6 +18,8 @@ PT.save = (function () {
     if (j.controlando) return 'Largue a botoeira.';
     if (PT.ponte.emOperacao()) return 'Tem carga na ponte ou caindo.';
     if (PT.construcao.ativo) return 'Saia do modo construção.';
+    if (PT.entrega.st.caminhoes.some(c => c.estado !== 'saindo')) return 'Tem caminhão no pátio (espere ele sair).';
+    if (PT.ui.modalAberto()) return 'Feche a janela aberta.';
     return null;
   }
 
@@ -66,11 +68,24 @@ PT.save = (function () {
   }
 
   // chamado no início (main.js). Retorna true se carregou um save.
+  // validação mínima antes de mexer em qualquer coisa do jogo
+  function validar(s) {
+    const precisa = ['tempo', 'jogador', 'eco', 'rep', 'zoeira', 'estoque', 'construcao', 'ponte', 'entrega', 'pedidos', 'entidades', 'maquinas'];
+    precisa.forEach(k => { if (s[k] === undefined) throw new Error('save sem o campo "' + k + '"'); });
+    if (!Number.isFinite(s.eco.caixa)) throw new Error('caixa inválido');
+    if (!Array.isArray(s.entidades) || !Array.isArray(s.maquinas)) throw new Error('listas inválidas');
+    s.maquinas.forEach(m => { if (!PT.DADOS.maquinas[m.defId]) throw new Error('máquina desconhecida: ' + m.defId); });
+    s.entidades.forEach(e => { if (e.tipo === 'bobina' && !PT.DADOS.bobinas[e.spec]) throw new Error('bobina desconhecida: ' + e.spec); });
+  }
+
   function carregarPendente() {
     let txt = null;
-    try { txt = localStorage.getItem(CHAVE_CARREGAR); localStorage.removeItem(CHAVE_CARREGAR); } catch (e) { }
+    try { txt = localStorage.getItem(CHAVE_CARREGAR); } catch (e) { }
     if (!txt) return false;
-    const s = migrar(JSON.parse(txt));
+    let s;
+    try { s = migrar(JSON.parse(txt)); validar(s); }
+    catch (e) { try { localStorage.removeItem(CHAVE_CARREGAR); } catch (x) { } throw new Error('arquivo de save inválido (' + e.message + '). Seu save anterior continua guardado.'); }
+    try { localStorage.removeItem(CHAVE_CARREGAR); } catch (e) { }
     PT.tempo.carregar(s.tempo);
     PT.eco.carregar(s.eco); PT.rep.carregar(s.rep); PT.estoque.carregar(s.estoque); PT.construcao.carregar(s.construcao);
     PT.ponte.carregar(s.ponte); PT.entrega.carregar(s.entrega);

@@ -55,7 +55,6 @@ PT.entrega = (function () {
   }
 
   function atualizar(dt) {
-    const minutos = PT.tempo.minutosDeJogo(dt);
     const sDt = Math.min(dt * PT.tempo.vel, 1);      // segundos "acelerados", com teto anti-túnel
     st.caminhoes.slice().forEach(c => {
       if (c.estado === 'chegando') {
@@ -73,7 +72,6 @@ PT.entrega = (function () {
           if (c.e.tipo === 'coleta') PT.ev.emit('coletaChegou', c); else descarregar(c);
         }
       } else if (c.estado === 'parado') {
-        c.espera += minutos;
         // carroceria acompanha o caminhão; quando tudo saiu, vai embora
         c.carroceria = c.carroceria.filter(o => PT.ent.lista.includes(o) && !o.preso && Math.abs(o.y - 1.2) < 0.05 && Math.abs(o.z - CM.z) < 1.5 && Math.abs(o.x - c.x) < 6.5);
         if (c.e.tipo === 'fornecedor' && c.carroceria.length === 0) partir(c);
@@ -89,6 +87,7 @@ PT.entrega = (function () {
 
   // verifica a fila a cada minuto de jogo
   PT.ev.on('minuto', ({ dia, minutos }) => {
+    st.caminhoes.forEach(c => { if (c.estado === 'parado') c.espera += 1; });   // espera conta em minutos de JOGO (passo fixo)
     const h = minutos / 60;
     st.fila.slice().forEach(e => {
       if (dia > e.dia || (dia === e.dia && h >= e.hora)) {
