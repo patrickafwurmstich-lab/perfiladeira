@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modelos grátis — prévia</title>
+<style>
+  body { margin: 0; background: #e9edf1; font-family: system-ui, sans-serif; color: #1f2933; }
+  header { padding: 14px 18px 4px; }
+  h1 { margin: 0; font-size: 20px; }
+  p { margin: 4px 0 0; font-size: 13px; color: #52606d; }
+  #grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; padding: 12px 18px 24px; }
+  .cel { background: #fff; border: 1px solid #d3dae1; border-radius: 6px; overflow: hidden; }
+  .cel canvas { display: block; width: 100%; height: 190px; }
+  .cel div { padding: 6px 9px 8px; font-size: 13px; border-top: 1px solid #eef1f4; }
+  .cel b { display: block; } .cel small { color: #7b8794; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Modelos 3D grátis já baixados (CC0)</h1>
+  <p>Grab3D e Kenney, licença CC0 (uso comercial livre). O nome em negrito é o ID do modelo no jogo; arraste para girar.</p>
+</header>
+<div id="grade"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+const LISTA = [
+  ['grab3d/forklift-light.glb', 'empilhadeira_eletrica'], ['grab3d/pallet-jack.glb', 'paleteira'],
+  ['grab3d/overhead-crane-light.glb', 'ponte_viga / carro / gancho (adaptar)'], ['grab3d/electrical-cabinet.glb', 'quadro_eletrico'],
+  ['grab3d/industrial-control-panel.glb', 'clp_padrao (parcial)'], ['grab3d/hydraulic-press.glb', 'referência p/ guilhotina'],
+  ['grab3d/school-locker.glb', 'armario'], ['grab3d/office-desk.glb', 'computador_mesa (mesa)'],
+  ['grab3d/desktop-pc.glb', 'computador_mesa (PC)'], ['grab3d/computer-monitor.glb', 'computador_mesa (monitor)'],
+  ['grab3d/thermos.glb', 'garrafa_cafe'], ['grab3d/cardboard-box-stack.glb', 'volume_caixa'],
+  ['grab3d/metal-crate.glb', 'volume_engradado'], ['grab3d/wooden-pallet.glb', 'palete'],
+  ['grab3d/cement-bags.glb', 'saco_cimento'], ['grab3d/paint-can.glb', 'lata_tinta'], ['grab3d/paint-roller.glb', 'lata_tinta (rolo)'],
+  ['grab3d/roller-shutter-door.glb', 'barracao (portão)'], ['grab3d/loading-dock.glb', 'barracao (doca)'],
+  ['grab3d/hard-hat.glb', 'capacete (personagens)'], ['grab3d/snake-plant.glb', 'vaso_planta'],
+  ['grab3d/delivery-truck.glb', 'caminhao_entrega (baú)'],
+  ['kenney/truck-flat.glb', 'caminhao_entrega (carroceria)'], ['kenney/delivery-flat.glb', 'caminhao_entrega (alt.)'],
+  ['kenney/truck.glb', 'caminhão Kenney'], ['kenney/delivery.glb', 'van Kenney']
+];
+const grade = document.getElementById('grade'), loader = new THREE.GLTFLoader(), cenas = [];
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.outputEncoding = THREE.sRGBEncoding;
+LISTA.forEach(([arq, id]) => {
+  const cel = document.createElement('div'); cel.className = 'cel';
+  const cv = document.createElement('canvas'); cel.appendChild(cv);
+  const info = document.createElement('div'); info.innerHTML = '<b>' + id + '</b><small>' + arq + ' · carregando…</small>'; cel.appendChild(info);
+  grade.appendChild(cel);
+  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.0));
+  const sol = new THREE.DirectionalLight(0xffffff, 0.9); sol.position.set(3, 5, 4); sc.add(sol);
+  const cam = new THREE.PerspectiveCamera(32, 1.2, 0.01, 500);
+  const item = { cv, sc, cam, ang: 0.7, alvo: null, raio: 1, pronto: false };
+  cenas.push(item);
+  loader.load(arq, g => {
+    const m = g.scene; sc.add(m);
+    const box = new THREE.Box3().setFromObject(m), tam = box.getSize(new THREE.Vector3()), cen = box.getCenter(new THREE.Vector3());
+    let tris = 0; m.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+    item.alvo = cen; item.raio = Math.max(tam.x, tam.y, tam.z) * 1.6; item.pronto = true;
+    info.querySelector('small').textContent = arq + ' · ' + tam.x.toFixed(1) + '×' + tam.z.toFixed(1) + '×' + tam.y.toFixed(1) + ' m · ' + Math.round(tris / 100) / 10 + 'k tri';
+  }, undefined, e => { info.querySelector('small').textContent = arq + ' · ERRO ao carregar'; item.erro = true; });
+  let arr = null;
+  cv.addEventListener('pointerdown', e => { arr = e.clientX; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e => { if (arr !== null) { item.ang -= (e.clientX - arr) * 0.01; arr = e.clientX; } });
+  cv.addEventListener('pointerup', () => arr = null);
+});
+function desenhar() {
+  cenas.forEach(it => {
+    const w = it.cv.clientWidth, h = it.cv.clientHeight; if (!w || !it.pronto) return;
+    if (it.cv.width !== w * renderer.getPixelRatio()) { it.cv.width = w * renderer.getPixelRatio(); it.cv.height = h * renderer.getPixelRatio(); }
+    it.cam.aspect = w / h; it.cam.updateProjectionMatrix();
+    it.cam.position.set(it.alvo.x + Math.sin(it.ang) * it.raio, it.alvo.y + it.raio * 0.45, it.alvo.z + Math.cos(it.ang) * it.raio); it.cam.lookAt(it.alvo);
+    renderer.setSize(w, h, false); renderer.render(it.sc, it.cam);
+    const ctx = it.cv.getContext('2d'); ctx.clearRect(0, 0, it.cv.width, it.cv.height); ctx.drawImage(renderer.domElement, 0, 0, it.cv.width, it.cv.height);
+  });
+  window.__prontos = cenas.filter(c => c.pronto || c.erro).length;
+  requestAnimationFrame(desenhar);
+}
+desenhar();
+</script>
+</body>
+</html>
