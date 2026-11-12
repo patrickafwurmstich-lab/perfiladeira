@@ -142,12 +142,15 @@ PT.ponte = (function () {
 
     // visual
     const vib = st.estresse > 1.5 ? (Math.random() - 0.5) * 0.08 : 0;
-    viga.position.set(st.x, PC.alturaTrilho + 0.25, M.D / 2);
-    carro.position.set(st.x, PC.alturaTrilho + 0.75, st.z);
+    // com os modelos 3D o carro roda em cima do trilho da viga (topo a 1,08 m) e o cabo sai do tambor
+    const g3 = PT.glb && PT.glb.ativo('ponte_viga'), olhal = (PT.glb && PT.glb.ativo('ponte_gancho')) ? 0.72 : 0.8;
+    const yViga = PC.alturaTrilho + 0.25, yCarro = g3 ? yViga + 1.08 : PC.alturaTrilho + 0.75;
+    viga.position.set(st.x, yViga, M.D / 2);
+    carro.position.set(st.x, yCarro, st.z);
     const hx = st.x + st.swx + vib, hz = st.z + st.swz + vib;
-    const topoCabo = PC.alturaTrilho + 0.75, comp = Math.max(0.05, topoCabo - st.y - 0.8);
+    const topoCabo = g3 ? yCarro + 0.4 : yCarro, comp = Math.max(0.05, topoCabo - st.y - olhal);
     cabo.visible = st.rompida <= 0;
-    cabo.position.set((st.x + hx) / 2, st.y + 0.8, (st.z + hz) / 2);
+    cabo.position.set((st.x + hx) / 2, st.y + olhal, (st.z + hz) / 2);
     cabo.scale.set(1, comp, 1); cabo.userData.mesh.position.y = 0.5;
     cabo.rotation.set(Math.atan2(hz - st.z, comp) * 0.9, 0, -Math.atan2(hx - st.x, comp) * 0.9);
     cabo.userData.mesh.material.color.setHex(corCabo());

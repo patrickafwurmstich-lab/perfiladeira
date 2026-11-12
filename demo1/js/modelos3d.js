@@ -10,7 +10,8 @@ window.PT = window.PT || {};
 // modelos aprovados (crítica ChatGPT + Grok) e que já encaixam na regra do jogo
 PT.GLB_NO_JOGO = [
   'bobina_1t', 'bobina_2t', 'botoeira', 'mandril', 'berco_bobina', 'porta_escritorio', 'sino_balcao',
-  'balcao_loja', 'mostruario', 'clp_padrao', 'placa_dias_sem_acidente', 'placa_parede'
+  'balcao_loja', 'mostruario', 'clp_padrao', 'placa_dias_sem_acidente', 'placa_parede',
+  'perfiladeira_tp40', 'dobradeira'          // complexos v2: aprovados (ChatGPT + Grok)
 ];
 
 PT.glb = (function () {
@@ -20,6 +21,14 @@ PT.glb = (function () {
   try { ligado = !/[?&]cubos=1/.test(location.search) && localStorage.getItem('pt_cubos') !== '1'; } catch (e) { }
   const disponivel = () => ligado && typeof THREE !== 'undefined' && THREE.GLTFLoader;
   const st = { carregados: 0, erros: 0, trocados: 0 };
+  // deslocamento do .glb dentro da caixa do jogo: o mandril do desbobinador do modelo
+  // fica exatamente no ponto onde o jogo monta a bobina (pontoEntrada = -comprimento/2 - 1 m)
+  const AJUSTE = {
+    perfiladeira_tp40: { dx: -1.8 },   // mandril do modelo em x = -7,2 → -9,0
+    guilhotina: { dx: -1.65 }          // mandril em x = -2,85 → -4,5
+  };
+  const ALTURA_MANDRIL = 1.12;         // eixo do desbobinador dos modelos (m)
+  function ativo(id) { return disponivel() && PT.GLB_NO_JOGO.indexOf(id) >= 0; }
 
   function carregar(id) {
     if (!cache[id]) cache[id] = new Promise((ok, erro) => {
@@ -56,6 +65,7 @@ PT.glb = (function () {
       const m = cena.clone(true);
       const caixa = new THREE.Box3().setFromObject(m);
       m.position.y = -altura / 2 - caixa.min.y;       // base do modelo no chão do objeto
+      const aj = AJUSTE[id]; if (aj) { m.position.x += aj.dx || 0; m.position.z += aj.dz || 0; if (aj.ry) m.rotation.y = aj.ry; }
       m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       // placa de acidentes: a textura viva do jogo (número de dias) vai para a face do modelo
       if (id === 'placa_dias_sem_acidente' && Array.isArray(mesh.material) && mesh.material[4] && mesh.material[4].map) {
@@ -83,5 +93,5 @@ PT.glb = (function () {
     });
   }
   function definirLigado(v) { try { localStorage.setItem('pt_cubos', v ? '0' : '1'); } catch (e) { } }
-  return { aplicar, carregar, st, ligado: () => ligado, definirLigado, luzTorre };
+  return { aplicar, carregar, st, ligado: () => ligado, definirLigado, luzTorre, ativo, ALTURA_MANDRIL };
 })();

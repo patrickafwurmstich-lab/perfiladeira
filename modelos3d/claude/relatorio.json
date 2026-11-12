@@ -281,7 +281,7 @@
  },
  "dobradeira": {
   "id": "dobradeira",
-  "tris": 4946,
+  "tris": 5414,
   "med": {
    "x": 4.26,
    "y": 1.655,
@@ -371,7 +371,7 @@
  },
  "ponte_viga": {
   "id": "ponte_viga",
-  "tris": 1726,
+  "tris": 2950,
   "med": {
    "x": 2.6,
    "y": 1.08,
@@ -381,27 +381,27 @@
  },
  "ponte_carro": {
   "id": "ponte_carro",
-  "tris": 3276,
+  "tris": 3500,
   "med": {
    "x": 1.4,
-   "y": 0.802,
+   "y": 0.911,
    "z": 1.45,
-   "minY": 0.003
+   "minY": -0.016
   }
  },
  "ponte_gancho": {
   "id": "ponte_gancho",
-  "tris": 1008,
+  "tris": 1264,
   "med": {
    "x": 0.36,
    "y": 0.665,
-   "z": 0.231,
+   "z": 0.237,
    "minY": 0.045
   }
  },
  "caminhao_carroceria": {
   "id": "caminhao_carroceria",
-  "tris": 4248,
+  "tris": 5760,
   "med": {
    "x": 8.905,
    "y": 2.825,

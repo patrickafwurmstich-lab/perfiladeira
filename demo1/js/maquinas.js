@@ -87,7 +87,9 @@ PT.maq = (function () {
   function tentarMontar(b) {
     const m = lista.find(m => m.def.entrada === 'bobina' && !m.bobina && Math.hypot(pontoEntrada(m).x - b.x, pontoEntrada(m).z - b.z) < 1.6);
     if (!m) return false;
-    const p = pontoEntrada(m); b.x = p.x; b.z = p.z; b.y = 0.3; b.rot = m.rot; b.montadaEm = m.id;
+    const p = pontoEntrada(m); b.x = p.x; b.z = p.z; b.rot = m.rot; b.montadaEm = m.id;
+    // com o modelo 3D a bobina fica no mandril do desbobinador (eixo a 1,12 m); com cubos, a 0,3 m
+    b.y = (PT.glb && PT.glb.ativo(m.def.modelo)) ? Math.max(0.3, PT.glb.ALTURA_MANDRIL - b.g.userData.altura / 2) : 0.3;
     PT.ent.sync(b); m.bobina = b; m.alinhado = false; m.alinhamento = 0;
     PT.ev.emit('aviso', b.codigo + ' montada no desbobinador da ' + m.nome + '. Agora alinhe a chapa no CLP.');
     PT.ev.emit('bobinaMontada', { m, b });

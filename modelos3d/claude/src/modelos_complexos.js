@@ -225,11 +225,14 @@
     const viga = grupo('viga_fixacao'); pos(viga, 0, YT + 0.02, 0);
     viga.add(pos(extrudar([[-0.3, 0], [-0.12, 0], [0.05, 0.12], [0.05, 0.2], [-0.3, 0.2]], L - 0.1, TEAL_E, 'perfil_viga', 0.01), 0, 0, 0).rotateY(Math.PI / 2));
     [-1.6, 0, 1.6].forEach(x => {
-      viga.add(pos(caixa(0.08, 0.32, 0.08, COR.grafite, 'braco', 0.01), x, 0.3, 0.2));
+      viga.add(pos(caixa(0.12, 0.34, 0.12, COR.grafite, 'braco', 0.015), x, 0.3, 0.2));
       viga.add(pos(rot(cilindro(0.016, 0.35, COR.aco, 'alavanca_aperto', 0.005, 8), 0.9, 0, 0), x, 0.5, 0.33));
       viga.add(pos(cilindro(0.03, 0.06, COR.vermelho, 'manopla', 0.01, 10), x, 0.62, 0.45));
     });
     g.add(viga);
+    // batente traseiro regulável (encosto da chapa) com 2 manípulos amarelos
+    g.add(pos(caixa(L - 0.5, 0.06, 0.05, COR.aco, 'batente_traseiro', 0.008), 0, YT + 0.03, 0.3));
+    [-1.2, 1.2].forEach(x => g.add(pos(cilindro(0.035, 0.07, AMARELO, 'manipulo_batente', 0.01, 10), x, YT + 0.09, 0.3)));
     // avental: gira na aresta da frente (dobradiça em z = -0,36, y = YT) — nó 'avental'
     const av = grupo('avental'); pos(av, 0, YT, -0.36);
     av.add(pos(caixa(L - 0.06, 0.04, 0.16, AMARELO, 'chapa_avental', 0.01), 0, -0.02, -0.08));
@@ -398,10 +401,14 @@
   // ---------- PONTE ROLANTE (feita do zero: a grátis é de pórtico) ----------
   M.ponte_viga = () => {   // viga caixão de 40 m em Z + cabeceiras com rodas; pivot = topo do trilho
     const g = grupo('ponte_viga'), V = 20;
-    g.add(pos(caixa(0.7, 0.9, 2 * V - 0.6, AMARELO, 'viga_caixao', 0.04), 0, 0.55, 0));
-    g.add(pos(caixa(0.12, 0.08, 2 * V - 1.0, COR.grafite, 'trilho_carro', 0), -0.2, 1.04, 0));
-    g.add(pos(caixa(0.12, 0.08, 2 * V - 1.0, COR.grafite, 'trilho_carro', 0), 0.2, 1.04, 0));
-    zebra(g, 0, 0.55, 0, 0.71, 0.3, 2 * V - 0.6, 30, 'z');
+    // viga DUPLA: o carro anda por cima das duas e o cabo desce pelo vão do meio (não atravessa a viga)
+    [-1, 1].forEach(s => {
+      g.add(pos(caixa(0.32, 0.9, 2 * V - 0.6, AMARELO, 'viga_caixao', 0.04), s * 0.62, 0.55, 0));
+      g.add(pos(caixa(0.1, 0.08, 2 * V - 1.0, COR.grafite, 'trilho_carro', 0), s * 0.62, 1.04, 0));
+      zebra(g, s * 0.62, 0.55, 0, 0.33, 0.3, 2 * V - 0.6, 30, 'z');
+    });
+    // diafragmas ligando as duas vigas
+    for (let i = -3; i <= 3; i++) g.add(pos(caixa(0.92, 0.16, 0.12, AMARELO, 'travamento', 0.02), 0, 0.85, i * 5.5));
     [-1, 1].forEach(s => {
       const cab = grupo('cabeceira'); pos(cab, 0, 0, s * (V - 0.2));
       cab.add(pos(caixa(2.6, 0.45, 0.4, AMARELO, 'viga_cabeceira', 0.03), 0, 0.3, 0));
@@ -410,25 +417,25 @@
       cab.add(pos(caixa(0.6, 0.12, 0.5, COR.vermelho, 'batente', 0.03), s > 0 ? 0 : 0, 0.3, s * 0.25));
       g.add(cab);
     });
-    g.add(pos(rot(plano(1.6, 0.4, (c, w, h) => { c.fillStyle = '#f5c84b'; c.fillRect(0, 0, w, h); c.fillStyle = '#2b2f36'; c.font = 'bold 90px sans-serif'; c.textAlign = 'center'; c.fillText('1.500 kg', w / 2, 92); }, 512, 128, 'placa_capacidade'), 0, -Math.PI / 2, 0), -0.355, 0.55, 3));
+    g.add(pos(rot(plano(1.6, 0.4, (c, w, h) => { c.fillStyle = '#f5c84b'; c.fillRect(0, 0, w, h); c.fillStyle = '#2b2f36'; c.font = 'bold 90px sans-serif'; c.textAlign = 'center'; c.fillText('1.500 kg', w / 2, 92); }, 512, 128, 'placa_capacidade'), 0, -Math.PI / 2, 0), -0.785, 0.55, 3));
     return g;
   };
   M.ponte_carro = () => {   // carro/talha: rodas no trilho da viga, tambor do cabo
     const g = grupo('ponte_carro');
-    g.add(pos(caixa(1.4, 0.15, 1.3, COR.grafite, 'quadro', 0.03), 0, 0.2, 0));
-    [-1, 1].forEach(s => [-1, 1].forEach(t => g.add(pos(eixoX(0.1, 0.08, COR.preto, 'roda', 14), s * 0.62, 0.1, t * 0.5))));
-    g.add(pos(eixoZ(0.24, 0.8, TEAL, 'tambor', 18), 0, 0.55, 0));
-    for (let i = 0; i < 6; i++) g.add(pos(rot(anel(0.24, 0.255, 0.03, COR.aco, 'espira_cabo', 18, 0.004), Math.PI / 2, 0, 0), 0, 0.55, -0.3 + i * 0.12));
-    g.add(pos(eixoZ(0.16, 0.36, TEAL_E, 'motor_elevacao', 16), 0, 0.5, 0.62));
-    g.add(pos(caixa(0.34, 0.34, 0.2, TEAL_E, 'redutor', 0.03), 0, 0.5, -0.52));
-    g.add(pos(caixa(0.3, 0.25, 0.15, COR.grafite, 'caixa_eletrica', 0.03), 0.5, 0.45, 0.4));
+    g.add(pos(caixa(1.4, 0.15, 1.3, COR.grafite, 'quadro', 0.03), 0, 0.3, 0));
+    [-1, 1].forEach(s => [-1, 1].forEach(t => { g.add(pos(eixoX(0.13, 0.08, COR.preto, 'roda', 14), s * 0.62, 0.13, t * 0.5)); g.add(pos(eixoX(0.15, 0.02, COR.aco, 'flange_roda', 14), s * 0.62 - s * 0.05, 0.13, t * 0.5)); }));
+    g.add(pos(eixoZ(0.24, 0.8, TEAL, 'tambor', 18), 0, 0.64, 0));
+    for (let i = 0; i < 6; i++) g.add(pos(rot(anel(0.24, 0.255, 0.03, COR.aco, 'espira_cabo', 18, 0.004), Math.PI / 2, 0, 0), 0, 0.64, -0.3 + i * 0.12));
+    g.add(pos(eixoZ(0.16, 0.36, TEAL_E, 'motor_elevacao', 16), 0, 0.6, 0.62));
+    g.add(pos(caixa(0.34, 0.34, 0.2, TEAL_E, 'redutor', 0.03), 0, 0.6, -0.52));
+    g.add(pos(caixa(0.3, 0.25, 0.15, COR.grafite, 'caixa_eletrica', 0.03), 0.5, 0.52, 0.4));
     return g;
   };
   M.ponte_gancho = () => {   // moitão com 2 polias + gancho com trava (pivot = ponta de baixo do gancho)
     const g = grupo('ponte_gancho');
     const moitao = grupo('moitao'); pos(moitao, 0, 0.55, 0);
     moitao.add(caixa(0.36, 0.28, 0.2, AMARELO, 'carcaca', 0.04));
-    [-1, 1].forEach(s => moitao.add(pos(eixoZ(0.09, 0.03, COR.grafite, 'polia', 16), s * 0.085, 0.02, 0.112)));
+    [-1, 1].forEach(s => { moitao.add(pos(eixoZ(0.075, 0.03, COR.grafite, 'polia', 16), s * 0.085, 0.02, 0.112)); [-0.017, 0.017].forEach(dz => moitao.add(pos(eixoZ(0.095, 0.008, COR.aco, 'flange_polia', 16), s * 0.085, 0.02, 0.112 + dz))); });
     zebra(moitao, 0, 0, 0, 0.364, 0.2, 0.204, 3, 'x');
     g.add(moitao);
     g.add(pos(cilindro(0.04, 0.12, COR.aco, 'pescoco', 0.01, 10), 0, 0.36, 0));
@@ -437,7 +444,7 @@
     for (let i = 0; i <= 12; i++) { const a = Math.PI + (i / 12) * (Math.PI + 0.55); pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, 0]); }
     const gancho = tubo(pts, 0.03, COR.vermelho, 'gancho', 28);
     g.add(gancho);
-    g.add(pos(rot(caixa(0.012, 0.13, 0.025, AMARELO, 'trava', 0.004), 0, 0, -0.75), 0.07, 0.2, 0));
+    g.add(pos(rot(caixa(0.022, 0.14, 0.04, AMARELO, 'trava', 0.006), 0, 0, -0.75), 0.07, 0.2, 0));
     g.children.forEach(c => c.position.y += 0.02);
     return g;
   };
@@ -447,7 +454,7 @@
     const g = grupo('caminhao_carroceria'), BRANCO = 0xf2f0ea;
     // chassi e rodas (2 eixos, roda dupla atrás)
     [-1, 1].forEach(s => g.add(pos(caixa(8.4, 0.22, 0.12, COR.grafite, 'longarina', 0), 0.2, 0.75, s * 0.45)));
-    const roda = (x, z, nome) => { const r = grupo(nome); r.add(eixoZ(0.48, 0.3, COR.borracha, 'pneu', 18)); r.add(pos(eixoZ(0.26, 0.31, COR.aco, 'aro', 14), 0, 0, 0)); pos(r, x, 0.48, z); return r; };
+    const roda = (x, z, nome) => { const r = grupo(nome); r.add(eixoZ(0.48, 0.3, COR.borracha, 'pneu', 18)); r.add(pos(eixoZ(0.26, 0.31, COR.aco, 'aro', 14), 0, 0, 0)); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; [-1, 1].forEach(f => r.add(pos(caixa(0.05, 0.05, 0.02, COR.grafite, 'porca', 0), Math.cos(a) * 0.15, Math.sin(a) * 0.15, f * 0.16))); } pos(r, x, 0.48, z); return r; };
     [-1, 1].forEach(s => { g.add(roda(3.0, s * 1.02, 'roda_dianteira')); g.add(roda(-2.0, s * 1.0, 'roda_traseira')); g.add(roda(-2.0, s * 0.68, 'roda_traseira_dupla')); });
     // cabine avançada (cara de caminhão brasileiro), para-choque e faróis
     const cab = grupo('cabine'); pos(cab, 3.35, 0, 0);
@@ -463,8 +470,8 @@
     // carroceria de madeira com guardas laterais baixas (cabem pilhas de telha de 6 m)
     const car = grupo('carroceria'); pos(car, -1.2, 0, 0);
     car.add(pos(caixa(6.4, 0.12, 2.45, COR.madeira, 'assoalho', 0.01), 0, 0.92, 0));
-    [-1, 1].forEach(s => car.add(pos(caixa(6.4, 0.45, 0.06, COR.madeiraEsc, 'guarda_lateral', 0.01), 0, 1.2, s * 1.2)));
-    car.add(pos(caixa(0.06, 0.45, 2.45, COR.madeiraEsc, 'guarda_traseira', 0.01), -3.2, 1.2, 0));
+    [-1, 1].forEach(s => { [0, 1, 2].forEach(k => car.add(pos(caixa(6.4, 0.14, 0.06, k === 1 ? COR.madeira : COR.madeiraEsc, 'tabua_lateral', 0.01), 0, 1.04 + k * 0.155, s * 1.2))); });
+    [0, 1, 2].forEach(k => car.add(pos(caixa(0.06, 0.14, 2.45, k === 1 ? COR.madeira : COR.madeiraEsc, 'tabua_traseira', 0.01), -3.2, 1.04 + k * 0.155, 0)));
     car.add(pos(caixa(0.12, 1.3, 2.45, COR.grafite, 'protetor_cabine', 0.02), 3.15, 1.6, 0));
     for (let i = 0; i < 6; i++) [-1, 1].forEach(s => car.add(pos(caixa(0.06, 0.5, 0.08, COR.grafite, 'fueiro', 0.01), -2.9 + i * 1.16, 1.22, s * 1.22)));
     g.add(car);
