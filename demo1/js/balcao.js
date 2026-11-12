@@ -22,17 +22,20 @@ PT.balcao = (function () {
     // piso
     caixa(lj.x1 - lj.x0, 0.08, lj.z1 - lj.z0, 0xb08d5e, (lj.x0 + lj.x1) / 2, 0.04, (lj.z0 + lj.z1) / 2);
     // paredes com porta para o barracão (norte) e para a rua (sul)
+    const predio3d = PT.glb && PT.glb.ativo('loja_balcao');
+    const parede = (...a) => { if (!predio3d) caixa(...a); };
+    if (predio3d) { const pr = PT.modelo('loja_balcao', { semRotulo: true }); pr.position.set((lj.x0 + lj.x1) / 2, 0, (lj.z0 + lj.z1) / 2); pr.userData.mesh.material.visible = false; sc.add(pr); }
     [[lj.z1, 'norte'], [lj.z0, 'sul']].forEach(([z]) => {
-      caixa(px - 1 - lj.x0, h, 0.25, cw, (lj.x0 + px - 1) / 2, h / 2, z, 0.55); P.push({ x0: lj.x0, x1: px - 1, z0: z - 0.2, z1: z + 0.2 });
-      caixa(lj.x1 - px - 1, h, 0.25, cw, (px + 1 + lj.x1) / 2, h / 2, z, 0.55); P.push({ x0: px + 1, x1: lj.x1, z0: z - 0.2, z1: z + 0.2 });
+      parede(px - 1 - lj.x0, h, 0.25, cw, (lj.x0 + px - 1) / 2, h / 2, z, 0.55); P.push({ x0: lj.x0, x1: px - 1, z0: z - 0.2, z1: z + 0.2 });
+      parede(lj.x1 - px - 1, h, 0.25, cw, (px + 1 + lj.x1) / 2, h / 2, z, 0.55); P.push({ x0: px + 1, x1: lj.x1, z0: z - 0.2, z1: z + 0.2 });
     });
-    [lj.x0, lj.x1].forEach(x => { caixa(0.25, h, lj.z1 - lj.z0, cw, x, h / 2, (lj.z0 + lj.z1) / 2, 0.55); P.push({ x0: x - 0.2, x1: x + 0.2, z0: lj.z0, z1: lj.z1 }); });
+    [lj.x0, lj.x1].forEach(x => { parede(0.25, h, lj.z1 - lj.z0, cw, x, h / 2, (lj.z0 + lj.z1) / 2, 0.55); P.push({ x0: x - 0.2, x1: x + 0.2, z0: lj.z0, z1: lj.z1 }); });
     // balcão (deixa passagem na ponta oeste para o dono entrar e sair)
     const bal = PT.modelo('balcao_loja', { dims: [lj.x1 - lj.x0 - 3, 0.7, 1.1] }); bal.position.set((lj.x0 + 2.5 + lj.x1) / 2, 0, lj.balcaoZ); sc.add(bal);
     P.push({ x0: lj.x0 + 2.5, x1: lj.x1, z0: lj.balcaoZ - 0.35, z1: lj.balcaoZ + 0.35 });
     const sino = PT.modelo('sino_balcao', { semRotulo: true }); sino.position.set(px + 1.2, 1.1, lj.balcaoZ); sc.add(sino);
     // placa da fachada
-    const placa = PT.rotuloSprite('LOJA PARECIS TELHA — PRONTA ENTREGA', '#ffd27a'); placa.scale.set(4.6, 0.85, 1); placa.position.set((lj.x0 + lj.x1) / 2, 3.8, lj.z0 - 0.2); sc.add(placa);
+    if (!predio3d) { const placa = PT.rotuloSprite('LOJA PARECIS TELHA — PRONTA ENTREGA', '#ffd27a'); placa.scale.set(4.6, 0.85, 1); placa.position.set((lj.x0 + lj.x1) / 2, 3.8, lj.z0 - 0.2); sc.add(placa); }   // o prédio 3D já tem o letreiro
     PT.registroModelos.usos.loja_balcao = 1; PT.registroModelos.max.loja_balcao = 1;
   }
 

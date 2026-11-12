@@ -67,7 +67,8 @@ PT.ui = (function () {
   }
   function proximaLigacao() {
     if (st.modal || !st.filaLigacoes.length || PT.mundo.jog.morto) return;
-    const p = PT.pedidos.st.lista.find(x => x.id === st.filaLigacoes.shift());
+    const id = st.filaLigacoes.shift();   // tira UM da fila (antes o shift ficava dentro do find e esvaziava a fila com 2+ pedidos)
+    const p = PT.pedidos.st.lista.find(x => x.id === id);
     if (!p || p.status !== 'oferta') return proximaLigacao();
     ligacaoAtual = p.id; clearTimeout(ligTimer); ligTimer = setTimeout(() => { if (st.modal === 'ligacao' && ligacaoAtual === p.id) fecharModal(); }, 20000);
     abrirModal('ligacao');
@@ -221,6 +222,7 @@ PT.ui = (function () {
   return {
     textoPagamento, correio: () => st.correio, correioNaoLidos: () => st.correio.filter(m => !m.lido).length,
     hud, aviso, email, modalAberto, abrirModal, cancelarInteracoes, capturandoTeclado, abrirComputador, abrirCLP, minijogo, progresso, fecharModal,
-    salvarCorreio() { return st.correio.slice(0, 60); }, carregarCorreio(c) { st.correio = c || []; }
+    salvarCorreio() { return st.correio.slice(0, 60); }, carregarCorreio(c) { st.correio = c || []; },
+    _estado: () => ({ modal: st.modal, fila: st.filaLigacoes.slice(), atual: ligacaoAtual })   // para os testes
   };
 })();

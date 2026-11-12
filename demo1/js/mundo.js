@@ -57,7 +57,7 @@ PT.mundo = (function () {
     // faixas
     for (let x = -36; x < M.L + 40; x += 6) caixa(3, 0.13, 0.15, 0xf5f5f5, x, 0.02, (M.corredor.z0 + M.corredor.z1) / 2);
     // paredes (baixas, para enxergar dentro) com aberturas dos portões no corredor
-    const h = 3.2, cw = 0x9aa4ad;
+    const h = 3.2, cw = (PT.glb && PT.glb.ativo('barracao_estrutura')) ? 0xd9d4c8 : 0x9aa4ad;   // com a estrutura 3D: alvenaria
     caixa(M.L, h, 0.3, cw, M.L / 2, h / 2, M.D);                       // fundo
     paredes.push({ x0: 0, x1: M.L, z0: M.D - 0.2, z1: M.D + 0.5 });
     // frente, com porta de pedestre para a loja de balcão
@@ -74,10 +74,13 @@ PT.mundo = (function () {
       paredes.push({ x0: x - 0.4, x1: x + 0.4, z0: 0, z1: M.corredor.z0 });
     });
     // pilares e trilhos da ponte (vigas de rolamento já instaladas)
-    for (let x = 0; x <= M.L; x += 12) {
+    if (PT.glb && PT.glb.ativo('barracao_estrutura')) {
+      const est = PT.modelo('barracao_estrutura', { semRotulo: true }); est.position.set(M.L / 2, 0, M.D / 2);
+      est.userData.mesh.material.visible = false; est.userData.mesh.castShadow = false; scene.add(est);   // a caixa de 132 m nunca aparece
+    } else for (let x = 0; x <= M.L; x += 12) {
       [0.4, M.D - 0.4].forEach(z => caixa(0.5, M.ponte.alturaTrilho, 0.5, 0x7b8790, x, M.ponte.alturaTrilho / 2, z, true));
     }
-    [0.4, M.D - 0.4].forEach(z => caixa(M.L, 0.5, 0.4, 0x5d6d7e, M.L / 2, M.ponte.alturaTrilho, z));
+    if (!(PT.glb && PT.glb.ativo('barracao_estrutura'))) [0.4, M.D - 0.4].forEach(z => caixa(M.L, 0.5, 0.4, 0x5d6d7e, M.L / 2, M.ponte.alturaTrilho, z));
     // zonas pintadas
     Object.keys(M.zonas).forEach(k => {
       const zn = M.zonas[k];

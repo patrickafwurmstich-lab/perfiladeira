@@ -34,13 +34,24 @@ const THREE_FILE = (process.env.THREE_JS || require('path').join(__dirname, 'thr
   ok(r === false, 'W4 perder o foco da janela solta as teclas');
   // W5: ligação fechada vira chamada perdida (espera o respawn dos testes de morte acima)
   await p.waitForFunction(() => !PT.mundo.jog.morto, null, { timeout: 30000 }).catch(() => {});
+  await p.evaluate(() => { for (let i = 0; i < 300 && PT.mundo.jog.morto; i++) PT.zoeira.atualizar(0.1); });   // cena pesada no navegador de teste: adianta o respawn
+  // e espera fechar qualquer janela/barra de progresso ainda aberta (o respawn abre o e-mail do hospital)
+  await p.evaluate(() => { PT.ui.cancelarInteracoes(); if (PT.ui.modalAberto()) PT.ui.fecharModal(); });
+  await p.waitForFunction(() => !PT.ui.modalAberto(), null, { timeout: 15000 }).catch(() => {});
   r = await p.evaluate(() => {
     PT.ui.cancelarInteracoes(); let ped; for (let i = 0; i < 30 && !ped; i++) { const x = PT.pedidos.gerar(); if (x.canal === 'telefone') ped = x; }
     const aberta = PT.ui.modalAberto(); PT.ui.fecharModal();
     const mail = PT.ui.salvarCorreio().find(m => m.pedidoId === ped.id && /Chamada perdida/.test(m.assunto));
-    return { aberta, mail: !!mail, status: ped.status };
+    return { aberta, mail: !!mail, status: ped.status, morto: PT.mundo.jog.morto, canal: ped && ped.canal };
   });
   ok(r.aberta && r.mail && r.status === 'oferta', 'W5 ' + JSON.stringify(r) + ' ligação fechada sem responder vira "chamada perdida" no e-mail e o pedido continua em aberto');
+  // W5b: com vários pedidos na lista, a ligação nova abre (bug: o shift() dentro do find esvaziava a fila)
+  r = await p.evaluate(() => {
+    let abriu = 0, tel = 0;
+    for (let i = 0; i < 40 && tel < 3; i++) { PT.ui.cancelarInteracoes(); const x = PT.pedidos.gerar(); if (x.canal === 'telefone') { tel++; if (PT.ui._estado().atual === x.id) abriu++; } }
+    PT.ui.cancelarInteracoes(); return { tel, abriu, total: PT.pedidos.st.lista.length };
+  });
+  ok(r.tel > 0 && r.abriu === r.tel, 'W5b toda ligação nova abre mesmo com ' + r.total + ' pedidos na lista (' + r.abriu + '/' + r.tel + ')');
   await p.evaluate(() => PT.ui.cancelarInteracoes());
   // W6: caminhão travado pelo corredor desiste e volta amanhã
   r = await p.evaluate(() => {

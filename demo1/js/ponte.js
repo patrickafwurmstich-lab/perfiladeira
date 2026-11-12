@@ -144,7 +144,7 @@ PT.ponte = (function () {
     const vib = st.estresse > 1.5 ? (Math.random() - 0.5) * 0.08 : 0;
     // com os modelos 3D o carro roda em cima do trilho da viga (topo a 1,08 m) e o cabo sai do tambor
     const g3 = PT.glb && PT.glb.ativo('ponte_viga'), olhal = (PT.glb && PT.glb.ativo('ponte_gancho')) ? 0.72 : 0.8;
-    const yViga = PC.alturaTrilho + 0.25, yCarro = g3 ? yViga + 1.08 : PC.alturaTrilho + 0.75;
+    const yViga = (PT.glb && PT.glb.ativo('barracao_estrutura')) ? 9.13 : PC.alturaTrilho + 0.25, yCarro = g3 ? yViga + 1.08 : PC.alturaTrilho + 0.75;
     viga.position.set(st.x, yViga, M.D / 2);
     carro.position.set(st.x, yCarro, st.z);
     const hx = st.x + st.swx + vib, hz = st.z + st.swz + vib;

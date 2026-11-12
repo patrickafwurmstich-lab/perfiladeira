@@ -13,7 +13,8 @@ PT.GLB_NO_JOGO = [
   'balcao_loja', 'mostruario', 'clp_padrao', 'placa_dias_sem_acidente', 'placa_parede',
   'perfiladeira_tp40', 'dobradeira', 'guilhotina',       // máquinas (complexos v2/v3)
   'ponte_viga', 'ponte_carro', 'ponte_gancho',          // ponte rolante v3 (viga dupla)
-  'caminhao_entrega'                                    // caminhão toco v3 (arquivo caminhao_carroceria)
+  'caminhao_entrega',                                   // caminhão toco v3 (arquivo caminhao_carroceria)
+  'escritorio', 'loja_balcao', 'barracao_estrutura'     // prédios
 ];
 
 PT.glb = (function () {
@@ -81,6 +82,7 @@ PT.glb = (function () {
       }
       esconderCubo(mesh);
       mesh.add(m); g.userData.glb = m; st.trocados++;
+      if (id === 'escritorio' || id === 'loja_balcao') registrarPredio(g, m);
       // painel CLP de máquina: a torre de luz do modelo assume a luz de estado
       if (id === 'clp_padrao' && PT.maq) { const maq = PT.maq.lista.find(x => x.g === g.parent); if (maq) luzTorre(maq); }
     }).catch(() => { /* sem o arquivo: fica o cubo */ });
@@ -194,8 +196,30 @@ PT.glb = (function () {
     nova.reset().play(); if (velha) nova.crossFadeFrom(velha, 0.2, false);
     ser.atual = nome;
   }
+  // prédios: com o jogador dentro some o teto e as paredes ficam transparentes (câmera em 3ª pessoa)
+  const predios = [];
+  function registrarPredio(g, m) {
+    const tetos = [], mats = [];
+    m.traverse(o => {
+      if (/^teto|laje|platibanda/.test(o.name)) tetos.push(o);
+      if (o.isMesh) { o.material = o.material.clone(); o.material.userData.op = o.material.opacity; mats.push(o.material); }
+    });
+    const d = g.userData.dims; predios.push({ g, tetos, mats, meioX: d[0] / 2, meioZ: d[1] / 2, dentro: null });
+  }
+  function atualizarPredios() {
+    const j = PT.mundo && PT.mundo.jog; if (!j) return;
+    predios.forEach(p => {
+      const dx = j.x - p.g.position.x, dz = j.z - p.g.position.z, c = Math.cos(p.g.rotation.y), s = Math.sin(p.g.rotation.y);
+      const lx = dx * c - dz * s, lz = dx * s + dz * c;
+      const dentro = Math.abs(lx) < p.meioX + 0.3 && Math.abs(lz) < p.meioZ + 0.3;
+      if (dentro === p.dentro) return; p.dentro = dentro;
+      p.tetos.forEach(t => { t.visible = !dentro; });
+      p.mats.forEach(m => { m.transparent = dentro || m.userData.op < 1; m.opacity = dentro ? Math.min(m.userData.op, 0.28) : m.userData.op; m.depthWrite = !dentro; m.needsUpdate = true; });
+    });
+  }
   const _p = new THREE.Vector3();
   function atualizar(dt) {
+    if (predios.length) atualizarPredios();
     if (!vivos.length || dt <= 0) return;
     for (let i = vivos.length - 1; i >= 0; i--) {
       const s = vivos[i];

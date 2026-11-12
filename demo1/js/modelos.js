@@ -42,6 +42,7 @@ PT.MODELOS = {
   piso_concreto: { nome: 'Piso de concreto (tile 6x6)', categoria: 'Estrutura', dims: [6, 6, 0.1], forma: 'caixa', cor: 0x7f8a93,
     estados: ['normal', 'rachado', 'cratera com destroços', 'remendo de cimento'], polys: '2 tris + decal', prioridade: 'Demo',
     notas: 'Cicatriz = troca de decal/modelo em 3 estágios, não fratura real.' },
+  barracao_estrutura: { nome: 'Estrutura do barracão 132 x 40 (pilares, viga de rolamento, tesouras, terças)', categoria: 'Estrutura', dims: [132, 40, 12.8], forma: 'caixa', cor: 0x7b8790, polys: '40k (fundido por cor)', prioridade: 'Demo' },
   escritorio: { nome: 'Escritório (sala 8 x 8)', categoria: 'Estrutura', dims: [8, 8, 3], forma: 'caixa', cor: 0xd8cfc4,
     sockets: ['porta (respawn)', 'mesa do computador', 'parede de certificados'], polys: '5–8k', prioridade: 'Demo' },
   porta_escritorio: { nome: 'Porta do escritório', categoria: 'Estrutura', dims: [1, 0.1, 2.1], forma: 'caixa', cor: 0x6b4f3a, animacoes: ['abrir'], polys: '500', prioridade: 'Demo' },

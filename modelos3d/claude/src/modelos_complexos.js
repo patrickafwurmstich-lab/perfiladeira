@@ -266,16 +266,16 @@
     for (let i = 0; i < 3; i++) { const t = caixa(0.53, 0.1, 0.63, COR.preto, 'faixa', 0); pos(t, 0, 0.32 + i * 0.3, 0); g.add(t); }
     return g;
   };
-  M.viga_rolamento = () => {   // perfil I de 6 m + trilho; topo do trilho = 0,6 m acima do pivot
-    const g = grupo('viga_rolamento'), L = 6;
+  M.viga_rolamento = (L) => {   // perfil I (6 m por padrão) + trilho; topo do trilho = 0,6 m acima do pivot
+    const g = grupo('viga_rolamento'); L = L || 6;
     g.add(pos(caixa(L, 0.03, 0.3, ACO_EST, 'mesa_inferior', 0), 0, 0.015, 0));
     g.add(pos(caixa(L, 0.46, 0.025, ACO_EST, 'alma', 0), 0, 0.26, 0));
     g.add(pos(caixa(L, 0.03, 0.3, ACO_EST, 'mesa_superior', 0), 0, 0.505, 0));
-    for (let i = 0; i < 5; i++) [-1, 1].forEach(s => g.add(pos(caixa(0.012, 0.46, 0.13, ACO_EST, 'enrijecedor', 0), -L / 2 + 0.6 + i * 1.2, 0.26, s * 0.075)));
+    for (let i = 0; i < Math.round(L / 1.2) - 0; i++) [-1, 1].forEach(s => g.add(pos(caixa(0.012, 0.46, 0.13, ACO_EST, 'enrijecedor', 0), -L / 2 + 0.6 + i * 1.2, 0.26, s * 0.075)));
     g.add(pos(caixa(L, 0.02, 0.12, COR.grafite, 'base_trilho', 0), 0, 0.53, 0));
     g.add(pos(caixa(L, 0.05, 0.03, COR.grafite, 'alma_trilho', 0), 0, 0.565, 0));
     g.add(pos(caixa(L, 0.03, 0.06, COR.aco, 'boleto_trilho', 0), 0, 0.6, 0));
-    for (let i = 0; i < 7; i++) [-1, 1].forEach(s => g.add(pos(caixa(0.06, 0.02, 0.04, COR.grafite, 'grampo', 0), -L / 2 + 0.5 + i * 0.83, 0.545, s * 0.07)));
+    for (let i = 0; i < Math.round(L / 0.83) - 0; i++) [-1, 1].forEach(s => g.add(pos(caixa(0.06, 0.02, 0.04, COR.grafite, 'grampo', 0), -L / 2 + 0.5 + i * 0.83, 0.545, s * 0.07)));
     return g;
   };
   M.tesoura_40m = () => {   // treliça de 40 m em Z, banzo inferior em y=0, cumeeira +2,0 m
@@ -293,9 +293,41 @@
     for (let i = 1; i < N; i += 2) g.add(pos(caixa(0.3, 0.3, 0.012, COR.grafite, 'gusset', 0).rotateY(Math.PI / 2), 0, 0.15, -V + i * 2));
     return g;
   };
-  M.terca = () => {   // perfil U enrijecido 150 x 60, 6 m em X, galvanizado
+  // junta todas as malhas da mesma cor numa só (poucas chamadas de desenho no notebook)
+  function fundir(g, nome) {
+    g.updateMatrixWorld(true);
+    const grupos = new Map(), soltos = [];
+    g.traverse(o => {
+      if (!o.isMesh) return;
+      const m = o.material; if (m.map) { soltos.push(o); return; }
+      const k = m.color.getHexString() + '_' + m.metalness + '_' + m.roughness;
+      let ge = o.geometry.clone().applyMatrix4(o.matrixWorld); if (ge.index) ge = ge.toNonIndexed();
+      Object.keys(ge.attributes).forEach(a => { if (!['position', 'normal', 'uv'].includes(a)) ge.deleteAttribute(a); });
+      if (!ge.attributes.uv) ge.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(ge.attributes.position.count * 2), 2));
+      if (!ge.attributes.normal) ge.computeVertexNormals();
+      if (!grupos.has(k)) grupos.set(k, { m, gs: [] }); grupos.get(k).gs.push(ge);
+    });
+    const out = grupo(nome);
+    let i = 0; grupos.forEach(({ m, gs }) => { const me = new THREE.Mesh(THREE.BufferGeometryUtils.mergeBufferGeometries(gs), m); me.name = nome + '_' + (i++); out.add(me); });
+    soltos.forEach(o => { const c = o.clone(); c.matrix.copy(o.matrixWorld); c.matrix.decompose(c.position, c.quaternion, c.scale); out.add(c); });
+    return out;
+  }
+  M.barracao_estrutura = () => {   // barracão inteiro do jogo: 132 m em X (centro em 0), 40 m em Z (centro em 0)
+    const g = grupo('tmp'), L = 132, V = 20, PASSO = 12;
+    for (let x = -L / 2; x <= L / 2 + 0.01; x += PASSO) {
+      [-1, 1].forEach(s => { const p = M.pilar_consolo(); pos(p, x, 0, s * V); p.rotation.y = s > 0 ? Math.PI : 0; g.add(p); });
+      g.add(pos(M.tesoura_40m(), x, 10.68, 0));
+    }
+    [-1, 1].forEach(s => {
+      g.add(pos(M.viga_rolamento(L + 0.6), 0, 8.53, s * (V - 0.6)));
+      for (let k = 0; k < 7; k++) { const z = s * (V - k * 2.9); const y = 10.68 + 0.45 + (2.0 - 0.45) * (1 - Math.abs(z) / V); g.add(pos(M.terca(L + 0.8), 0, y + 0.08, z)); }
+      g.add(pos(caixa(L + 0.6, 0.06, 0.06, ACO_EST, 'travamento_beiral', 0), 0, 10.75, s * (V - 0.2)));
+    });
+    return fundir(g, 'barracao_estrutura');
+  };
+  M.terca = (L) => {   // perfil U enrijecido 150 x 60 (6 m por padrão) em X, galvanizado
     const g = grupo('terca');
-    const m = extrudar(chapaPerfil([[0.045, 0.012], [0.06, 0.012], [0.06, 0], [0, 0], [0, 0.15], [0.06, 0.15], [0.06, 0.138], [0.045, 0.138]], 0.004), 6, COR.galvalume, 'perfil');
+    const m = extrudar(chapaPerfil([[0.045, 0.012], [0.06, 0.012], [0.06, 0], [0, 0], [0, 0.15], [0.06, 0.15], [0.06, 0.138], [0.045, 0.138]], 0.004), L || 6, COR.galvalume, 'perfil');
     rot(m, 0, Math.PI / 2, 0); g.add(m); return g;
   };
   M.painel_fechamento = () => {   // 6 m de largura: alvenaria 2,5 m + telha vertical até 10,5 m (face externa em -Z)
@@ -380,12 +412,12 @@
     frente.add(toldo);
     g.add(frente);
     // fundos (porta para o barracão) e laterais
-    const fundos = grupo('parede_fundos'); fundos.add(parede(W + E, H, E, [{ c: 0, larg: 1.2, alt: 2.12, base: 0 }], PAREDE, 'alvenaria')); pos(fundos, 0, 0, D / 2); fundos.rotation.y = Math.PI; g.add(fundos);
+    const fundos = grupo('parede_fundos'); fundos.add(parede(W + E, H, E, [{ c: 0, larg: 2.0, alt: 2.3, base: 0 }], PAREDE, 'alvenaria')); pos(fundos, 0, 0, D / 2); fundos.rotation.y = Math.PI; g.add(fundos);
     [-1, 1].forEach(s => { const l = grupo('parede_lateral'); l.add(parede(D, H, E, [{ c: 1.5 * s, larg: 1.4, alt: 1.0, base: 1.3 }], PAREDE, 'alvenaria')); l.add(pos(janela(1.4, 1.0, E), 1.5 * s, 1.3, 0)); pos(l, s * W / 2, 0, 0); l.rotation.y = s * Math.PI / 2; g.add(l); });
     // barrado externo e estantes (lado do atendente, atrás do balcão)
     [-1, 1].forEach(s => g.add(pos(caixa(0.012, 0.9, D, 0xc7b994, 'barrado', 0), s * (W / 2 + E / 2 + 0.006), 0.45, 0)));
     for (let k = 0; k < 4; k++) {
-      const est = grupo('estante'), x = -4.2 + k * 2.8; pos(est, x, 0, D / 2 - 0.35);
+      const est = grupo('estante'), x = [-4.6, -2.1, 2.1, 4.6][k]; pos(est, x, 0, D / 2 - 0.35);   // vão livre de 1,8 m na porta dos fundos
       [-1, 1].forEach(s => est.add(pos(caixa(0.05, 2.0, 0.45, COR.grafite, 'montante', 0.01), s * 1.2, 1.0, 0)));
       for (let n = 0; n < 4; n++) {
         const y = 0.15 + n * 0.55; est.add(pos(caixa(2.4, 0.03, 0.45, COR.madeira, 'prateleira', 0.006), 0, y, 0));
@@ -404,14 +436,14 @@
     const g = grupo('ponte_viga'), V = 20;
     // viga DUPLA: o carro anda por cima das duas e o cabo desce pelo vão do meio (não atravessa a viga)
     [-1, 1].forEach(s => {
-      g.add(pos(caixa(0.32, 0.9, 2 * V - 0.6, AMARELO, 'viga_caixao', 0.04), s * 0.62, 0.55, 0));
-      g.add(pos(caixa(0.1, 0.08, 2 * V - 1.0, COR.grafite, 'trilho_carro', 0), s * 0.62, 1.04, 0));
-      zebra(g, s * 0.62, 0.55, 0, 0.33, 0.3, 2 * V - 0.6, 30, 'z');
+      g.add(pos(caixa(0.32, 0.9, 2 * V - 1.4, AMARELO, 'viga_caixao', 0.04), s * 0.62, 0.55, 0));
+      g.add(pos(caixa(0.1, 0.08, 2 * V - 1.8, COR.grafite, 'trilho_carro', 0), s * 0.62, 1.04, 0));
+      zebra(g, s * 0.62, 0.55, 0, 0.33, 0.3, 2 * V - 1.4, 30, 'z');
     });
     // diafragmas ligando as duas vigas
     for (let i = -3; i <= 3; i++) g.add(pos(caixa(0.92, 0.16, 0.12, AMARELO, 'travamento', 0.02), 0, 0.85, i * 5.5));
     [-1, 1].forEach(s => {
-      const cab = grupo('cabeceira'); pos(cab, 0, 0, s * (V - 0.2));
+      const cab = grupo('cabeceira'); pos(cab, 0, 0, s * (V - 0.6));   // roda no trilho da viga de rolamento
       cab.add(pos(caixa(2.6, 0.45, 0.4, AMARELO, 'viga_cabeceira', 0.03), 0, 0.3, 0));
       [-1, 1].forEach(t => { cab.add(pos(eixoZ(0.16, 0.12, COR.grafite, 'roda', 16), t * 1.05, 0.16, 0)); cab.add(pos(caixa(0.3, 0.3, 0.46, COR.grafite, 'caixa_roda', 0.03), t * 1.05, 0.25, 0)); });
       cab.add(pos(eixoX(0.13, 0.35, COR.grafite, 'motor_translacao', 14), 0.6, 0.65, 0));
