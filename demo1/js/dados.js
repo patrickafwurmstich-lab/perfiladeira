@@ -155,7 +155,7 @@ PT.DADOS = {
     carroceria: { comprimento: 12, largura: 2.5, celula: 0.5 },   // grade 24 x 5
     capacidadeKg: 6000,
     pecasPorPacote: 20,
-    balanco: [0.30, 0.70],         // centro de massa deve ficar entre 30% e 70% do comprimento
+    balanco: [0.25, 0.75],         // centro de massa entre 25% e 75% do comprimento (Gemini: era 30–70%, frustrante)
     chanceDanoSemCinta: 0.35,      // por pacote sem cinta
     fracaoDanoPacote: 0.15,        // % das peças do pacote que amassam
     danoDesbalanceado: 0.10,       // chance extra por pacote se a carga estiver desbalanceada
@@ -166,7 +166,8 @@ PT.DADOS = {
   empilhadeira: {
     capacidadeKg: 2500, velMax: 3.5, aceleracao: 2.2, giro: 1.6, garfoMax: 3.0, velGarfo: 0.6,
     limiarTombo: 12,           // risco = |vel| × |giro| × (1 + garfo×fatorAltura) × (1 + peso/capacidade)
-    fatorAltura: 1.2, consumoBateriaPorSeg: 1 / 900, horasRecarga: 2, minutosDesvirar: 30
+    fatorAltura: 1.2, consumoBateriaPorSeg: 1 / 900, horasRecarga: 1, minutosDesvirar: 10,   // Gemini: recarga e desvirar mais curtos (ritmo arcade)
+    alertaBateria: 0.15
   },
 
   // ---------------- REPUTAÇÃO ----------------
@@ -181,8 +182,8 @@ PT.DADOS = {
   salarios: { ajudante: 1900, operador: 2450, ponte: 2650, mecanico: 3200, encarregado: 3500 },
   funcionarios: {
     maxAtivos: 6, hz: 10, velocidade: 1.6, eficienciaAjudante: 0.6, energiaPorTarefa: 0.06,
-    pilhaParaTirar: 40, desgasteParaGraxa: 0.4, chanceEsconderTorta: 0.5, diasOrientacao: 3, multaAtraso: 0.05,
-    cursoPreco: 900, cursoHoras: 24,
+    pilhaParaTirar: 40, desgasteParaGraxa: 0.4, chanceEsconderTorta: 0.25, diasOrientacao: 3, multaAtraso: 0.05,
+    cursoPreco: 400, cursoHoras: 24,
     duracao: { tirarPilha: 4, limparEnrosco: 10, graxa: 5, operar: 6 },    // segundos de jogo (x eficiência)
     nomesTarefa: { tirarPilha: 'levando pilha', limparEnrosco: 'cortando enrosco', graxa: 'engraxando', operar: 'operando' },
     cargos: {

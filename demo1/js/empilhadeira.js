@@ -26,7 +26,7 @@ PT.empi = (function () {
   }
   function atualizarVisual(o) {
     o.garfos.forEach(g => { g.position.y = 0.1 + o.garfoY; g.rotation.y = Math.PI / 2; g.material.color.setHex(o.acessorio === 'mandril' ? 0x8e44ad : 0x222222); });
-    if (o.g.userData.rotulo) o.g.userData.rotulo.userData.atualizar('Empilhadeira ' + Math.round(o.bateria * 100) + '%' + (o.acessorio === 'mandril' ? ' + mandril' : '') + (o.tombada > 0 ? ' — TOMBADA' : ''));
+    if (o.g.userData.rotulo) o.g.userData.rotulo.userData.atualizar((o.bateria <= E().alertaBateria ? '🔋! ' : '') + 'Empilhadeira ' + Math.round(o.bateria * 100) + '%' + (o.acessorio === 'mandril' ? ' + mandril' : '') + (o.tombada > 0 ? ' — TOMBADA' : ''));
     o.g.rotation.z = o.tombada > 0 ? Math.PI / 2 * 0.95 : 0;
   }
   function frente(o, d) { return { x: o.x + Math.cos(o.rot) * d, z: o.z - Math.sin(o.rot) * d }; }   // frente = +X local
@@ -56,6 +56,7 @@ PT.empi = (function () {
       PT.ent.sync(o);
       // bateria
       o.bateria = Math.max(0, o.bateria - (Math.abs(o.vel) > 0.1 || t.KeyR ? D.consumoBateriaPorSeg * dt : 0));
+      if (o.bateria <= D.alertaBateria && o.bateria > 0 && !o.alertou) { o.alertou = true; PT.ev.emit('aviso', '🔋 PIII-PIII — bateria da empilhadeira em ' + Math.round(o.bateria * 100) + '%. Leve para o carregador perto do quadro.'); }
       if (o.bateria <= 0 && !o.avisouBateria) { o.avisouBateria = true; PT.ev.emit('celular', { de: 'Empilhadeira', texto: 'Piiii... BATERIA ACABOU. Bem na pior hora, como manda a tradição.' }); }
       // TOMBAMENTO: velocidade × curva × altura do garfo × peso
       const risco = Math.abs(o.vel) * Math.abs(taxaGiro) * (1 + o.garfoY * D.fatorAltura) * (1 + pesoCarga / D.capacidadeKg);
@@ -140,7 +141,7 @@ PT.empi = (function () {
   PT.ev.on('minuto', () => PT.ent.lista.forEach(o => {
     if (o.tipo !== 'empilhadeira') return;
     if (o.tombada > 0 && o.desvirando) { o.tombada -= 1; if (o.tombada <= 0) { o.tombada = 0; o.desvirando = false; atualizarVisual(o); PT.ev.emit('aviso', 'Empilhadeira desvirada. Nem arranhou... quase.'); } }
-    if (o.carregando) { o.bateria = Math.min(1, o.bateria + 1 / (E().horasRecarga * 60)); if (o.bateria >= 1) o.carregando = false; o.avisouBateria = false; atualizarVisual(o); }
+    if (o.carregando) { o.bateria = Math.min(1, o.bateria + 1 / (E().horasRecarga * 60)); if (o.bateria >= 1) o.carregando = false; o.avisouBateria = false; o.alertou = false; atualizarVisual(o); }
   }));
 
   // ---------- interações ----------

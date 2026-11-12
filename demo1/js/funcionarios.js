@@ -181,7 +181,9 @@ PT.func = (function () {
     st.lista.forEach(f => {
       f.g.position.set(f.x, 0, f.z); f.g.rotation.y = f.rot;
       if (f.carregando) { f.carregando.x = f.x + Math.sin(f.rot) * 1.0; f.carregando.z = f.z + Math.cos(f.rot) * 1.0; f.carregando.y = 0.5; f.carregando.rot = f.rot + Math.PI / 2; PT.ent.sync(f.carregando); }
-      if (f.g.userData.rotulo) { const r = f.nome.split(' ')[0] + ' — ' + (f.tarefa ? F().nomesTarefa[f.tarefa.tipo] : f.estado); if (r !== f.ultRot) { f.ultRot = r; f.g.userData.rotulo.userData.atualizar(r); } }
+      // ícone de estado para ler o gargalo de relance (Gemini)
+      const ic = f.tarefa ? { tirarPilha: '📦', limparEnrosco: '🔧', graxa: '🛢', operar: '⚙' }[f.tarefa.tipo] : ({ 'café': '☕', 'almoço': '🍽', tartaruga: '🪧' }[f.estado] || '❓');
+      if (f.g.userData.rotulo) { const r = ic + ' ' + f.nome.split(' ')[0] + ' — ' + (f.tarefa ? F().nomesTarefa[f.tarefa.tipo] : (f.estado === 'café' ? 'sem tarefa (café)' : f.estado)); if (r !== f.ultRot) { f.ultRot = r; f.g.userData.rotulo.userData.atualizar(r); } }
     });
   }
 

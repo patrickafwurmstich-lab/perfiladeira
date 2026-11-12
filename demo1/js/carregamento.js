@@ -78,7 +78,10 @@ PT.carga = (function () {
       '<div class="cgBarra"><span class="' + (a.acimaPeso ? 'ruim' : '') + '">Peso: ' + Math.round(a.peso) + ' / ' + C.capacidadeKg + ' kg</span>' +
       '<span class="' + (a.desbalanceada ? 'ruim' : 'bom') + '">Equilíbrio: ' + (a.pos.length ? Math.round(a.cm * 100) + '% ' + (a.desbalanceada ? '(DESBALANCEADA)' : '(ok)') : '—') + '</span>' +
       '<span class="' + (a.semCinta ? 'ruim' : 'bom') + '">Cintas: ' + (a.pos.length - a.semCinta) + '/' + a.pos.length + '</span>' +
-      '<span>Na carroceria: ' + a.pecas + ' peças</span></div>' + grade +
+      '<span>Na carroceria: ' + a.pecas + ' peças</span></div>' +
+      // balança: faixa verde = zona segura; o ponto mostra para onde o peso está puxando (Gemini)
+      '<div class="balanca"><span>CABINE</span><div class="trilhoB"><div class="seguro" style="left:' + C.balanco[0] * 100 + '%;width:' + (C.balanco[1] - C.balanco[0]) * 100 + '%"></div>' +
+      (a.pos.length ? '<div class="ponto ' + (a.desbalanceada ? 'ruim' : '') + '" style="left:' + a.cm * 100 + '%"></div>' : '') + '</div><span>TRASEIRA</span></div>' + grade +
       '<h3>Pacotes na zona verde</h3><div class="cgFora">' + (fora.map(o => '<div class="pacote solto' + (st.sel === o ? ' sel' : '') + '" data-pk="' + o.id + '" style="width:' + o.w * PX * 0.6 + 'px;height:' + o.h * PX * 0.8 + 'px;background:' + cor(o) + '">' + o.n + (o.tipo === 'torta' ? ' tortas' : '') + '</div>').join('') || '<i>todos na carroceria</i>') + '</div>' +
       '<div class="botoes"><button id="cgAuto">Arrumar automático</button><button id="cgCinta">Passar cintas (' + a.semCinta + ')</button>' +
       '<button id="cgTortas">' + (st.incluirTortas ? 'Tirar as tortas' : 'Incluir tortas') + '</button>' +
