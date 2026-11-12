@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parecis Telha — Demo 1 (sistemas)</title>
+<style>
+  :root { --fundo: #0f141c; --painel: rgba(15,20,28,.88); --borda: #2c3e50; --txt: #ecf0f1; --bom: #58d68d; --ruim: #ff7b6b; --amarelo: #f4d03f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1b2631; font-family: system-ui, Segoe UI, sans-serif; color: var(--txt); }
+  #cena { position: fixed; inset: 0; }
+  #hud { position: fixed; top: 10px; left: 10px; background: var(--painel); padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.55; min-width: 250px; pointer-events: none; }
+  #dica { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--painel); padding: 10px 16px; border-radius: 10px; font-size: 15px; line-height: 1.6; max-width: 90vw; text-align: left; pointer-events: none; }
+  #dica:empty { display: none; }
+  #dica b { color: var(--amarelo); }
+  #dica .verde { color: #2ecc71; } #dica .amarelo { color: #f1c40f; } #dica .vermelho { color: #e74c3c; }
+  #avisos { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
+  .aviso { background: rgba(20,30,45,.95); border: 1px solid var(--borda); padding: 8px 14px; border-radius: 8px; font-size: 14px; transition: opacity .6s; max-width: 70vw; }
+  .aviso.sumir { opacity: 0; }
+  #celular { position: fixed; right: 10px; top: 10px; width: 300px; background: var(--painel); border-radius: 14px; padding: 10px; font-size: 13px; border: 2px solid #34495e; }
+  #celular h4 { margin: 0 0 6px; font-size: 13px; color: #aab7b8; }
+  #celular.vibrar { animation: vib .12s 4; }
+  @keyframes vib { 0% { transform: translateX(0) } 50% { transform: translateX(-4px) } 100% { transform: translateX(3px) } }
+  .msg { border-top: 1px solid #2c3e50; padding: 5px 0; }
+  .msg small { color: #85929e; }
+  #prancheta { display: none; position: fixed; left: 10px; top: 190px; width: 300px; max-height: 60vh; overflow: auto; background: #f5ecd7; color: #222; border-radius: 6px; padding: 10px 14px; font-size: 13px; box-shadow: 0 6px 20px #0008; }
+  #prancheta b { display: block; margin-top: 8px; }
+  #ajuda { display: none; position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); background: var(--painel); padding: 18px 24px; border-radius: 12px; font-size: 14px; line-height: 1.7; width: min(640px, 92vw); }
+  .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); align-items: center; justify-content: center; z-index: 10; }
+  .caixa { background: #17202a; border: 1px solid var(--borda); border-radius: 12px; padding: 16px 20px; width: min(980px, 94vw); max-height: 88vh; overflow: auto; }
+  #clp .caixa, #ligacao .caixa, #minijogo .caixa, #progresso .caixa { width: min(560px, 94vw); }
+  button, .btn { background: #2e4053; color: var(--txt); border: 1px solid #5d6d7e; border-radius: 7px; padding: 7px 12px; cursor: pointer; font-size: 14px; display: inline-block; }
+  button:hover, .btn:hover { background: #3d566e; }
+  button.sel { background: #1f618d; border-color: #5dade2; }
+  button.off { opacity: .45; }
+  button.start { background: #1e8449; } button.stop { background: #922b21; }
+  .fechar { float: right; padding: 2px 9px; }
+  .botoes { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .botoes.grandes button { padding: 12px 16px; font-size: 16px; }
+  .navegador .barra { background: #0b1117; padding: 8px 10px; border-radius: 8px; font-family: monospace; color: #aed6f1; }
+  .abas, .cats { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .card { background: #1c2833; border: 1px solid #2c3e50; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 3px; }
+  .card h3 { margin: 0; font-size: 15px; } .card .preco { font-size: 20px; font-weight: bold; color: var(--amarelo); } .card .estado { font-size: 12px; color: #aab7b8; }
+  .card small { color: #ccd1d1; }
+  .bom { color: var(--bom) !important; } .ruim { color: var(--ruim) !important; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin: 8px 0; }
+  .grade > div { background: #1c2833; padding: 8px; border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  td, th { border-bottom: 1px solid #2c3e50; padding: 4px 6px; text-align: left; vertical-align: top; }
+  tr.apagado { opacity: .5; }
+  .mail { background: #1c2833; border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
+  .mail p { margin: 6px 0; }
+  .lcd { background: #0b2e1a; color: #7dff9b; font-family: monospace; padding: 10px; border-radius: 8px; line-height: 1.6; font-size: 13px; }
+  .form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+  .form label { display: flex; flex-direction: column; font-size: 13px; gap: 3px; }
+  input, select { background: #0b1117; color: var(--txt); border: 1px solid #5d6d7e; border-radius: 6px; padding: 6px; font-size: 14px; }
+  .trilho { position: relative; height: 34px; background: #0b1117; border-radius: 17px; margin: 14px 0; overflow: hidden; }
+  .trilho .verde { position: absolute; top: 0; bottom: 0; background: #1e8449; }
+  .trilho .bolha { position: absolute; top: 4px; width: 26px; height: 26px; margin-left: -13px; border-radius: 50%; background: #f4d03f; }
+  .trilho .enche { position: absolute; top: 0; bottom: 0; left: 0; background: #2e86c1; width: 0; }
+  .barraRep { display: flex; align-items: center; gap: 8px; margin: 6px 0; } .barraRep span { width: 170px; } .barraRep div { flex: 1; height: 14px; background: #0b1117; border-radius: 7px; overflow: hidden; } .barraRep i { display: block; height: 100%; background: #f4d03f; }
+  .log { font-family: monospace; font-size: 12px; color: #aab7b8; max-height: 200px; overflow: auto; }
+  #morte { display: none; position: fixed; inset: 0; background: radial-gradient(transparent, rgba(80,0,0,.7)); align-items: center; justify-content: center; text-align: center; z-index: 20; pointer-events: none; }
+  #morte h1 { font-size: 46px; text-shadow: 0 3px 10px #000; }
+  @media (max-width: 760px) { #celular { width: 200px; font-size: 11px; } #hud { font-size: 12px; min-width: 0; } }
+</style>
+</head>
+<body>
+<div id="cena"></div>
+<div id="hud"></div>
+<div id="avisos"></div>
+<div id="celular"><h4>📱 Celular</h4><div id="celMsgs"></div></div>
+<div id="dica"></div>
+<div id="prancheta"></div>
+<div id="ajuda">
+  <h3 style="margin-top:0">Controles — Demo 1 (sistemas com cubos)</h3>
+  <b>WASD</b> andar · <b>Shift</b> correr · <b>arrastar o mouse</b> gira a câmera · <b>roda</b> zoom<br>
+  <b>E</b> ação principal · <b>1–4</b> ações extras (aparecem embaixo da tela)<br>
+  <b>Ponte (botoeira):</b> WASD move · <b>R/F</b> sobe/desce gancho · <b>Espaço</b> engata/solta · <b>Shift</b> precisão · <b>E</b> larga<br>
+  <b>Construção:</b> mouse posiciona · <b>R</b> gira · <b>clique/Enter</b> instala · <b>Esc</b> cancela<br>
+  <b>TAB</b> prancheta · <b>T</b> velocidade do tempo (x1/x5/x20/x60) · <b>P</b> pausa · <b>K</b> salvar · <b>L</b> carregar · <b>H</b> esta ajuda<br><br>
+  <b>Roteiro do teste:</b> espere o caminhão do Seu Tião → tire a perfiladeira e a bobina da carroceria com a ponte → abra o engradado e instale → puxe o cabo do quadro → monte a bobina no desbobinador (solte-a com a ponte na ponta da máquina) → CLP: ligar, alinhar, START → tire a pilha com a paleteira até a zona VERDE → aceite um pedido no computador → carregue o caminhão da coleta. Para a zoeira: compre a bobina de 2 t e tente erguer com a ponte de 1,5 t.
+</div>
+<div id="computador" class="modal"><div class="caixa"></div></div>
+<div id="clp" class="modal"><div class="caixa"></div></div>
+<div id="minijogo" class="modal"><div class="caixa"></div></div>
+<div id="ligacao" class="modal"><div class="caixa"></div></div>
+<div id="progresso" class="modal"><div class="caixa"></div></div>
+<div id="morte"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- ordem importa: dados → infraestrutura → sistemas → interface → laço -->
+<script src="js/dados.js"></script>
+<script src="js/eventos.js"></script>
+<script src="js/modelos.js"></script>
+<script src="js/tempo.js"></script>
+<script src="js/mundo.js"></script>
+<script src="js/reputacao.js"></script>
+<script src="js/economia.js"></script>
+<script src="js/loja.js"></script>
+<script src="js/estoque.js"></script>
+<script src="js/entrega.js"></script>
+<script src="js/construcao.js"></script>
+<script src="js/maquinas.js"></script>
+<script src="js/ponte.js"></script>
+<script src="js/pedidos.js"></script>
+<script src="js/zoeira.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/save.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
