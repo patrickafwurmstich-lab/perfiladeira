@@ -52,6 +52,12 @@ func _ready() -> void:
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(base + "_eixo.png")
 	var g: Vector3 = Vector3(P.x, P.h, P.z) + P.FUNDO_GANCHO
+	# close da fita na face da bobina e na curva da boca do furo
+	cam.global_position = pc + eixo * 0.95 + lado * 0.28 + Vector3(0, 0.40, 0)
+	cam.look_at(pc + eixo * 0.6 + Vector3(0, 0.27, 0))
+	for i in 4: await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(base + "_boca.png")
 	var mg: MeshInstance3D = P.gancho.find_child("gancho", true, false)
 	var ab: AABB = mg.global_transform * mg.get_aabb()
 	print("gancho aabb ", ab, " g ", g, " gancho_pos ", P.gancho.global_position, " escala ", P.gancho.global_transform.basis.get_scale())

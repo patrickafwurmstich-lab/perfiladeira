@@ -62,6 +62,8 @@ var fitas: Array = []
 var olhais: Array = []
 var costuras: Array = []
 var transicoes: Array = []
+var mat_olhal: StandardMaterial3D
+var mat_contato: StandardMaterial3D
 var mangas: Array = []
 var bordas: Array = []         # [perna_frente, perna_tras, trecho dentro do furo, laço no gancho]
 var botoeira: Node3D
@@ -117,7 +119,7 @@ func _ready() -> void:
 	mci.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var mfx := StandardMaterial3D.new()
 	mfx.albedo_color = Color(0.95, 0.85, 0.1)     # faixa da etiqueta de carga (amarela)
-	for i in 8:                                    # 0-1 pernas, 2 dentro do furo, 3 sobra, 4-7 dobras na face/boca
+	for i in 12:                                   # 0-1 pernas, 2 dentro do furo, 3 sobra, 4-5 na face, 6-11 curva da boca
 		var f := MeshInstance3D.new()
 		var bm := BoxMesh.new()
 		bm.size = Vector3(0.112, 1.0, 0.008)       # fita de 112 mm × 8 mm (cinta de 2 t)
@@ -175,6 +177,9 @@ func _ready() -> void:
 	molh.albedo_color = Color(0.74, 0.13, 0.06)        # mesma fita, um tom mais escuro pelo atrito/sombra no gancho
 	molh.roughness = 0.85
 	molh.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat_olhal = molh
+	mat_contato = molh.duplicate()
+	mat_contato.albedo_color = Color(0.50, 0.08, 0.035)   # oclusão onde a fita aperta o aço (o renderizador não faz AO)
 	for k in 2:
 		var segs := []
 		for i in 12:
@@ -607,11 +612,21 @@ func _desenhar_cinta() -> void:
 	var pa: Array = []
 	var pb: Array = []
 	var pd: Array = []
+	var arcos: Array = []
+	var meia_esp := 0.0045                                               # meia espessura da fita: encosta na chapa
+	var hd := topo_furo + 0.006                                          # fita colada no topo do furo
+	var rf := 0.016                                                      # raio da curva da fita na boca do furo
 	for k in 2:
 		var sg := 1.0 if k == 0 else -1.0
-		pa.append(c + eixo * sg * (meia + 0.010) + Vector3.UP * (rext + 0.010))
-		pb.append(c + eixo * sg * (meia + 0.005) + Vector3.UP * (topo_furo + 0.024))
-		pd.append(c + eixo * sg * (meia - 0.014) + Vector3.UP * (topo_furo + 0.006))
+		var fz := meia + meia_esp                                        # plano da face + meia espessura
+		pa.append(c + eixo * sg * fz + Vector3.UP * (rext + meia_esp))
+		pb.append(c + eixo * sg * fz + Vector3.UP * (hd + rf))
+		pd.append(c + eixo * sg * (fz - rf) + Vector3.UP * hd)
+		var arc: Array = []
+		for i in 4:                                                      # quarto de círculo: da face para dentro do furo
+			var a := deg_to_rad(90.0 * i / 3.0)
+			arc.append(c + eixo * sg * (fz - rf + rf * cos(a)) + Vector3.UP * (hd + rf - rf * sin(a)))
+		arcos.append(arc)
 	var e1: Vector3 = pa[0]
 	var e2: Vector3 = pa[1]
 	var g := Vector3(x, h, z) + FUNDO_GANCHO                             # fundo da curva do gancho (medido no modelo)
@@ -619,8 +634,10 @@ func _desenhar_cinta() -> void:
 	_fita(fitas[1], g + (e2 - g).normalized() * 0.08, e2, lado)
 	_fita(fitas[2], pd[0], pd[1], lado)                                  # trecho colado no topo do furo
 	for k in 2:
-		_fita(fitas[4 + 2 * k], pa[k], pb[k], lado)                      # deitada na face da bobina
-		_fita(fitas[5 + 2 * k], pb[k], pd[k], lado)                      # contornando a borda da boca do furo
+		_fita(fitas[4 + k], pa[k], pb[k], lado)                          # deitada na face da bobina, encostada
+		var arc: Array = arcos[k]
+		for i in 3:
+			_fita(fitas[6 + 3 * k + i], arc[i], arc[i + 1], lado)        # curva suave (raio 16 mm) na boca do furo
 	# mangas de proteção na quina externa (onde a fita dobra sob carga), com borda arredondada
 	for k in 2:
 		var ak: Vector3 = pa[k]
@@ -661,6 +678,7 @@ func _desenhar_cinta() -> void:
 		var lb: Vector3 = pts[8] if la == pts[0] else pts[0]
 		for i in 8:
 			_fita(segs[i], pts[i], pts[i + 1], arame)
+			segs[i].material_override = mat_contato if (i >= 2 and i <= 5) else mat_olhal
 		_fita(segs[8], la, la.lerp(ponta_a, 0.5), arame)
 		_fita(segs[9], la.lerp(ponta_a, 0.5), ponta_a, arame)
 		_fita(segs[10], lb, lb.lerp(ponta_b, 0.5), arame)
