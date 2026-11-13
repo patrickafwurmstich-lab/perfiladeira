@@ -123,7 +123,13 @@ Ponto de partida: o Lucas avaliou a Demo como "3% de um simulador", e as três I
 ## 8. O que NÃO simular (por enquanto)
 Física real de deformação da chapa, torque por estação, temperatura, viscosidade do óleo hidráulico e colisão individual de telhas. A pilha é um objeto só, que ganha camadas.
 
-## 9. Ordem de implementação (esta noite)
+## 9. Onde implementar (decisão da madrugada)
+- **ChatGPT e Grok:** a parte física (caixa de comando, fita, rolos, guilhotina, ponte, ferramentas) deve nascer no Godot, para não fazer duas vezes. O Gemini não opinou.
+- **Conferido:** dá para rodar o Godot 4.7.2 aqui no ambiente do Claude, com tela virtual para tirar prints e gravar vídeo.
+- **Decisão:** a v2 é construída direto no **Godot 4.7.2** (pasta `godot/`). A Demo continua sendo a referência das regras e dos números.
+- **Entrega para o Lucas:** um .exe do Windows (com os personagens, só para ele) e uma versão web sem os personagens ithappy.
+
+## 10. Ordem de implementação (esta noite)
 1. Relógio com 3× e conta igual à animação; rebalancear pedidos.
 2. Linha contínua da perfiladeira (fita, formação, telha, corte, deslize, pilha encaixada), bobina girando e encolhendo do jeito certo, rolos e lâmina.
 3. Caixa de comando 3D (câmera aproxima, botões clicáveis, IHM viva, sirene, torre).
@@ -131,4 +137,4 @@ Física real de deformação da chapa, torque por estação, temperatura, viscos
 5. Falhas visíveis (ondulada, enrosco amassado, chiado, graxeiras).
 6. Guilhotina e dobradeira no mesmo nível.
 7. Funcionários executando as mesmas etapas, com o tempo de cada uma.
-8. Testes, prints e revisão das IAs em cada etapa.
+8. Testes, prints, vídeo e revisão das IAs em cada etapa.
