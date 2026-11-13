@@ -41,6 +41,9 @@ var balanco := Vector2.ZERO        # ângulo do pêndulo (x, z) em rad
 var balanco_v := Vector2.ZERO
 var encaixando := 0.0
 var _avisou_cabo := false
+var off_carga := OFF_CINTA     # comprimento da cinta + moitão da carga atual (ajusta na hora de engatar)
+var bercos: Array = []         # centros de apoio das bobinas nos berços (Vector3)
+const Y_BERCO := 0.55          # altura do centro da bobina apoiada no V do berço
 
 var viga: Node3D
 var carro: Node3D
@@ -167,7 +170,7 @@ func on_foco_clique(_ev, _hit) -> void:
 	pass
 
 func _dica() -> void:
-	var s := "PONTE · W/S afasta/aproxima · A/D lados · R/F gancho · G engata/solta · mouse olha · E larga  |  gancho %.2f m" % h
+	var s := "PONTE · W/S afasta/aproxima · A/D lados · R/F gancho · Shift lento · G engata/solta · E larga  |  gancho %.2f m" % h
 	if carga:
 		s += "  |  CARGA %s %.0f kg" % [carga.codigo, carga.kg]
 	var alvo := _alvo_proximo()
@@ -177,8 +180,15 @@ func _dica() -> void:
 
 func _pos_carga() -> Vector3:
 	var L := Y_CARRO - h
-	var off := Vector3(sin(balanco.x), 0, sin(balanco.y)) * (L + OFF_CINTA)
-	return Vector3(x, h - OFF_CINTA, z) + off
+	var off := Vector3(sin(balanco.x), 0, sin(balanco.y)) * (L + off_carga)
+	return Vector3(x, h - off_carga, z) + off
+
+## altura do centro da bobina quando apoiada no que está embaixo dela (berço ou chão)
+func _apoio_centro(px: float, pz: float, r: float) -> float:
+	for b in bercos:
+		if absf(px - b.x) < 0.45 and absf(pz - b.z) < 0.45:
+			return Y_BERCO
+	return r
 
 ## o que dá para fazer agora com a ponte (texto para a dica)
 func _alvo_proximo() -> String:
@@ -196,26 +206,43 @@ func _alvo_proximo() -> String:
 		return "Alinhe com o mandril: Δx %+.0f mm · Δaltura %+.0f mm" % [dx * 1000, dy * 1000]
 	return ""
 
+## bobina logo abaixo do gancho: centralizado a até 35 cm e o gancho entre o topo dela e 1,5 m acima
 func _bobina_sob_gancho():
 	for b in bobinas:
-		var topo: Vector3 = b.no.global_position
-		var d := Vector2(topo.x - x, topo.z - z)
-		var dh: float = (h - OFF_CINTA) - topo.y
-		if d.length() < 0.25 and absf(dh) < 0.12:
+		var c: Vector3 = b.no.global_position
+		var d := Vector2(c.x - x, c.z - z)
+		var acima: float = h - (c.y + b.r)
+		if d.length() < 0.35 and acima > -0.02 and acima < 1.5:
 			return b
 	return null
+
+## topo da bobina mais alta logo abaixo do gancho (o gancho não entra na bobina)
+func _topo_embaixo() -> float:
+	var t := -10.0
+	for b in bobinas:
+		var c: Vector3 = b.no.global_position
+		if Vector2(c.x - x, c.z - z).length() < 0.5:
+			t = maxf(t, c.y + b.r)
+	return t
 
 func _engatar_ou_soltar() -> void:
 	if carga == null:
 		var b = _bobina_sob_gancho()
 		if b == null:
-			Bus.aviso.emit("Gancho longe: centralize em cima da bobina e desça até a cinta alcançar o furo.")
+			Bus.aviso.emit("Gancho longe: centralize o gancho em cima da bobina e desça até perto dela.")
 			return
 		if b.kg > CAPACIDADE_KG:
 			Bus.aviso.emit("Carga acima da capacidade da ponte!")
 			return
 		carga = b
 		bobinas.erase(b)
+		# a cinta se ajusta: o centro da bobina fica onde está; o gancho guarda essa distância
+		off_carga = maxf(h - b.no.global_position.y, b.r + 0.08)
+		# gancho fora de centro: ao subir, a bobina "puxa" para baixo do gancho e balança (não teleporta)
+		var Lt := Y_CARRO - h + off_carga
+		var c0: Vector3 = b.no.global_position
+		balanco = Vector2(asin(clampf((c0.x - x) / Lt, -0.5, 0.5)), asin(clampf((c0.z - z) / Lt, -0.5, 0.5)))
+		balanco_v = Vector2.ZERO
 		cinta.visible = true
 		Som.tocar("trava", null, Vector3(x, h, z), -4.0)
 		Bus.aviso.emit("Cinta passada no furo da %s. Suba devagar." % b.codigo)
@@ -231,10 +258,12 @@ func _engatar_ou_soltar() -> void:
 			return
 		encaixando = 0.001
 		return
-	if (h - OFF_CINTA) - carga.r > 0.12:
-		Bus.aviso.emit("Desça a bobina até apoiar antes de soltar a cinta (nunca solte carga no ar).")
+	var pc := _pos_carga()
+	var apoio := _apoio_centro(pc.x, pc.z, carga.r)
+	if pc.y - apoio > 0.04:
+		Bus.aviso.emit("Desça a bobina até apoiar (no chão ou no berço) antes de soltar a cinta — nunca solte carga no ar.")
 		return
-	carga.no.position = to_local(_pos_carga())
+	carga.no.position = to_local(Vector3(pc.x, apoio, pc.z))
 	bobinas.append(carga)
 	carga = null
 	cinta.visible = false
@@ -261,9 +290,11 @@ func _physics_process(delta: float) -> void:
 		ah = float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))
 	var vx0 := vx
 	var vz0 := vz
-	vx = move_toward(vx, ax * V_PONTE, ACEL * delta)
-	vz = move_toward(vz, az * V_CARRO, ACEL * delta)
-	vh = ah * V_GANCHO
+	# Shift = velocidade lenta (25%), como o 2º estágio do botão de uma botoeira de verdade
+	var lento := 0.25 if (operando and Input.is_action_pressed("correr")) else 1.0
+	vx = move_toward(vx, ax * V_PONTE * lento, ACEL * delta)
+	vz = move_toward(vz, az * V_CARRO * lento, ACEL * delta)
+	vh = ah * V_GANCHO * (0.35 if lento < 1.0 else 1.0)
 	var nx := clampf(x + vx * delta, X_MIN, X_MAX)
 	var nz := clampf(z + vz * delta, Z_MIN, Z_MAX)
 	if operando and jogador:
@@ -282,12 +313,12 @@ func _physics_process(delta: float) -> void:
 			_avisou_cabo = false
 	x = nx
 	z = nz
-	var h_min := H_MIN
+	var h_min := maxf(H_MIN, _topo_embaixo() + 0.02)   # o gancho para em cima da bobina, não entra nela
 	if carga:
-		h_min = maxf(H_MIN, carga.r + OFF_CINTA)       # a bobina apoia no chão
+		h_min = maxf(H_MIN, _apoio_centro(x, z, carga.r) + off_carga)   # a bobina apoia no chão/berço
 	h = clampf(h + vh * delta, h_min, H_MAX)
 	# pêndulo: a aceleração da ponte/carro empurra a carga para trás; amortece com o tempo
-	var L := maxf(0.3, Y_CARRO - h + OFF_CINTA)
+	var L := maxf(0.3, Y_CARRO - h + off_carga)
 	var w2 := 9.8 / L
 	var acc := Vector2((vx - vx0) / maxf(delta, 0.0001), (vz - vz0) / maxf(delta, 0.0001))
 	balanco_v += (-w2 * balanco - acc / L) * delta

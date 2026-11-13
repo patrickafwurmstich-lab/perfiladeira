@@ -49,6 +49,7 @@ func _ready() -> void:
 		b.position = Vector3(bx, 0.0, -4.5)
 		b.rotation.y = PI / 2          # selas em V atravessadas: a bobina deita no mesmo sentido do mandril
 		add_child(b)
+		ponte.bercos.append(Vector3(bx, 0.55, -4.5))
 		ponte.nova_bobina(Vector3(bx, 0.55, -4.5), cods[i])
 	jogador = Jogador.new()
 	jogador.maquina = maquina
