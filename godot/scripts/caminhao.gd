@@ -8,7 +8,11 @@ extends Node3D
 const CAPACIDADE := 6000.0     # kg de CARGA ÚTIL (toco 4×2; PBT ~ 9,5 t com a tara)
 const X_EIXO_D := 3.00         # eixo dianteiro (local)
 const X_EIXO_T := -2.00        # eixo traseiro
-const CARGA_EIXO_D := 2500.0   # o eixo dianteiro aguenta só isso a mais da tara (6 t legal − ~3,5 t da cabine/motor)
+const TARA_D := 2600.0         # tara sobre o eixo dianteiro (cabine, motor) — toco ~4 t de tara
+const TARA_T := 1400.0         # tara sobre o eixo traseiro (chassi, carroceria)
+const LIM_EIXO_D := 6000.0     # limite legal do eixo dianteiro simples (pneus simples)
+const LIM_EIXO_T := 10000.0    # limite legal do eixo traseiro simples com rodado duplo
+const FRENTE_MIN := 0.25       # a frente precisa de pelo menos 25% do peso total para esterçar e frear
 const Y_PISO := 0.98
 const BED_X0 := -4.40
 const BED_X1 := 1.85
@@ -59,17 +63,21 @@ func _ready() -> void:
 	# calços amarelos atrás das rodas traseiras (aparecem quando calçado)
 	var mc := StandardMaterial3D.new()
 	mc.albedo_color = Color(0.95, 0.8, 0.1)
+	# um calço de cada lado do pneu traseiro (frente e trás), encostados na banda de rodagem
+	# pneu traseiro: centro em x = −2,00, raio 0,48 → toca o chão em x = −2,00; o calço de 0,30 × 0,20
+	# encosta no pneu a ~0,13 m do centro de contato (onde a altura do pneu bate com a rampa do calço)
 	for sz in [-1.0, 1.0]:
-		var k := MeshInstance3D.new()
-		var pm := PrismMesh.new()
-		pm.size = Vector3(0.30, 0.22, 0.25)
-		k.mesh = pm
-		k.material_override = mc
-		k.position = Vector3(-3.05, 0.11, sz * 1.0)
-		k.rotation.z = PI / 2 * 0.0
-		k.visible = false
-		add_child(k)
-		calcos.append(k)
+		for lado in [-1.0, 1.0]:
+			var k := MeshInstance3D.new()
+			var pm := PrismMesh.new()
+			pm.size = Vector3(0.30, 0.20, 0.24)
+			pm.left_to_right = 0.0 if lado < 0.0 else 1.0     # ponta fina embaixo do pneu, face alta para fora
+			k.mesh = pm
+			k.material_override = mc
+			k.position = Vector3(-2.00 + lado * 0.27, 0.10, sz * 1.0)
+			k.visible = false
+			add_child(k)
+			calcos.append(k)
 	Interagivel.criar(self, Vector3(-3.0, 0.6, -1.6), _txt_calco, _faz_calco, 1.6)
 	_placa()
 
@@ -111,7 +119,7 @@ func carga_apoiada(c: Carga) -> void:
 	else:
 		Bus.alarme_resolvido.emit("Caminhão")
 
-## carga nos eixos: devolve [kg no dianteiro, kg no traseiro, centro x]
+## reação nos eixos com a tara: devolve [total dianteiro, total traseiro, xcg da carga, carga útil]
 func cargas_eixos() -> Array:
 	var w := 0.0
 	var mx := 0.0
@@ -120,10 +128,11 @@ func cargas_eixos() -> Array:
 		w += cc.kg
 		mx += cc.kg * to_local(cc.global_position).x
 	if w <= 0.0:
-		return [0.0, 0.0, 0.0]
+		return [TARA_D, TARA_T, 0.0, 0.0]
 	var xcg := mx / w
+	# momentos em torno do eixo traseiro: R_d · L = W · (xcg − x_t)
 	var fd := w * (xcg - X_EIXO_T) / (X_EIXO_D - X_EIXO_T)
-	return [fd, w - fd, xcg]
+	return [TARA_D + fd, TARA_T + (w - fd), xcg, w]
 
 func pedido_atual() -> Dictionary:
 	return PEDIDOS[pedido]
@@ -158,10 +167,12 @@ func conferir() -> String:
 	if kg > CAPACIDADE:
 		return "PESO: %.0f kg, o caminhão leva %.0f kg de carga útil" % [kg, CAPACIDADE]
 	var ex := cargas_eixos()
-	if ex[0] > CARGA_EIXO_D:
-		return "carga muito para a frente: %.0f kg no eixo dianteiro (máx %.0f) — puxe para trás" % [ex[0], CARGA_EIXO_D]
-	if ex[0] < 0.0:
-		return "carga atrás do eixo traseiro: a frente fica leve (sem direção) — puxe para a frente"
+	if ex[0] > LIM_EIXO_D:
+		return "eixo dianteiro com %.0f kg (limite %.0f): carga muito para a frente — puxe para trás" % [ex[0], LIM_EIXO_D]
+	if ex[1] > LIM_EIXO_T:
+		return "eixo traseiro com %.0f kg (limite %.0f): carga muito para trás" % [ex[1], LIM_EIXO_T]
+	if ex[0] < FRENTE_MIN * (ex[0] + ex[1]):
+		return "frente leve: só %.0f%% do peso no eixo dianteiro (mín 25%%) — puxe a carga para a frente" % (100.0 * ex[0] / (ex[0] + ex[1]))
 	return ""
 
 func resumo() -> Dictionary:
@@ -270,4 +281,4 @@ func _placa() -> void:
 		return
 	var r := resumo()
 	var ex := cargas_eixos()
-	placa.text = "PEDIDO: %s\nna carroceria: %.0f m telha · %d rufos · %d chapas · %.0f/%.0f kg úteis\neixo dianteiro +%.0f kg (máx %.0f) · %s" % [_txt_pedido(), r.telha_m, r.rufo, r.chapa, r.kg, CAPACIDADE, ex[0], CARGA_EIXO_D, "CALÇADO" if calcado else "SEM CALÇO"]
+	placa.text = "PEDIDO: %s\nna carroceria: %.0f m telha · %d rufos · %d chapas · %.0f/%.0f kg úteis\neixos: dianteiro %.0f/%.0f kg · traseiro %.0f/%.0f kg · %s" % [_txt_pedido(), r.telha_m, r.rufo, r.chapa, r.kg, CAPACIDADE, ex[0], LIM_EIXO_D, ex[1], LIM_EIXO_T, "CALÇADO" if calcado else "SEM CALÇO"]

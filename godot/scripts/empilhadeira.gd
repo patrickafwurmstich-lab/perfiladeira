@@ -215,7 +215,8 @@ func centro_de_carga(c: Carga) -> float:
 	var calcanhar := PONTA_Z - COMPR_GARFO
 	return maxf(to_local(c.global_position).z - calcanhar, 0.0)
 
-## capacidade residual: a nominal vale para o centro de carga de 500 mm; mais longe, o momento cresce
+## capacidade residual (modelo simplificado de momento, não tabela de fabricante): a nominal vale
+## para o centro de carga de 500 mm; mais longe, o momento da carga cresce na mesma proporção
 func capacidade_para(c: Carga) -> float:
 	return CAPACIDADE * 0.5 / maxf(0.5, centro_de_carga(c))
 
@@ -400,7 +401,8 @@ func dirigir(acel: float, vira: float, sobe: float, delta: float) -> void:
 		_conferir_carga()
 
 ## dois limites físicos na curva (aceleração lateral a = v·ω):
-##  1) a carga solta escorrega dos garfos quando a > μ·g (aço sobre aço/madeira, μ ≈ 0,30 → 2,9 m/s²)
+##  1) a carga solta escorrega dos garfos quando a > μ·g (μ da carga: madeira dos pontaletes/palete sobre aço ≈ 0,35 → 3,4 m/s²)
+##     (modelo simplificado: o CG combinado é recalculado a cada quadro com o peso e a altura atuais)
 ##  2) a empilhadeira tomba de lado quando a > g·b/h, com b = 0,33 m (meia base do triângulo de
 ##     estabilidade de uma contrabalançada com eixo traseiro pivotado) e h = altura do centro de gravidade
 ##     combinado (máquina 3.600 kg a 0,62 m + carga na altura dos garfos)
@@ -422,7 +424,7 @@ func _checar_tombo(a_lat: float, lado_curva: float) -> void:
 	if tombada:
 		return
 	var fora := -global_transform.basis.x * lado_curva      # para fora da curva
-	if carga and a_lat > MU_GARFO * 9.8:
+	if carga and a_lat > carga.mu * 9.8:
 		var c := carga
 		carga = null
 		c.soltar(mundo if mundo else get_parent())
@@ -431,7 +433,7 @@ func _checar_tombo(a_lat: float, lado_curva: float) -> void:
 		c.espalhar(fora)
 		avarias += 1
 		Som.tocar("bang", null, c.global_position, 0.0)
-		Bus.alarme.emit("Empilhadeira", "CARGA ESCORREGOU dos garfos na curva (%.1f m/s², limite %.1f). Ande mais devagar nas curvas." % [a_lat, MU_GARFO * 9.8])
+		Bus.alarme.emit("Empilhadeira", "CARGA ESCORREGOU dos garfos na curva (%.1f m/s², limite μ·g = %.1f). Ande mais devagar nas curvas." % [a_lat, c.mu * 9.8])
 	if a_lat > limite_tombo():
 		tombada = true
 		a_tombo = a_lat

@@ -133,7 +133,7 @@ func _ready() -> void:
 	ok(C.infracoes == 1, "carregou sem calço: infração registrada")
 	C.calcar(true)
 	var ex: Array = C.cargas_eixos()
-	ok(ex[0] <= C.CARGA_EIXO_D and ex[0] >= 0.0, "eixo dianteiro +%.0f kg, traseiro +%.0f kg" % [ex[0], ex[1]])
+	ok(ex[0] <= C.LIM_EIXO_D and ex[1] <= C.LIM_EIXO_T and C.conferir() == "", "eixos com a tara: dianteiro %.0f kg, traseiro %.0f kg" % [ex[0], ex[1]])
 	await rodar(Vector3(0, 0, -1), 1.0)
 	await rodar(Vector3(-0.5, 0, 0), 3.0)
 	await foto("no_caminhao", C.to_global(Vector3(-1, 3.5, -6)), C.to_global(Vector3(-1, 1, 0)))

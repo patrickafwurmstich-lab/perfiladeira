@@ -17,6 +17,7 @@ var y_vao := 0.0              # altura do vão dos garfos acima da base da carga
 var corpo: StaticBody3D
 var no_garfo: Node3D = null   # quem está segurando
 var etiqueta: Label3D
+var mu := 0.35                  # atrito com os garfos: madeira (palete/pontalete) sobre aço ≈ 0,3–0,4
 var garfo_min := -0.04          # quanto abaixo do vão o topo do garfo pode estar (chão/tábuas de baixo + 4 cm de garfo)
 
 static func criar(pai: Node, xf: Transform3D, p_tipo: String, p_qtd: int, p_metros: float, p_kg: float, p_tam: Vector3, p_desc: String, com_palete := false) -> Carga:
@@ -89,9 +90,12 @@ func _montar(com_palete: bool) -> void:
 	var mcant := StandardMaterial3D.new()
 	mcant.albedo_color = Color(0.92, 0.92, 0.9)
 	var n_fitas := maxi(2, int(tamanho.x / 1.0) + 1)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(descricao) + n_fitas
 	for i in n_fitas:
-		var fx := lerpf(-tamanho.x * 0.38, tamanho.x * 0.38, float(i) / (n_fitas - 1))
-		_caixa(Vector3(0.032, h + 0.012, larg + 0.012), Vector3(fx, base_h + h * 0.5, 0), mf)
+		var fx := lerpf(-tamanho.x * 0.38, tamanho.x * 0.38, float(i) / (n_fitas - 1)) + rng.randf_range(-0.04, 0.04)
+		var fita := _caixa(Vector3(0.032, h + 0.012, larg + 0.012), Vector3(fx, base_h + h * 0.5, 0), mf)
+		fita.rotation.y = deg_to_rad(rng.randf_range(-2.5, 2.5))       # passadas à mão: nunca perfeitamente retas
 		for sz in [-1.0, 1.0]:
 			_caixa(Vector3(0.07, 0.035, 0.035), Vector3(fx, base_h + h - 0.012, sz * (larg * 0.5 - 0.012)), mcant)
 	var et := Label3D.new()

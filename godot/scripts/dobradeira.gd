@@ -61,6 +61,9 @@ var no_chapa: Node3D
 var no_plano: MeshInstance3D
 var pivo_aba: Node3D
 var no_aba: MeshInstance3D
+var arco_dobra: Array = []
+const R_DOBRA := 0.004          # raio interno da dobra (≈ 9× a espessura na dobradeira manual)
+const ESP_VIS := 0.0016         # espessura desenhada da chapa (igual na parte plana, no arco e na aba)
 var pilha_ok: Node3D
 var pilha_tiras: Node3D
 var lb_regua: Label3D
@@ -138,6 +141,13 @@ func _ready() -> void:
 	no_aba.mesh = BoxMesh.new()
 	no_aba.material_override = Perfil.material_chapa()
 	pivo_aba.add_child(no_aba)
+	# raio da dobra (a chapa curva, não quebra): 6 trechos num arco de raio interno ~4 mm
+	for i in 6:
+		var sg := MeshInstance3D.new()
+		sg.mesh = BoxMesh.new()
+		sg.material_override = Perfil.material_chapa()
+		no_chapa.add_child(sg)
+		arco_dobra.append(sg)
 	# leitura da régua no batente
 	lb_regua = Label3D.new()
 	lb_regua.font_size = 28
@@ -407,12 +417,27 @@ func _atualizar_visual() -> void:
 		var desliza := 0.0
 		if escorregou:
 			desliza = -0.03
-		(no_plano.mesh as BoxMesh).size = Vector3(COMPRIMENTO, 0.0012, preso)
-		no_plano.position = Vector3(0, Y_MESA + 0.0006, Z_DOBRA + preso * 0.5 + desliza)
-		(no_aba.mesh as BoxMesh).size = Vector3(COMPRIMENTO, 0.0012, aba)
-		no_aba.position = Vector3(0, 0, -aba * 0.5)
-		pivo_aba.position = Vector3(0, Y_MESA + 0.0006, Z_DOBRA + desliza)
-		pivo_aba.rotation.x = deg_to_rad(ang_chapa() if not escorregou else minf(ang_avental, 25.0))
+		var e := ESP_VIS
+		(no_plano.mesh as BoxMesh).size = Vector3(COMPRIMENTO, e, preso)
+		no_plano.position = Vector3(0, Y_MESA + e * 0.5, Z_DOBRA + preso * 0.5 + desliza)
+		# arco da dobra: centro acima da linha de dobra, raio = raio interno + meia espessura
+		var ang := deg_to_rad(ang_chapa() if not escorregou else minf(ang_avental, 25.0))
+		var rm := R_DOBRA + e * 0.5
+		var cy := Y_MESA + e * 0.5 + rm
+		var cz := Z_DOBRA + desliza
+		var n := arco_dobra.size()
+		var compr_arco := maxf(rm * ang / n, 0.0002)
+		for i in n:
+			var t := ang * (i + 0.5) / n
+			var sg: MeshInstance3D = arco_dobra[i]
+			(sg.mesh as BoxMesh).size = Vector3(COMPRIMENTO, e, compr_arco * 1.08)
+			sg.position = Vector3(0, cy - rm * cos(t), cz - rm * sin(t))
+			sg.rotation.x = t
+			sg.visible = ang > 0.01
+		(no_aba.mesh as BoxMesh).size = Vector3(COMPRIMENTO, e, maxf(aba - rm * ang, 0.001))
+		no_aba.position = Vector3(0, 0, -maxf(aba - rm * ang, 0.001) * 0.5)
+		pivo_aba.position = Vector3(0, cy - rm * cos(ang), cz - rm * sin(ang))
+		pivo_aba.rotation.x = ang
 	# palete de tiras e de peças prontas
 	_empilhar(pilha_tiras, estoque_tiras, false)
 	_empilhar(pilha_ok, pecas_palete, true)

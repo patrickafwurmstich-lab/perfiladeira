@@ -42,6 +42,10 @@ func _ready() -> void:
 	d.puxar_avental(0.0)
 	await _q(2)
 	await foto("dob_lado_solto", d.to_global(Vector3(2.6, 1.0, -0.4)), d.to_global(Vector3(0, 0.95, -0.3)), 1.4)
+	# corte na ponta da peça: raio da dobra e espessura (aperto aberto, viga levantada)
+	d.cmd_aperto(false)
+	await _q(2)
+	await foto("dob_dobra_close", d.to_global(Vector3(1.03, 0.93, -0.37)), d.to_global(Vector3(0.0, 0.93, -0.37)), 0.10)
 	# --- amarrado + empilhadeira
 	var m: Perfiladeira = main.maquina
 	for i in 40:
