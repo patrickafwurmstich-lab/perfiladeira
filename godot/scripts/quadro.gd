@@ -3,7 +3,10 @@ extends Node3D
 ## Quadro elétrico geral. Cada máquina tem seu disjuntor; sem ele, a caixa de comando fica morta.
 ## A porta abre (anima) e a alavanca do disjuntor sobe/desce de verdade.
 
-var maquina
+var maquina                    # perfiladeira (disjuntor 0)
+var maquinas := {}             # índice do disjuntor → máquina (0 perfiladeira, 1 linha de corte...)
+var alavancas: Array = []
+var foco: Marker3D
 var modelo: Node3D
 var porta: Node3D
 var alavanca: MeshInstance3D
@@ -47,6 +50,18 @@ func _ready() -> void:
 		add_child(lv)
 		if i == 0:
 			alavanca = lv
+		alavancas.append(lv)
+		# área clicável do disjuntor (camada 2, como os botões da caixa de comando)
+		var sb := StaticBody3D.new()
+		sb.collision_layer = 2
+		sb.set_meta("disjuntor", i)
+		var cs2 := CollisionShape3D.new()
+		var bs2 := BoxShape3D.new()
+		bs2.size = Vector3(0.09, 0.15, 0.08)
+		cs2.shape = bs2
+		sb.add_child(cs2)
+		sb.position = Vector3(x, 1.35, 0.18)
+		add_child(sb)
 		var et := Label3D.new()
 		et.text = nomes[i]
 		et.font_size = 16
@@ -63,23 +78,47 @@ func _ready() -> void:
 	cs.shape = bs
 	cs.position = Vector3(0, 1.03, 0.02)
 	col.add_child(cs)
+	foco = Marker3D.new()
+	add_child(foco)
+	foco.transform = Transform3D(Basis(), Vector3(0, 1.45, 0.95)).looking_at(Vector3(0, 1.3, 0.15), Vector3.UP)
 	Interagivel.criar(self, Vector3(0, 1.2, 0.8), _txt, _faz, 1.6)
 
 func _txt() -> String:
 	if not aberta:
 		return "Abrir o quadro elétrico"
-	return ("Desligar" if maquina.energia else "Ligar") + " o disjuntor da PERFILADEIRA"
+	return "Mexer nos disjuntores (clique no da máquina)"
 
 func _faz() -> void:
 	if not aberta:
 		aberta = true
 		Som.tocar("trava", null, global_position + Vector3(0, 1.2, 0.4), -6.0)
 		return
-	maquina.cmd_disjuntor(not maquina.energia)
+	if maquinas.is_empty():
+		maquinas[0] = maquina
+	Interacoes.focar(foco, self, "QUADRO ELÉTRICO · clique no disjuntor para ligar/desligar · E ou Esc sai")
+
+func on_foco_clique(ev: InputEventMouseButton, hit: Dictionary) -> void:
+	if not ev.pressed or ev.button_index != MOUSE_BUTTON_LEFT or hit.is_empty():
+		return
+	var col: Object = hit.collider
+	if not col.has_meta("disjuntor"):
+		return
+	var i: int = col.get_meta("disjuntor")
+	if maquinas.has(i):
+		maquinas[i].cmd_disjuntor(not maquinas[i].energia)
+	else:
+		Som.tocar("trava", null, global_position + Vector3(0, 1.3, 0.2), -6.0)
+		Bus.aviso.emit("Esse circuito ainda não tem máquina instalada.")
+
+## para testes e funcionários: liga/desliga o disjuntor de uma máquina sem o mouse
+func disjuntor(i: int, ligar: bool) -> void:
+	if maquinas.has(i) and maquinas[i].energia != ligar:
+		maquinas[i].cmd_disjuntor(ligar)
 
 func _process(delta: float) -> void:
 	_ang = move_toward(_ang, 1.9 if aberta else 0.0, delta * 3.0)
 	if porta:
 		porta.rotation.y = _ang
-	if alavanca and maquina:
-		alavanca.position.y = 1.36 if maquina.energia else 1.30
+	for i in alavancas.size():
+		var mq = maquinas.get(i, maquina if i == 0 else null)
+		alavancas[i].position.y = 1.36 if (mq and mq.energia) else 1.30

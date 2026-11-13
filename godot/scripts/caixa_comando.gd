@@ -83,7 +83,7 @@ func _montar_porta() -> void:
 	porta.position = Vector3(0, y_c, face_z - 0.006)
 	add_child(porta)
 	var placa := Label3D.new()
-	placa.text = "PERFILADEIRA TP-40  ·  380 V  ·  15 kW"
+	placa.text = "%s  ·  380 V  ·  15 kW" % maquina.NOME.to_upper()
 	placa.font_size = 22
 	placa.pixel_size = 0.0011
 	placa.modulate = Color(0.1, 0.1, 0.1)

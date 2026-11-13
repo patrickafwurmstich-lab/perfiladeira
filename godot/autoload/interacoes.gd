@@ -106,7 +106,11 @@ class GuiasFoco extends RefCounted:
 		maq = m
 		_avisar()
 	func _avisar() -> void:
-		Interacoes.dica.emit("Manivela %s · desvio %+.1f mm · folga %.1f mm · Tab troca · roda/A-D gira · Esc sai" % ["CENTRO" if qual == 0 else "APERTO", maq.desvio_mm, maq.folga_mm])
+		var nome: String = ["CENTRO", "APERTO", "ENDIREITADOR"][qual]
+		var txt := "Manivela %s · desvio %+.1f mm · folga %.1f mm" % [nome, maq.desvio_mm, maq.folga_mm]
+		if maq.TEM_ENDIREITADOR:
+			txt += " · penetração %.1f mm" % maq.penetracao_mm
+		Interacoes.dica.emit(txt + " · Tab troca · roda/A-D gira · Esc sai")
 	func on_foco_clique(ev, _hit) -> void:
 		if ev.pressed and ev.button_index == MOUSE_BUTTON_WHEEL_UP:
 			maq.girar_manivela(qual, 0.25)
@@ -117,7 +121,7 @@ class GuiasFoco extends RefCounted:
 		if not ev.pressed:
 			return
 		if ev.is_action("trocar_manivela"):
-			qual = 1 - qual
+			qual = (qual + 1) % (3 if maq.TEM_ENDIREITADOR else 2)
 		elif ev.is_action("direita"):
 			maq.girar_manivela(qual, 0.25)
 		elif ev.is_action("esquerda"):

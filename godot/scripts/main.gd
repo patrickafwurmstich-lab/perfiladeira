@@ -6,6 +6,7 @@ var jogador: Jogador
 var hud: HUD
 var quadro: QuadroEletrico
 var ponte: PonteRolante
+var corte: LinhaCorte
 
 func _ready() -> void:
 	_ambiente()
@@ -33,13 +34,19 @@ func _ready() -> void:
 	maquina = Perfiladeira.new()
 	maquina.name = "Perfiladeira"
 	add_child(maquina)
+	corte = LinhaCorte.new()
+	corte.name = "LinhaCorte"
+	corte.position = Vector3(3.0, 0, -9.0)
+	add_child(corte)
 	quadro = QuadroEletrico.new()
 	quadro.maquina = maquina
+	quadro.maquinas = {0: maquina, 1: corte}
 	quadro.position = Vector3(-11.0, 0, 3.2)
 	add_child(quadro)
 	_armario_epi(Vector3(-12.6, 0, 5.6))
 	ponte = PonteRolante.new()
 	ponte.maquina = maquina
+	ponte.maquinas = [maquina, corte]
 	add_child(ponte)
 	var berco_m := load("res://modelos/berco_bobina.glb")
 	var cods := ["BOB-014", "BOB-015", "BOB-016"]
@@ -60,6 +67,7 @@ func _ready() -> void:
 	hud = HUD.new()
 	hud.jogador = jogador
 	hud.maquina = maquina
+	hud.maquinas = [maquina, corte]
 	add_child(hud)
 	Bus.aviso.emit("Bom dia! A perfiladeira está desligada. Siga a lista à esquerda: comece pelo quadro elétrico.")
 

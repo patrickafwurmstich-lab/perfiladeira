@@ -5,22 +5,22 @@ extends Node3D
 ##  tira da bobina (raio real), gasta rolo e graxa, consome energia, avança a peça e vai para a pilha.
 ## Coordenadas: as do modelo 3D (X ao longo da máquina, a chapa anda de -X para +X; +Z = lado do operador).
 
-const NOME := "Perfiladeira TP-40"
+var NOME := "Perfiladeira TP-40"
 # ---- geometria do modelo perfiladeira_tp40.glb ----
-const X_DESB := -7.2
-const Y_DESB := 1.12
-const X_ENTRADA := -6.2        # começo da mesa de entrada
-const Y_PASSE := 0.948         # linha de passe (topo dos rolos inferiores)
-const X_E0 := -4.9             # 1ª estação
-const PASSO := 0.75
-const N_EST := 13
-const X_E1 := X_E0 + (N_EST - 1) * PASSO    # última estação (4,1)
-const X_CORTE := 5.07          # contra-faca da guilhotina
-const X_APOIO_FIM := 7.05
-const X_PILHA := 7.2           # começo da pilha (sobre pontaletes no chão)
-const R_INF := 0.085
-const R_SUP := 0.07
-const Y_LAMINA := 1.18
+var X_DESB := -7.2
+var Y_DESB := 1.12
+var X_ENTRADA := -6.2        # começo da mesa de entrada
+var Y_PASSE := 0.948         # linha de passe (topo dos rolos inferiores)
+var X_E0 := -4.9             # 1ª estação
+var PASSO := 0.75
+var N_EST := 13
+var X_E1 := X_E0 + (N_EST - 1) * PASSO    # última estação (4,1)
+var X_CORTE := 5.07          # contra-faca da guilhotina
+var X_APOIO_FIM := 7.05
+var X_PILHA := 7.2           # começo da pilha (sobre pontaletes no chão)
+var R_INF := 0.085
+var R_SUP := 0.07
+var Y_LAMINA := 1.18
 # ---- material e máquina (dados da Demo) ----
 const ESPESSURA := 0.00043     # chapa 0,43 mm
 const R_FURO := 0.254          # furo de 508 mm
@@ -28,10 +28,42 @@ const KW := 15.0
 const V_REAL := 12.0 / 60.0    # 12 m/min da máquina real
 const FATOR_VISUAL := 3.0      # decisão da sala: 3x a real = 0,6 m/s (telha de 6 m em 10 s)
 const V_JOG := 0.12
-const MESA_CAP := 60
-const NINHO := 0.006           # altura de cada telha encaixada na pilha
-const LARG_UTIL := 0.98        # largura útil da TP-40 (m² vendável = L × 0,98)
-const X_SENSOR_FIM := X_E0 - 0.6   # sensor de fim de chapa (alavanca na entrada)
+var MESA_CAP := 60
+var NINHO := 0.006           # altura de cada telha encaixada na pilha
+var LARG_UTIL := 0.98        # largura útil da TP-40 (m² vendável = L × 0,98)
+# ---- o que muda entre as máquinas da família (perfiladeira × linha de corte) ----
+var ARQUIVO_MODELO := "res://modelos/perfiladeira_tp40.glb"
+var PLANO := false            # true = chapa lisa (sem estações formadoras)
+var X_MESA := -5.75           # mesa de entrada / guias
+var POS_CAIXA := Vector3(-5.2, 0, 1.45)
+var Y_PILHA0 := 0.10          # altura da 1ª peça da pilha
+var X_BATENTE := -1.0         # >0: as peças correm até o batente (pilha na própria mesa)
+var LAMINA_CURSO := 0.25
+var Y_PISADOR := 1.10
+var PISADOR_CURSO := 0.13
+var GRAXEIRAS_X: Array = []   # vazio = calcula pelas estações
+var COLISAO: Array = [
+	[Vector3(-7.2, 0.7, 0), Vector3(1.4, 1.4, 1.7)],
+	[Vector3(-5.75, 0.45, 0), Vector3(0.9, 0.9, 1.3)],
+	[Vector3(-0.4, 0.75, 0.1), Vector3(9.9, 1.5, 1.7)],
+	[Vector3(4.95, 0.9, -0.2), Vector3(1.1, 1.8, 2.3)],
+	[Vector3(6.4, 0.45, 0), Vector3(1.3, 0.9, 1.3)],
+]
+var COMPRIMENTO_PADRAO := 3.0
+var NOME_PECA := "TELHA"
+var PECAS := "telhas"
+var GRAXEIRA_Y := 1.2
+var GRAXEIRA_Z := 0.69
+var MANIVELA_Z := 0.72
+var TAMPA_X0 := 0.0           # 0/0 = cobre as estações
+var TAMPA_X1 := 0.0
+var TAMPA_Y := 1.30
+# endireitador (só a linha de corte): volantes que regulam a penetração dos rolos
+var TEM_ENDIREITADOR := false
+var penetracao_mm := 0.0
+var PENETRACAO_IDEAL := 2.0
+var volantes: Array = []
+var X_SENSOR_FIM := X_E0 - 0.6   # sensor de fim de chapa (alavanca na entrada)
 const T_CORTE := 0.9           # ciclo da guilhotina: pisador desce, lâmina desce/sobe, pisador sobe
 const T_SIRENE := 3.0          # sirene + giroflex antes de qualquer movimento automático
 
@@ -86,6 +118,7 @@ var freio_ok := false           # freio do desbobinador ajustado (sem ele a bobi
 var barriga_m := 0.0            # chapa frouxa entre bobina e mesa
 var ponta_refilada := false     # a ponta da bobina vem amassada: corta-se fora antes da peça teste
 var lamina_em_cima := true      # sensor de lâmina em repouso
+var arco_m := 0.0               # flecha vertical da chapa (memória de bobina mal endireitada) — linha de corte
 var enrosco_aleatorio := true   # testes automáticos desligam o sorteio para serem repetíveis
 
 # ---- nós visuais ----
@@ -123,22 +156,44 @@ var rng := RandomNumberGenerator.new()
 var ponta_mao: Vector3 = Vector3.ZERO   # onde está a mão do jogador quando puxa a ponta (local)
 var jogador_ref: Node3D
 
-func _ready() -> void:
-	rng.randomize()
-	erro_encoder_mm = rng.randf_range(-15.0, 15.0)
-	_mat_chapa = Perfil.material_chapa()
-	modelo = load("res://modelos/perfiladeira_tp40.glb").instantiate()
-	add_child(modelo)
+## geometria da máquina: a perfiladeira usa os valores acima; outras máquinas da mesma família
+## (linha de corte) mudam os números em _configurar() e herdam toda a lógica testada
+func _configurar() -> void:
+	pass
+
+## rolos que giram com a chapa (inferiores e superiores); a linha de corte troca por endireitador + puxador
+func _achar_rolos() -> void:
 	for e in N_EST:
 		rolos_inf.append(modelo.find_child("rolo_inf_%d" % e, true, false))
 		rolos_sup.append(modelo.find_child("rolo_sup_%d" % e, true, false))
+
+## onde a peça cortada termina de deslizar (início dela no eixo X)
+func _x_pilha(L: float) -> float:
+	return X_BATENTE - 0.04 - L if X_BATENTE > 0.0 else X_PILHA
+
+func _ready() -> void:
+	_configurar()
+	X_E1 = X_E0 + (N_EST - 1) * PASSO
+	X_SENSOR_FIM = X_E0 - 0.6 if not PLANO else X_ENTRADA + 0.1
+	if TAMPA_X0 == 0.0 and TAMPA_X1 == 0.0:
+		TAMPA_X0 = X_E0 - 0.35
+		TAMPA_X1 = X_E1 + 0.35
+	rng.randomize()
+	erro_encoder_mm = rng.randf_range(-15.0, 15.0)
+	_mat_chapa = Perfil.material_chapa()
+	comprimento = COMPRIMENTO_PADRAO
+	modelo = load(ARQUIVO_MODELO).instantiate()
+	add_child(modelo)
+	_achar_rolos()
 	lamina = modelo.find_child("lamina", true, false)
+	if lamina:
+		Y_LAMINA = lamina.position.y
 	mandril = modelo.find_child("mandril_desbobinador", true, false)
 	if mandril:
 		for c in mandril.get_children():
 			if String(c.name).begins_with("regua"):
 				reguas.append([c, c.position])
-	var ent := modelo.find_child("mesa_entrada", true, false)
+	var ent := modelo.find_child("mesa_entrada", true, false) if not PLANO else null
 	if ent:
 		for c in ent.get_children():
 			if String(c.name).begins_with("guia"):
@@ -167,12 +222,12 @@ func _ready() -> void:
 	caixa = CaixaComando.new()
 	caixa.maquina = self
 	add_child(caixa)
-	caixa.position = Vector3(-5.2, 0, 1.45)
+	caixa.position = POS_CAIXA
 	_interacoes()
 	var fg := Marker3D.new()
 	fg.name = "FocoGuias"
 	add_child(fg)
-	fg.transform = Transform3D(Basis(), Vector3(-5.75, 1.55, 1.75)).looking_at(Vector3(-5.75, 0.85, 0.55), Vector3.UP)
+	fg.transform = Transform3D(Basis(), Vector3(X_MESA, 1.55, 1.75)).looking_at(Vector3(X_MESA, 0.85, 0.55), Vector3.UP)
 	_atualizar_visual(0.0)
 
 # ======================================================================
@@ -192,6 +247,7 @@ func etapas() -> Array:
 		["Passar a chapa até a guilhotina (AVANÇO LENTO, modo manual)", fita == "enfiada"],
 		["Refilar a ponta amassada (CORTE MANUAL — vai para a sucata)", ponta_refilada],
 		["Centralizar as guias (desvio ≤ 2 mm, folga ≤ 3 mm)", absf(desvio_mm) <= 2.0 and folga_mm <= 3.0 and fita == "enfiada"],
+		["Ajustar o endireitador (volantes) para a chapa sair reta", absf(penetracao_mm - PENETRACAO_IDEAL) <= 0.25] if TEM_ENDIREITADOR else ["", true],
 		["Cortar uma PEÇA TESTE (IHM, modo manual)", teste_feito],
 		["Medir a peça com a trena e corrigir (erro ≤ 2 mm)", medida_ok],
 		["Proteção dos rolos fechada, modo AUTOMÁTICO e LIGA", rodando],
@@ -217,7 +273,7 @@ func fase() -> String:
 
 func proxima_etapa() -> String:
 	for e in etapas():
-		if not e[1]:
+		if not e[1] and e[0] != "":
 			return e[0]
 	return "Produzindo. Fique de olho no chiado, na pilha e na bobina."
 
@@ -598,18 +654,22 @@ func _cortar() -> void:
 	# defeitos que se veem: guia fora de centro entorta (camber), folga deixa a chapa "nadar",
 	# cassete gasto deixa o perfil assimétrico
 	var curva := (desvio_mm / 1000.0) * 0.18 * L + (rng.randf_range(-1, 1) * (folga_mm - 3.0) * 0.0006 * L if folga_mm > 3.0 else 0.0)
-	var assim := clampf((desgaste - 0.35) * 1.6, 0.0, 1.0)
+	var assim := clampf((desgaste - 0.35) * 1.6, 0.0, 1.0) if not PLANO else 0.0
+	# endireitador fora do ponto: pouca penetração deixa a "memória" da bobina (chapa arqueada),
+	# penetração demais arqueia para o outro lado
+	arco_m = (PENETRACAO_IDEAL - penetracao_mm) * 0.004 * L if TEM_ENDIREITADOR else 0.0
 	var erro_mm := (L - comprimento) * 1000.0
 	var defeito := ""
 	if absf(erro_mm) > 5.0: defeito = "medida"
 	if absf(curva) > 0.004: defeito = "torta"
 	if assim > 0.3: defeito = "perfil"
+	if absf(arco_m) > 0.004: defeito = "memoria"
 	var no := MeshInstance3D.new()
 	no.mesh = _malha_telha(L, curva, assim)
 	no.material_override = _mat_chapa
 	no.position = Vector3(X_CORTE, Y_PASSE, desvio_mm / 1000.0 * 0.3)
 	add_child(no)
-	deslizando.append({"no": no, "L": L, "curva": curva, "assim": assim, "defeito": defeito, "fase": 0, "t": 0.0, "preso": true})
+	deslizando.append({"no": no, "L": L, "curva": curva, "assim": assim, "arco": arco_m, "defeito": defeito, "fase": 0, "t": 0.0, "preso": true})
 	produzidas += 1
 	if teste_ativo:
 		teste_ativo = false
@@ -620,16 +680,16 @@ func _cortar() -> void:
 		rodando = false
 		falha = "lote"
 		Som.tocar("buzina", self, global_position + Vector3(0, 2, 1), -4.0)
-		Bus.aviso.emit("Lote concluído: %d telhas de %.2f m." % [produzidas, comprimento])
+		Bus.aviso.emit("Lote concluído: %d %s de %.2f m." % [produzidas, PECAS, comprimento])
 	_estado()
 
-const TAMBOR := Vector3(5.6, 0.0, 1.35)
+var TAMBOR := Vector3(5.6, 0.0, 1.35)
 var _thoc_tocado := true
 
 func _malha_telha(L: float, curva: float, assim: float) -> ArrayMesh:
-	var k := "%d_%d_%d" % [int(L * 1000), int(curva * 1000), int(assim * 10)]
+	var k := "%d_%d_%d_%d" % [int(L * 1000), int(curva * 1000), int(assim * 10), int(arco_m * 1000)]
 	if not _cache_telha.has(k):
-		_cache_telha[k] = Perfil.malha_telha(L, curva, assim)
+		_cache_telha[k] = Perfil.malha_chapa(L, curva, arco_m) if PLANO else Perfil.malha_telha(L, curva, assim)
 	return _cache_telha[k]
 
 func _deslizar(dt_ind: float) -> void:
@@ -655,20 +715,21 @@ func _deslizar(dt_ind: float) -> void:
 		if d.fase == 0:
 			# desliza sobre o apoio de rolos até a traseira passar do fim do apoio
 			no.position.x += 1.6 * dt_ind
-			if no.position.x >= X_PILHA:
-				no.position.x = X_PILHA
+			var xp := _x_pilha(d.L)
+			if no.position.x >= xp:
+				no.position.x = xp
 				d.fase = 1
 				d.t = 0.0
 		else:
 			# cai na pilha (encaixa por cima da anterior)
 			d.t += dt_ind
-			var y_alvo := 0.10 + pilha.size() * NINHO + 0.02
-			no.position.y = lerpf(Y_PASSE, y_alvo, clampf(d.t / 0.25, 0.0, 1.0))
+			var y_alvo := Y_PILHA0 + pilha.size() * NINHO + 0.002
+			no.position.y = lerpf(maxf(Y_PASSE, y_alvo), y_alvo, clampf(d.t / 0.25, 0.0, 1.0))
 			if d.t >= 0.25:
 				no.position.y = y_alvo
-				Som.tocar("clank", self, global_position + Vector3(X_PILHA + d.L * 0.5, 0.4, 0), -2.0)
+				Som.tocar("clank", self, global_position + Vector3(_x_pilha(d.L) + d.L * 0.5, Y_PILHA0, 0), -2.0)
 				no.position.z += rng.randf_range(-0.003, 0.003)     # alinhadas pelas guias, mas não perfeitas
-				pilha.append({"L": d.L, "curva": d.curva, "assim": d.assim, "defeito": d.defeito})
+				pilha.append({"L": d.L, "curva": d.curva, "assim": d.assim, "arco": d.get("arco", 0.0), "defeito": d.defeito})
 				pilha_nos.append(no)
 				deslizando.remove_at(i)
 				Bus.peca_na_pilha.emit(NOME, pilha.size())
@@ -694,18 +755,18 @@ func medir_trena() -> Dictionary:
 		return {}
 	var t: Dictionary = pilha[pilha.size() - 1]
 	var erro: float = (t.L - comprimento) * 1000.0
-	ultima_medida = {"L": t.L, "erro_mm": erro, "curva_mm": t.curva * 1000.0}
+	ultima_medida = {"L": t.L, "erro_mm": erro, "curva_mm": t.curva * 1000.0, "arco_mm": t.get("arco", 0.0) * 1000.0}
 	trena_no.visible = true
-	var top := 0.10 + pilha.size() * NINHO + 0.05
-	trena_no.position = Vector3(X_PILHA, top, 0.47)
+	var top := Y_PILHA0 + pilha.size() * NINHO + 0.05
+	trena_no.position = Vector3(_x_pilha(t.L), top, 0.47)
 	trena_no.scale = Vector3(t.L, 1, 1)
 	(trena_no.get_child(1) as Label3D).text = "%.3f m" % t.L
 	(trena_no.get_child(1) as Label3D).scale = Vector3(1.0 / t.L, 1, 1)
-	if absf(erro) <= 2.0 and absf(t.curva) * 1000.0 <= 3.0:
+	if absf(erro) <= 2.0 and absf(t.curva) * 1000.0 <= 3.0 and absf(t.get("arco", 0.0)) * 1000.0 <= 3.0:
 		medida_ok = true
 		if not perfeita_dada and absf(desvio_mm) <= 2.0 and folga_mm <= 3.0:
 			perfeita_dada = true
-			Bus.conquista.emit("PRIMEIRA TELHA PERFEITA!", "%.3f m na trena, sem torção. Agora é produção." % t.L)
+			Bus.conquista.emit("PRIMEIRA %s PERFEITA!" % NOME_PECA, "%.3f m na trena, sem torção. Agora é produção." % t.L)
 	return ultima_medida
 
 # ======================================================================
@@ -796,9 +857,10 @@ func _atualizar_visual(dt: float) -> void:
 	volante_freio.rotation.z = -2.0 if freio_ok else 0.0
 	# rolos giram só onde tem chapa puxando; todos estão engrenados pela corrente
 	if dsv > 0.0:
-		for i in N_EST:
-			if rolos_inf[i]: rolos_inf[i].rotation.z -= dsv / R_INF
-			if rolos_sup[i]: rolos_sup[i].rotation.z += dsv / R_SUP
+		for rl in rolos_inf:
+			if rl: rl.rotation.z -= dsv / R_INF
+		for rl in rolos_sup:
+			if rl: rl.rotation.z += dsv / R_SUP
 	# guilhotina: pisador desce → lâmina desce (THOC no fundo) → lâmina sobe → pisador sobe
 	var tt := 1.0 - corte_t / T_CORTE if corte_t > 0.0 else 1.0
 	var kl := 0.0
@@ -814,8 +876,8 @@ func _atualizar_visual(dt: float) -> void:
 			Som.tocar("thoc", null, global_position + Vector3(X_CORTE, 1.3, 0), 3.0)
 	lamina_em_cima = kl < 0.02
 	if lamina:
-		lamina.position.y = Y_LAMINA - 0.25 * kl
-	pisador.position.y = 1.10 - 0.13 * kp
+		lamina.position.y = Y_LAMINA - LAMINA_CURSO * kl
+	pisador.position.y = Y_PISADOR - PISADOR_CURSO * kp
 	# guias: centro deslocado e folga visíveis
 	for g in guias:
 		var no: Node3D = g[0]
@@ -926,7 +988,7 @@ func _montar_fita() -> void:
 	add_child(fita_alim2)
 	# fita formando (uma malha só; o shader esconde o que ainda não chegou)
 	fita_malha = MeshInstance3D.new()
-	fita_malha.mesh = Perfil.malha_fita(X_ENTRADA, X_CORTE, X_E0, X_E1)
+	fita_malha.mesh = Perfil.malha_fita(X_ENTRADA, X_CORTE, X_E0, X_E1, 0.08, PLANO)
 	fita_mat = Perfil.material_fita()
 	fita_mat.set_shader_parameter("x_rolos", X_E0)
 	fita_malha.material_override = fita_mat
@@ -934,7 +996,7 @@ func _montar_fita() -> void:
 	add_child(fita_malha)
 	# telha crescendo depois da contra-faca (malha de 1 m escalada)
 	peca_malha = MeshInstance3D.new()
-	peca_malha.mesh = Perfil.malha_telha(1.0)
+	peca_malha.mesh = Perfil.malha_chapa(1.0) if PLANO else Perfil.malha_telha(1.0)
 	peca_malha.material_override = _mat_chapa
 	peca_malha.position = Vector3(X_CORTE, Y_PASSE, 0)
 	add_child(peca_malha)
@@ -967,7 +1029,7 @@ func _montar_pisador_e_tambor() -> void:
 	mp.albedo_color = Color(0.2, 0.2, 0.22)
 	mp.metallic = 0.6
 	pisador.material_override = mp
-	pisador.position = Vector3(X_CORTE - 0.1, 1.10, 0)
+	pisador.position = Vector3(X_CORTE - 0.1, Y_PISADOR, 0)
 	add_child(pisador)
 	var tambor := MeshInstance3D.new()
 	var cy := CylinderMesh.new()
@@ -990,6 +1052,8 @@ func _montar_pisador_e_tambor() -> void:
 	add_child(lb)
 
 func _montar_pontaletes() -> void:
+	if X_BATENTE > 0.0:
+		return            # a pilha fica na própria mesa de saída, contra o batente
 	# batente de fim e guias laterais da pilha (as telhas encostam aqui e saem alinhadas)
 	var mg := StandardMaterial3D.new()
 	mg.albedo_color = Color(0.85, 0.65, 0.1)
@@ -1020,7 +1084,7 @@ func _montar_manivelas() -> void:
 	mm.albedo_color = Color(0.95, 0.78, 0.2)
 	for i in 2:
 		var g := Node3D.new()
-		g.position = Vector3(-5.95 + i * 0.4, 0.86, 0.72)
+		g.position = Vector3(X_MESA - 0.2 + i * 0.4, 0.86, MANIVELA_Z)
 		add_child(g)
 		var roda := MeshInstance3D.new()
 		var tm := TorusMesh.new()
@@ -1053,7 +1117,7 @@ func _montar_manivelas() -> void:
 	regua.font_size = 40
 	regua.pixel_size = 0.0012
 	regua.rotation.x = -PI / 2
-	regua.position = Vector3(-5.75, 0.885, 0.0)
+	regua.position = Vector3(X_MESA, 0.885, 0.0)
 	regua.rotation.y = PI / 2
 	add_child(regua)
 
@@ -1063,9 +1127,10 @@ func _montar_graxeiras() -> void:
 	mg.albedo_color = Color(0.98, 0.82, 0.1)
 	mg.emission_enabled = true
 	mg.emission = Color(0.3, 0.25, 0.0)
-	for i in 6:
-		var e := 1 + i * 2
-		var x := X_E0 + e * PASSO
+	if GRAXEIRAS_X.is_empty():
+		for i in 6:
+			GRAXEIRAS_X.append(X_E0 + (1 + i * 2) * PASSO)
+	for x in GRAXEIRAS_X:
 		var g := MeshInstance3D.new()
 		var cy := CylinderMesh.new()
 		cy.top_radius = 0.012
@@ -1073,21 +1138,18 @@ func _montar_graxeiras() -> void:
 		cy.height = 0.035
 		g.mesh = cy
 		g.rotation.x = PI / 2
-		g.position = Vector3(x, 1.2, 0.69)
+		g.position = Vector3(x, GRAXEIRA_Y, GRAXEIRA_Z)
 		g.material_override = mg
 		add_child(g)
 		graxeiras.append(g)
+	while graxa.size() < graxeiras.size():
+		graxa.append(0.4)
+	graxa.resize(graxeiras.size())
 
 func _montar_colisao() -> void:
 	var corpo := StaticBody3D.new()
 	add_child(corpo)
-	for b in [
-		[Vector3(-7.2, 0.7, 0), Vector3(1.4, 1.4, 1.7)],     # desbobinador + bobina
-		[Vector3(-5.75, 0.45, 0), Vector3(0.9, 0.9, 1.3)],   # mesa de entrada
-		[Vector3(-0.4, 0.75, 0.1), Vector3(9.9, 1.5, 1.7)],  # corpo formador + proteção
-		[Vector3(4.95, 0.9, -0.2), Vector3(1.1, 1.8, 2.3)],  # guilhotina + unidade hidráulica
-		[Vector3(6.4, 0.45, 0), Vector3(1.3, 0.9, 1.3)],     # apoio de saída
-	]:
+	for b in COLISAO:
 		var cs := CollisionShape3D.new()
 		var bs := BoxShape3D.new()
 		bs.size = b[1]
@@ -1151,9 +1213,10 @@ var _i_enrosco: Interagivel
 
 func _interacoes() -> void:
 	Interagivel.criar(self, Vector3(X_DESB + 0.2, 1.0, 0.9), _txt_bobina, _faz_bobina, 1.8)
-	Interagivel.criar(self, Vector3(-5.75, 0.95, 0.85), _txt_mesa, _faz_mesa, 1.4)
-	Interagivel.criar(self, Vector3(X_PILHA + 1.0, 0.6, 0.9), _txt_trena, _faz_trena, 2.0)
-	Interagivel.criar(self, Vector3(X_PILHA + 3.5, 0.6, 0.9), _txt_retirar, _faz_retirar, 2.5)
+	Interagivel.criar(self, Vector3(X_MESA, 0.95, 0.85), _txt_mesa, _faz_mesa, 1.4)
+	var xp := _x_pilha(COMPRIMENTO_PADRAO)
+	Interagivel.criar(self, Vector3(xp + 1.0, Y_PILHA0 + 0.5, 0.9), _txt_trena, _faz_trena, 2.0)
+	Interagivel.criar(self, Vector3(xp + COMPRIMENTO_PADRAO * 0.8, Y_PILHA0 + 0.5, 0.9), _txt_retirar, _faz_retirar, 2.5)
 	for i in graxeiras.size():
 		Interagivel.criar(self, graxeiras[i].position + Vector3(0, -0.2, 0.25), _txt_graxa.bind(i), _faz_graxa.bind(i), 1.0)
 	_i_enrosco = Interagivel.criar(self, Vector3(0, 1.0, 0.95), _txt_enrosco, _faz_enrosco, 2.2)
@@ -1246,6 +1309,13 @@ func girar_manivela(qual: int, voltas: float) -> void:
 	if v > 0.3:
 		Bus.aviso.emit("Não mexa nas guias com a máquina em produção.")
 		return
+	if qual == 2:
+		# volantes do endireitador: 1 volta = 0,5 mm de penetração dos rolos de cima
+		penetracao_mm = clampf(penetracao_mm + voltas * 0.5, 0.0, 6.0)
+		for vl in volantes:
+			vl.rotation.y -= voltas * TAU
+		Som.tocar("click", null, global_position + Vector3(X_E0 + 0.4, 1.6, 0), -14.0)
+		return
 	if qual == 0:
 		desvio_mm = clampf(desvio_mm + voltas * 2.0, -40.0, 40.0)
 	else:
@@ -1269,6 +1339,8 @@ func _faz_trena() -> void:
 	var txt := "Trena: %.3f m (programado %.3f). Erro %+.0f mm" % [m.L, comprimento, m.erro_mm]
 	if absf(m.curva_mm) > 1.0:
 		txt += " · torta %.0f mm (guia fora de centro!)" % absf(m.curva_mm)
+	if absf(m.get("arco_mm", 0.0)) > 1.0:
+		txt += " · arqueada %.0f mm (endireitador!)" % absf(m.arco_mm)
 	if absf(m.erro_mm) > 2.0:
 		txt += " → corrija %+.0f mm na IHM" % -m.erro_mm
 	Bus.aviso.emit(txt)
@@ -1277,12 +1349,12 @@ func _faz_trena() -> void:
 func _txt_retirar() -> String:
 	if pilha.is_empty() or rodando:
 		return ""
-	return "Retirar a pilha (%d telhas) — ajudante com a paleteira" % pilha.size()
+	return "Retirar a pilha (%d %s) — ajudante com a paleteira" % [pilha.size(), PECAS]
 
 func _faz_retirar() -> void:
 	Interacoes.progresso("Ajudante amarrando e levando a pilha...", 3.0, func():
 		var n := retirar_pilha()
-		Bus.aviso.emit("%d telhas foram para o estoque." % n)
+		Bus.aviso.emit("%d %s foram para o estoque." % [n, PECAS])
 		if falha == "mesa_cheia":
 			Bus.aviso.emit("Sensor da mesa livre. Aperte RESET e LIGA."))
 
@@ -1339,11 +1411,11 @@ var volante_freio: Node3D
 func _montar_protecao() -> void:
 	# tampa de tela articulada sobre as estações, com chave de segurança (intertravamento)
 	tampa = Node3D.new()
-	tampa.position = Vector3((X_E0 + X_E1) * 0.5, 1.30, -0.66)
+	tampa.position = Vector3((TAMPA_X0 + TAMPA_X1) * 0.5, TAMPA_Y, -0.66)
 	add_child(tampa)
 	var tela := MeshInstance3D.new()
 	var bm := BoxMesh.new()
-	bm.size = Vector3(X_E1 - X_E0 + 0.7, 0.012, 1.32)
+	bm.size = Vector3(TAMPA_X1 - TAMPA_X0, 0.012, 1.32)
 	tela.mesh = bm
 	tela.position = Vector3(0, 0, 0.66)
 	var mt := StandardMaterial3D.new()
@@ -1357,12 +1429,12 @@ func _montar_protecao() -> void:
 	for z in [0.0, 1.32]:
 		var q := MeshInstance3D.new()
 		var qb := BoxMesh.new()
-		qb.size = Vector3(X_E1 - X_E0 + 0.7, 0.04, 0.04)
+		qb.size = Vector3(TAMPA_X1 - TAMPA_X0, 0.04, 0.04)
 		q.mesh = qb
 		q.position = Vector3(0, 0, z)
 		q.material_override = mq
 		tampa.add_child(q)
-	for x in [-(X_E1 - X_E0 + 0.7) * 0.5, 0.0, (X_E1 - X_E0 + 0.7) * 0.5]:
+	for x in [-(TAMPA_X1 - TAMPA_X0) * 0.5, 0.0, (TAMPA_X1 - TAMPA_X0) * 0.5]:
 		var q := MeshInstance3D.new()
 		var qb := BoxMesh.new()
 		qb.size = Vector3(0.04, 0.04, 1.32)
@@ -1378,13 +1450,13 @@ func _montar_protecao() -> void:
 	var mc := StandardMaterial3D.new()
 	mc.albedo_color = Color(0.8, 0.1, 0.1)
 	ch.material_override = mc
-	ch.position = Vector3(X_E0 + 1.0, 1.27, 0.70)
+	ch.position = Vector3(TAMPA_X0 + minf(1.35, (TAMPA_X1 - TAMPA_X0) * 0.3), TAMPA_Y - 0.03, 0.70)
 	add_child(ch)
 	# dobradiças visíveis no lado de trás
 	var md := StandardMaterial3D.new()
 	md.albedo_color = Color(0.25, 0.25, 0.27)
 	md.metallic = 0.7
-	for xx in [-3.0, 0.0, 3.0]:
+	for xx in ([-3.0, 0.0, 3.0] if TAMPA_X1 - TAMPA_X0 > 3.0 else [-(TAMPA_X1 - TAMPA_X0) * 0.35, (TAMPA_X1 - TAMPA_X0) * 0.35]):
 		var d := MeshInstance3D.new()
 		var dc := CylinderMesh.new()
 		dc.top_radius = 0.022
@@ -1401,7 +1473,7 @@ func _montar_protecao() -> void:
 	lb2.size = Vector3(0.025, 0.07, 0.012)
 	lg.mesh = lb2
 	lg.material_override = md
-	lg.position = Vector3(X_E0 + 1.0 - (X_E0 + X_E1) * 0.5, -0.03, 1.36)
+	lg.position = Vector3(TAMPA_X0 + minf(1.35, (TAMPA_X1 - TAMPA_X0) * 0.3) - (TAMPA_X0 + TAMPA_X1) * 0.5, -0.03, 1.36)
 	tampa.add_child(lg)
 	var placa := Label3D.new()
 	placa.text = "! PERIGO — ROLOS EM MOVIMENTO\nNÃO ABRIR COM A MÁQUINA LIGADA"
@@ -1410,16 +1482,17 @@ func _montar_protecao() -> void:
 	placa.modulate = Color(0.1, 0.1, 0.1)
 	placa.outline_size = 0
 	placa.position = Vector3(-2.0, 0.012, 1.25)
+	placa.visible = TAMPA_X1 - TAMPA_X0 > 3.0
 	placa.rotation.x = -PI / 2
 	tampa.add_child(placa)
-	Interagivel.criar(self, Vector3(X_E0 + 1.6, 1.0, 0.95), _txt_tampa, _faz_tampa, 1.5)
+	Interagivel.criar(self, Vector3((TAMPA_X0 + TAMPA_X1) * 0.5, 1.0, 0.95), _txt_tampa, _faz_tampa, 1.5)
 
 func _txt_tampa() -> String:
 	return "Fechar a proteção dos rolos" if not protecao_fechada else "Abrir a proteção dos rolos (chave de segurança para a máquina)"
 
 func _faz_tampa() -> void:
 	protecao_fechada = not protecao_fechada
-	Som.tocar("trava", null, global_position + Vector3(X_E0 + 1.0, 1.3, 0.7), -4.0)
+	Som.tocar("trava", null, global_position + Vector3(TAMPA_X0 + 0.5, TAMPA_Y, 0.7), -4.0)
 	if not protecao_fechada and (v > 0.01 or rodando or teste_ativo):
 		# intertravamento: abriu com a máquina em ciclo → parada imediata, exige RESET
 		_parar_tudo("protecao")

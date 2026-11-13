@@ -50,7 +50,7 @@ static func secao_em(f: float, assimetria := 0.0) -> PackedVector2Array:
 	return secao(a, borda, escala)
 
 ## fita contínua da entrada (x0) até o corte (x1). xs_estacao: x da 1ª e da última estação.
-static func malha_fita(x0: float, x1: float, x_e0: float, x_e1: float, passo := 0.08) -> ArrayMesh:
+static func malha_fita(x0: float, x1: float, x_e0: float, x_e1: float, passo := 0.08, plano := false) -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var secoes: Array = []
@@ -58,7 +58,7 @@ static func malha_fita(x0: float, x1: float, x_e0: float, x_e1: float, passo := 
 	var x := x0
 	while x < x1 + 0.0001:
 		var f := clampf((x - x_e0) / (x_e1 - x_e0), 0.0, 1.0)
-		secoes.append(secao_em(f))
+		secoes.append(secao([0.0, 0.0, 0.0, 0.0, 0.0], 0.0, LARG_PLANA / LARG_FORMADA) if plano else secao_em(f))
 		xs.append(x)
 		x += passo
 	for i in secoes.size():
@@ -101,6 +101,25 @@ static func malha_telha(L: float, curva_m := 0.0, assimetria := 0.0) -> ArrayMes
 	st.generate_normals()
 	return st.commit()
 
+## chapa lisa (linha de corte): 1,20 m × L, com camber lateral (curva_m) e flecha de memória de bobina (arco_m)
+static func malha_chapa(L: float, curva_m := 0.0, arco_m := 0.0) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n_x := 2 if (absf(curva_m) < 0.0005 and absf(arco_m) < 0.0005) else maxi(6, int(L / 0.25) + 1)
+	for i in n_x:
+		var u := float(i) / (n_x - 1)
+		var x := u * L
+		var par := 4.0 * u * (1.0 - u)
+		for zz in [-LARG_PLANA * 0.5, LARG_PLANA * 0.5]:
+			st.set_uv(Vector2(x, zz))
+			st.add_vertex(Vector3(x, arco_m * par, zz + curva_m * par))
+	for i in n_x - 1:
+		var a := i * 2
+		st.add_index(a); st.add_index(a + 2); st.add_index(a + 1)
+		st.add_index(a + 1); st.add_index(a + 2); st.add_index(a + 3)
+	st.generate_normals()
+	return st.commit()
+
 ## material de chapa galvalume (fita usa o shader com corte de cabeça/cauda)
 static var _mat_cache: StandardMaterial3D
 
@@ -109,9 +128,9 @@ static func material_chapa() -> StandardMaterial3D:
 	if _mat_cache:
 		return _mat_cache
 	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.60, 0.62, 0.64)
-	m.metallic = 0.9
-	m.roughness = 0.42
+	m.albedo_color = Color(0.58, 0.60, 0.62)
+	m.metallic = 0.8
+	m.roughness = 0.85        # × textura de ruído (~0,5) = ~0,42: brilho de galvalume sem virar espelho
 	var ruido := FastNoiseLite.new()
 	ruido.frequency = 0.02
 	ruido.fractal_octaves = 3

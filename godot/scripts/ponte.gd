@@ -28,7 +28,8 @@ const FUNDO_GANCHO := Vector3(0.09, 0.075, 0.0)   # curva do gancho em relação
 const TOPO_MOITAO := 0.70                         # topo do moitão, onde o cabo de aço entra
 const CABO_BOTOEIRA := 9.0 # alcance horizontal do cabo da botoeira (do carro até a mão)
 
-var maquina
+var maquina                    # máquina mais perto do gancho (a ponte serve todas as do galpão)
+var maquinas: Array = []
 var jogador
 var x := -7.2
 var z := -2.0
@@ -333,7 +334,18 @@ func _engatar_ou_soltar() -> void:
 	cinta.visible = false
 	Som.tocar("clank", null, Vector3(x, h, z), -2.0)
 
+func _escolher_maquina() -> void:
+	if encaixando > 0.0 or maquinas.is_empty():
+		return
+	var melhor := 1e9
+	for mq in maquinas:
+		var d: float = Vector2(x, z).distance_to(Vector2(mq.to_global(Vector3(mq.X_DESB, 0, 0)).x, mq.to_global(Vector3(mq.X_DESB, 0, 0)).z))
+		if d < melhor:
+			melhor = d
+			maquina = mq
+
 func _physics_process(delta: float) -> void:
+	_escolher_maquina()
 	var ax := 0.0
 	var az := 0.0
 	var ah := 0.0

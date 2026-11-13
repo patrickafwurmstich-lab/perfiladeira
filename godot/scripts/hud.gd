@@ -5,6 +5,7 @@ extends CanvasLayer
 
 var jogador
 var maquina
+var maquinas: Array = []
 var lb_relogio: Label
 var lb_check: RichTextLabel
 var lb_prompt: Label
@@ -150,9 +151,19 @@ func _process(delta: float) -> void:
 		_conq_t -= delta
 		conq.visible = _conq_t > 0.0
 	if maquina:
-		var s := "[b]PARTIDA DA PERFILADEIRA[/b]\n"
+		# a lista acompanha a máquina mais perto do jogador
+		if jogador and maquinas.size() > 1:
+			var melhor := 1e9
+			for mq in maquinas:
+				var d: float = jogador.global_position.distance_to(mq.to_global(Vector3((mq.X_DESB + mq.X_CORTE) * 0.5, 0, 0)))
+				if d < melhor:
+					melhor = d
+					maquina = mq
+		var s := "[b]PARTIDA: %s[/b]\n" % maquina.NOME.to_upper()
 		var achou := false
 		for e in maquina.etapas():
+			if e[0] == "":
+				continue
 			if e[1]:
 				s += "[color=#7fd67f]OK  %s[/color]\n" % e[0]
 			elif not achou:
