@@ -24,16 +24,24 @@ func _ready() -> void:
 		await get_tree().process_frame
 		maior = maxf(maior, j.cam.global_position.distance_to(ant)); ant = j.cam.global_position
 	var sair := maior
-	# anda rente à máquina (a câmera roça nas proteções): não pode dar tranco
+	# anda DE VERDADE rente à máquina (a câmera roça nas proteções): não pode dar tranco
 	maior = 0.0
-	j.yaw = PI / 2
-	for i in 150:
-		j.global_position = m.to_global(Vector3(-6.0 + i * 0.04, 0.05, 1.05))
+	j.global_position = m.to_global(Vector3(-6.0, 0.05, 1.15))
+	j.reset_physics_interpolation()
+	j.yaw = -PI / 2
+	for i in 20: await get_tree().process_frame
+	ant = j.cam.global_position
+	Input.action_press("frente")
+	var pos_ant: Vector3 = j.get_global_transform_interpolated().origin
+	for i in 240:
 		await get_tree().process_frame
-		if i > 2:
-			maior = maxf(maior, j.cam.global_position.distance_to(ant))
+		var p: Vector3 = j.get_global_transform_interpolated().origin
+		var passo := p.distance_to(pos_ant)
+		pos_ant = p
+		maior = maxf(maior, j.cam.global_position.distance_to(ant) - passo)
 		ant = j.cam.global_position
-	var rente := maior - 0.04   # descontando o próprio passo do jogador
+	Input.action_release("frente")
+	var rente := maior          # já descontado o próprio passo do jogador
 	print("CAMERA caminho %.2f m · entrar: maior passo %.3f m/quadro · sair: %.3f · rente à máquina: %.3f" % [caminho, entrar, sair, rente])
 	var ok := entrar < caminho / 8.0 and sair < caminho / 8.0 and rente < 0.15
 	print("RESULTADO: ", "ok" if ok else "FALHA")

@@ -3,10 +3,19 @@ extends CharacterBody3D
 ## Operador. 3ª pessoa (SpringArm, não atravessa parede) ou 1ª pessoa (V).
 ## O [E] escolhe o ponto de interação mais perto e na frente do olhar.
 ## No modo foco a câmera voa até o alvo (caixa de comando, manivelas) e volta depois.
+## Câmera estilo GTA V: suporte separado do corpo (top_level) que segue a posição INTERPOLADA do
+## personagem (física 60 Hz × tela) com leve atraso, órbita livre no mouse, ombro direito,
+## colisão sem tranco e FOV um pouco maior correndo. O corpo vira suave para onde anda.
 
 const VEL_ANDAR := 1.6
 const VEL_CORRER := 3.6
-const SENS := 0.0025
+const SENS := 0.0022
+const OMBRO := 0.45              # deslocamento para a direita (câmera sobre o ombro)
+const DIST := 3.0
+const ALTURA_OLHO := 1.55
+const ALT_CAPACETE := 0.215      # do osso Head (nuca) até a base do capacete, no espaço do osso
+var vel_nativa := {}             # m/s que cada animação "anda" sozinha (para os pés não escorregarem)
+var _fov_alvo := 70.0
 var maquina
 var primeira_pessoa := false
 var yaw := 0.0
@@ -33,21 +42,25 @@ func _ready() -> void:
 	cs.shape = cap
 	cs.position.y = 0.9
 	add_child(cs)
+	# suporte da câmera: NÃO é filho "colado" do corpo (top_level) — segue suave a posição interpolada
 	cabeca = Node3D.new()
-	cabeca.position.y = 1.62
+	cabeca.top_level = true
+	cabeca.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	add_child(cabeca)
 	braco = SpringArm3D.new()
-	braco.spring_length = 2.8
-	braco.margin = 0.15
-	braco.position = Vector3(0.35, 0, 0)
+	braco.spring_length = DIST
+	braco.margin = 0.2
+	braco.position = Vector3(OMBRO, 0, 0)
 	braco.add_excluded_object(get_rid())
 	cabeca.add_child(braco)
 	cam = Camera3D.new()
 	cam.fov = 70
 	cam.near = 0.05
 	cam.current = true
+	cam.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	cabeca.add_child(cam)
 	_carregar_visual()
+	cabeca.global_position = global_position + Vector3(0, ALTURA_OLHO, 0)
 	if DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -59,6 +72,7 @@ func _carregar_visual() -> void:
 		for mi in visual.find_children("*", "MeshInstance3D", true, false):
 			mi.visible = mi.name in usar
 		anim = visual.find_child("AnimationPlayer", true, false)
+		_tirar_root_motion()
 		atualizar_epi()
 		# capacete amarelo preso no osso da cabeça
 		var esq := visual.find_child("Skeleton*", true, false) as Skeleton3D
@@ -69,17 +83,28 @@ func _carregar_visual() -> void:
 			var ba := BoneAttachment3D.new()
 			ba.bone_name = "Head"
 			esq.add_child(ba)
-			var c := MeshInstance3D.new()
-			var sm := SphereMesh.new()
-			sm.radius = 0.125
-			sm.height = 0.14
-			sm.is_hemisphere = true
-			c.mesh = sm
+			# capacete de segurança: casco + aba, apoiado no alto da cabeça (o osso Head fica na nuca)
 			var m := StandardMaterial3D.new()
 			m.albedo_color = Color(0.95, 0.95, 0.93)
+			m.roughness = 0.35
+			var c := MeshInstance3D.new()
+			var sm := SphereMesh.new()
+			sm.radius = 0.165
+			sm.height = 0.15
+			sm.is_hemisphere = true
+			c.mesh = sm
 			c.material_override = m
-			c.position = Vector3(0, 0.17, 0.0)
+			c.position = Vector3(0, ALT_CAPACETE, 0.01)
 			ba.add_child(c)
+			var aba := MeshInstance3D.new()
+			var cy := CylinderMesh.new()
+			cy.top_radius = 0.185
+			cy.bottom_radius = 0.19
+			cy.height = 0.014
+			aba.mesh = cy
+			aba.material_override = m
+			aba.position = Vector3(0, ALT_CAPACETE, 0.03)
+			ba.add_child(aba)
 		var aabb_alt := 1.86
 		visual.scale = Vector3.ONE * (1.80 / aabb_alt)
 	else:
@@ -107,6 +132,32 @@ func _carregar_visual() -> void:
 		visual.add_child(cap)
 	add_child(visual)
 
+## As animações do pacote andam o boneco para frente sozinhas (o osso Root vai 1,48 m por ciclo
+## na caminhada) e voltam ao início no loop = "teleporte". Tira esse avanço (o script já anda)
+## e guarda a velocidade nativa para casar o passo com a velocidade real.
+func _tirar_root_motion() -> void:
+	if anim == null:
+		return
+	for nome in anim.get_animation_list():
+		var a := anim.get_animation(nome)
+		for t in a.get_track_count():
+			if a.track_get_type(t) != Animation.TYPE_POSITION_3D:
+				continue
+			var caminho := String(a.track_get_path(t))
+			if not caminho.ends_with(":Root"):
+				continue
+			var n := a.track_get_key_count(t)
+			if n < 2:
+				continue
+			var ini: Vector3 = a.track_get_key_value(t, 0)
+			var fim: Vector3 = a.track_get_key_value(t, n - 1)
+			var dur := a.track_get_key_time(t, n - 1) - a.track_get_key_time(t, 0)
+			if dur > 0.0:
+				vel_nativa[nome] = Vector2(fim.x - ini.x, fim.z - ini.z).length() / dur * visual.scale.x
+			for k in n:
+				var v: Vector3 = a.track_get_key_value(t, k)
+				a.track_set_key_value(t, k, Vector3(ini.x, v.y, ini.z))
+
 func atualizar_epi() -> void:
 	if visual == null:
 		return
@@ -122,7 +173,7 @@ func _tocar(nome: String) -> void:
 	if anim.has_animation(nome):
 		var a := anim.get_animation(nome)
 		a.loop_mode = Animation.LOOP_LINEAR
-		anim.play(nome, 0.2)
+		anim.play(nome, 0.25)
 		_anim_atual = nome
 
 func _unhandled_input(ev: InputEvent) -> void:
@@ -133,7 +184,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 			return
 		var rel: Vector2 = ev.relative.limit_length(120.0)    # nenhum tranco grande de uma vez
 		yaw -= rel.x * SENS
-		pitch = clampf(pitch - rel.y * SENS, -1.3, 1.1)
+		pitch = clampf(pitch - rel.y * SENS, -1.2, 0.9)
 	elif ev is InputEventMouseButton and ev.pressed:
 		if ev.button_index == MOUSE_BUTTON_LEFT and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -179,15 +230,29 @@ func _physics_process(delta: float) -> void:
 		var mao: Vector3 = maquina.to_local(global_position + Vector3(0, 0.95, 0))
 		maquina.ponta_mao = mao
 	# animação e direção do corpo
-	if dir.length() > 0.1:
-		visual.rotation.y = lerp_angle(visual.rotation.y, atan2(dir.x, dir.z), 0.2)
-		_tocar("Run_Forward" if vel > 2.0 else "Walk_Forward")
+	var vh := Vector2(velocity.x, velocity.z).length()
+	if dir.length() > 0.1 and vh > 0.05:
+		# vira suave para onde anda (independe do FPS)
+		visual.rotation.y = lerp_angle(visual.rotation.y, atan2(dir.x, dir.z), 1.0 - exp(-10.0 * delta))
+		var nome := "Run_Forward" if vel > 2.0 else "Walk_Forward"
+		_tocar(nome)
+		if anim and vel_nativa.has(nome) and vel_nativa[nome] > 0.1:
+			anim.speed_scale = clampf(vh / vel_nativa[nome], 0.5, 2.0)
 	else:
 		_tocar("Idle_Breathing")
+		if anim:
+			anim.speed_scale = 1.0
+	_fov_alvo = 76.0 if vh > 2.5 else 70.0
 
 func _process(delta: float) -> void:
 	_ignorar_mouse = maxf(0.0, _ignorar_mouse - delta)
+	# segue a posição interpolada do corpo (sem tremido entre física e tela), com leve atraso
+	var corpo := get_global_transform_interpolated().origin + Vector3(0, ALTURA_OLHO, 0)
+	cabeca.global_position = cabeca.global_position.lerp(corpo, 1.0 - exp(-16.0 * delta))
+	if cabeca.global_position.distance_to(corpo) > 3.0:
+		cabeca.global_position = corpo          # teleporte de verdade (spawn): não arrasta
 	cabeca.rotation = Vector3(pitch, yaw, 0)
+	cam.fov = lerpf(cam.fov, _fov_alvo, 1.0 - exp(-4.0 * delta))
 	# saiu do foco (caixa de comando, ponte, manivelas): recaptura o mouse e ignora o 1º movimento
 	if _modo_ant == "foco" and Interacoes.modo != "foco":
 		if DisplayServer.get_name() != "headless":
@@ -203,8 +268,8 @@ func _process(delta: float) -> void:
 		alvo_dist = 0.0
 	else:
 		if braco.spring_length < 1.2:
-			braco.spring_length = 2.8
-		braco.position = Vector3(0.35, 0, 0)
+			braco.spring_length = DIST
+		braco.position = Vector3(OMBRO, 0, 0)
 		visual.visible = true
 		# aproxima rápido se bater em algo (não atravessa parede), afasta devagar (sem "pulos")
 		alvo_dist = braco.get_hit_length()
