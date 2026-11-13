@@ -1,0 +1,23 @@
+extends Node
+func _ready() -> void:
+	var main = load("res://cenas/main.tscn").instantiate()
+	add_child(main)
+	for i in 10: await get_tree().physics_frame
+	var P: PonteRolante = main.ponte
+	main.hud.visible = false
+	var b0 = P.bobinas[1]
+	var c: Vector3 = b0.no.global_position
+	P.x = c.x; P.z = c.z; P.h = c.y + b0.r + 0.05
+	await get_tree().physics_frame
+	P._engatar_ou_soltar()
+	P.h = c.y + P.off_carga + 0.6
+	for i in 20: await get_tree().physics_frame
+	var cam := Camera3D.new()
+	add_child(cam)
+	cam.global_position = c + Vector3(1.9, 1.3, 1.7)
+	cam.look_at(c + Vector3(0, 0.8, 0))
+	cam.current = true
+	for i in 6: await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(OS.get_cmdline_user_args()[0])
+	get_tree().quit()
