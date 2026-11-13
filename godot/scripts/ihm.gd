@@ -13,6 +13,7 @@ var lb_etapa: Label
 var barra_bob: ProgressBar
 var bt_teste: Button
 var bt_corte: Button
+var sensores := {}
 
 func _ready() -> void:
 	var fundo := ColorRect.new()
@@ -21,7 +22,7 @@ func _ready() -> void:
 	add_child(fundo)
 	var v := VBoxContainer.new()
 	v.position = Vector2(10, 6)
-	v.size = Vector2(580, 388)
+	v.size = Vector2(580, 448)
 	v.add_theme_constant_override("separation", 4)
 	add_child(v)
 	var topo := HBoxContainer.new()
@@ -54,6 +55,20 @@ func _ready() -> void:
 	bt_corte = _bt("CORTE MANUAL", func(): maquina.cmd_cortar_manual(), Color(0.45, 0.3, 0.15))
 	bts.add_child(bt_corte)
 	bts.add_child(_bt("ZERAR CONT.", func(): maquina.cmd_zerar(), Color(0.25, 0.25, 0.3)))
+	# diagnóstico dos sensores: cada um acende conforme o estado REAL lido da máquina
+	var hs := HBoxContainer.new()
+	hs.add_theme_constant_override("separation", 4)
+	v.add_child(hs)
+	for nome in ["MANDRIL", "PROTEÇÃO", "EMERG.", "CHAPA ENT.", "LÂMINA ↑", "MESA", "FREIO"]:
+		var l := _lab(nome, 13, Color(0.05, 0.05, 0.05))
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.custom_minimum_size = Vector2(78, 24)
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.3, 0.3, 0.3)
+		sb.set_corner_radius_all(4)
+		l.add_theme_stylebox_override("normal", sb)
+		hs.add_child(l)
+		sensores[nome] = sb
 	lb_etapa = _lab("", 15, Color(1.0, 0.85, 0.4))
 	lb_etapa.autowrap_mode = TextServer.AUTOWRAP_WORD
 	lb_etapa.custom_minimum_size.x = 570
@@ -162,3 +177,12 @@ func _process(_d: float) -> void:
 	bt_teste.disabled = m.modo != "manual"
 	bt_corte.disabled = m.modo != "manual"
 	lb_etapa.text = "PRÓXIMO: " + m.proxima_etapa()
+	var ok := Color(0.25, 0.85, 0.35)
+	var ruim := Color(0.95, 0.3, 0.25)
+	sensores["MANDRIL"].bg_color = ok if m.bobina.travada else ruim
+	sensores["PROTEÇÃO"].bg_color = ok if m.protecao_fechada else ruim
+	sensores["EMERG."].bg_color = ok if not m.emergencia else ruim
+	sensores["CHAPA ENT."].bg_color = ok if (m.fita in ["na_mesa", "enfiada"] and m.cauda_s < 0.0) else ruim
+	sensores["LÂMINA ↑"].bg_color = ok if m.lamina_em_cima else Color(0.95, 0.8, 0.2)
+	sensores["MESA"].bg_color = ok if m.pilha.size() < m.MESA_CAP else ruim
+	sensores["FREIO"].bg_color = ok if m.freio_ok else Color(0.95, 0.8, 0.2)

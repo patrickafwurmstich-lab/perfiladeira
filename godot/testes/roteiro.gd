@@ -82,6 +82,49 @@ func _rodar() -> void:
 	m.cmd_modo("manual")
 	m.cmd_jog(true)
 	ok(not m.jog, "JOG recusado sem chapa")
+	# ponte rolante: buscar a bobina no berço e encaixar no mandril
+	var P: PonteRolante = main.ponte
+	ok(not m.bobina.presente and P.bobinas.size() == 3, "começa sem bobina na máquina; 3 bobinas no berço")
+	var b0 = P.bobinas[0]
+	P.x = b0.no.global_position.x; P.z = b0.no.global_position.z; P.h = 3.0
+	await _q(2)
+	P._engatar_ou_soltar()
+	ok(P.carga == null, "gancho alto demais não engata")
+	P.h = b0.no.global_position.y + P.OFF_CINTA
+	await _q(2)
+	P._engatar_ou_soltar()
+	ok(P.carga != null, "cinta passada no furo da %s" % b0.codigo)
+	P.h = 3.0
+	await _q(2)
+	P._engatar_ou_soltar()
+	ok(P.carga != null, "não solta a carga no ar")
+	# acelera a ponte: a carga tem que balançar
+	P.operando = true
+	Interacoes.modo = "foco"
+	Input.action_press("direita")
+	await _seg(1.0)
+	Input.action_release("direita")
+	await _seg(0.3)
+	ok(P.balanco.length() > 0.005, "carga balança quando a ponte acelera (%.1f°)" % rad_to_deg(P.balanco.length()))
+	await foto("ponte_levando", Vector3(-6.0, 3.0, 4.0), P._pos_carga())
+	P.operando = false
+	Interacoes.modo = "andar"
+	P.x = m.to_global(Vector3(m.X_DESB, 0, 0)).x + 0.08
+	P.z = 1.3
+	P.h = m.Y_DESB + P.OFF_CINTA
+	P.balanco = Vector2.ZERO; P.balanco_v = Vector2.ZERO
+	await _q(2)
+	P._engatar_ou_soltar()
+	ok(P.encaixando == 0.0 and not m.bobina.presente, "desalinhada 8 cm: não encaixa")
+	P.x -= 0.08
+	P.balanco = Vector2.ZERO; P.balanco_v = Vector2.ZERO
+	await _q(2)
+	await foto("alinhando_mandril", Vector3(-5.6, 1.8, 3.0), Vector3(-7.2, 1.1, 0.8))
+	P._engatar_ou_soltar()
+	ok(P.encaixando > 0.0, "coaxial: bobina começa a deslizar no mandril")
+	await _seg(3.4)
+	ok(m.bobina.presente and m.bobina.cinta and P.carga == null and m.bobina.codigo == b0.codigo, "%s no mandril, com cinta, gancho livre" % b0.codigo)
+	P.h = 5.0
 	# bobina: cinta (precisa de EPI e mandril travado)
 	ok(m.bobina.cinta, "bobina chega com cinta")
 	m._faz_bobina()

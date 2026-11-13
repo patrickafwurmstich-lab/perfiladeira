@@ -18,8 +18,8 @@ var ihm: Control
 var foco: Marker3D
 var face_z := 0.162
 var y_c := 1.095
-const TELA_PX := Vector2i(600, 400)
-const TELA_M := Vector2(0.30, 0.20)
+const TELA_PX := Vector2i(600, 460)
+const TELA_M := Vector2(0.36, 0.276)
 
 func _ready() -> void:
 	modelo = load("res://modelos/clp_padrao.glb").instantiate()
@@ -88,7 +88,7 @@ func _montar_porta() -> void:
 	placa.pixel_size = 0.0011
 	placa.modulate = Color(0.1, 0.1, 0.1)
 	placa.outline_size = 0
-	placa.position = Vector3(0, y_c + 0.41, face_z + 0.003)
+	placa.position = Vector3(0, y_c + 0.42, face_z + 0.003)
 	add_child(placa)
 
 func _montar_tela() -> void:
@@ -110,7 +110,7 @@ func _montar_tela() -> void:
 	m.albedo_texture = tela_vp.get_texture()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	tela_quad.material_override = m
-	tela_quad.position = Vector3(0, y_c + 0.24, face_z + 0.011)
+	tela_quad.position = Vector3(0, y_c + 0.235, face_z + 0.011)
 	add_child(tela_quad)
 	var moldura := MeshInstance3D.new()
 	var bm := BoxMesh.new()
@@ -119,7 +119,7 @@ func _montar_tela() -> void:
 	var mm := StandardMaterial3D.new()
 	mm.albedo_color = Color(0.12, 0.12, 0.13)
 	moldura.material_override = mm
-	moldura.position = Vector3(0, y_c + 0.24, face_z + 0.004)
+	moldura.position = Vector3(0, y_c + 0.235, face_z + 0.004)
 	add_child(moldura)
 	var sb := StaticBody3D.new()
 	sb.collision_layer = 2

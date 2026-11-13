@@ -56,8 +56,8 @@ var velocidade := 1.0           # 0,6 a 1,0 da nominal
 var correcao_mm := 0.0
 
 # bobina e chapa
-var bobina := {"presente": true, "metros_total": 247.0, "metros": 247.0, "cinta": true, "travada": false, "codigo": "BOB-001", "kg": 1000.0}
-var fita := "presa"             # "presa" (cinta) | "solta" | "puxando" | "na_mesa" | "enfiada" | "nenhuma"
+var bobina := {"presente": false, "metros_total": 247.0, "metros": 0.0, "cinta": false, "travada": false, "codigo": "", "kg": 0.0}
+var fita := "nenhuma"             # "presa" (cinta) | "solta" | "puxando" | "na_mesa" | "enfiada" | "nenhuma"
 var cabeca := X_ENTRADA         # x da ponta da chapa dentro da máquina
 var cauda_s := -1.0             # distância andada desde que a bobina acabou (-1 = bobina não acabou)
 var peca_m := 0.0               # quanto já passou do corte na peça atual
@@ -95,6 +95,7 @@ var rolos_sup: Array = []
 var lamina: Node3D
 var mandril: Node3D
 var guias: Array = []           # [nó, lado]
+var reguas: Array = []          # réguas do mandril expansivo (abrem 8 mm quando trava)
 var bobina_grp: Node3D
 var bobina_malha: MeshInstance3D
 var bobina_furo: MeshInstance3D
@@ -133,6 +134,10 @@ func _ready() -> void:
 		rolos_sup.append(modelo.find_child("rolo_sup_%d" % e, true, false))
 	lamina = modelo.find_child("lamina", true, false)
 	mandril = modelo.find_child("mandril_desbobinador", true, false)
+	if mandril:
+		for c in mandril.get_children():
+			if String(c.name).begins_with("regua"):
+				reguas.append([c, c.position])
 	var ent := modelo.find_child("mesa_entrada", true, false)
 	if ent:
 		for c in ent.get_children():
@@ -179,6 +184,7 @@ func etapas() -> Array:
 		["Ligar o disjuntor da perfiladeira no quadro elétrico", energia],
 		["Ligar a CHAVE GERAL na caixa de comando", chave_geral],
 		["Emergência liberada e RESET apertado", chave_geral and not emergencia and not precisa_reset],
+		["Trazer a bobina com a PONTE ROLANTE e encaixar no mandril", bobina.presente],
 		["Travar o mandril da bobina (alavanca)", bobina.presente and bobina.travada],
 		["Ajustar o freio do desbobinador", freio_ok],
 		["Cortar as cintas da bobina", bobina.presente and not bobina.cinta],
@@ -661,6 +667,7 @@ func _deslizar(dt_ind: float) -> void:
 			if d.t >= 0.25:
 				no.position.y = y_alvo
 				Som.tocar("clank", self, global_position + Vector3(X_PILHA + d.L * 0.5, 0.4, 0), -2.0)
+				no.position.z += rng.randf_range(-0.003, 0.003)     # alinhadas pelas guias, mas não perfeitas
 				pilha.append({"L": d.L, "curva": d.curva, "assim": d.assim, "defeito": d.defeito})
 				pilha_nos.append(no)
 				deslizando.remove_at(i)
@@ -782,6 +789,10 @@ func _atualizar_visual(dt: float) -> void:
 	_tampa_ang = move_toward(_tampa_ang, 0.0 if protecao_fechada else 1.6, dt * 2.5 / maxf(Relogio.vel, 1))
 	tampa.rotation.x = -_tampa_ang
 	alav_mandril.rotation.z = -1.2 if bobina.travada else 0.0
+	for rg in reguas:
+		var p0: Vector3 = rg[1]
+		var dir := Vector3(p0.x, p0.y, 0.0).normalized()
+		(rg[0] as Node3D).position = p0 + dir * (0.008 if bobina.travada else 0.0)
 	volante_freio.rotation.z = -2.0 if freio_ok else 0.0
 	# rolos giram só onde tem chapa puxando; todos estão engrenados pela corrente
 	if dsv > 0.0:
@@ -870,11 +881,7 @@ func _montar_bobina_visual() -> void:
 	cm.bottom_radius = 0.31
 	bobina_malha.mesh = cm
 	bobina_malha.rotation.x = PI / 2
-	var mb := StandardMaterial3D.new()
-	mb.albedo_color = Color(0.72, 0.76, 0.80)
-	mb.metallic = 0.6
-	mb.roughness = 0.32
-	bobina_malha.material_override = mb
+	bobina_malha.material_override = Perfil.material_bobina()
 	bobina_grp.add_child(bobina_malha)
 	bobina_furo = MeshInstance3D.new()
 	var fm := CylinderMesh.new()
@@ -983,6 +990,19 @@ func _montar_pisador_e_tambor() -> void:
 	add_child(lb)
 
 func _montar_pontaletes() -> void:
+	# batente de fim e guias laterais da pilha (as telhas encostam aqui e saem alinhadas)
+	var mg := StandardMaterial3D.new()
+	mg.albedo_color = Color(0.85, 0.65, 0.1)
+	mg.metallic = 0.3
+	for lado in [-1.0, 1.0]:
+		for xx in [X_PILHA + 0.6, X_PILHA + 2.6, X_PILHA + 4.6]:
+			var g := MeshInstance3D.new()
+			var gb := BoxMesh.new()
+			gb.size = Vector3(0.05, 0.6, 0.05)
+			g.mesh = gb
+			g.material_override = mg
+			g.position = Vector3(xx, 0.3, lado * 0.585)
+			add_child(g)
 	var mm := StandardMaterial3D.new()
 	mm.albedo_color = Color(0.55, 0.40, 0.25)
 	for i in 7:
@@ -1146,8 +1166,6 @@ func _txt_bobina() -> String:
 		return "Pegar a ponta da chapa e puxar até a mesa de entrada"
 	if fita == "puxando":
 		return "Soltar a ponta (volta a ficar pendurada)"
-	if not bobina.presente:
-		return "Montar bobina nova (provisório — a ponte rolante entra na próxima etapa)"
 	return ""
 
 func _sem_epi(acao: String) -> bool:
@@ -1173,11 +1191,15 @@ func _faz_bobina() -> void:
 		Bus.aviso.emit("Segurando a ponta: ande até a mesa de entrada (a chapa vem junto).")
 	elif fita == "puxando":
 		fita = "solta"
-	elif not bobina.presente:
-		Interacoes.progresso("Montando bobina e travando o mandril...", 3.0, _montar_bobina_nova)
 
-func _montar_bobina_nova() -> void:
-	bobina = {"presente": true, "metros_total": 247.0, "metros": 247.0, "cinta": true, "travada": false, "codigo": "BOB-%03d" % rng.randi_range(2, 99), "kg": 1000.0}
+
+func bobina_travada_vazia() -> bool:
+	return bobina.travada and not bobina.presente
+
+## chamada pela ponte rolante quando a bobina termina de deslizar no mandril
+func receber_bobina(codigo: String, metros: float) -> void:
+	bobina = {"presente": true, "metros_total": metros, "metros": metros, "cinta": true, "travada": false, "codigo": codigo, "kg": metros / 247.0 * 1000.0}
+	_r_malha = 0.0
 	cauda_s = -1.0
 	aviso_10 = false
 	_fim_reconhecido = false
@@ -1358,6 +1380,38 @@ func _montar_protecao() -> void:
 	ch.material_override = mc
 	ch.position = Vector3(X_E0 + 1.0, 1.27, 0.70)
 	add_child(ch)
+	# dobradiças visíveis no lado de trás
+	var md := StandardMaterial3D.new()
+	md.albedo_color = Color(0.25, 0.25, 0.27)
+	md.metallic = 0.7
+	for xx in [-3.0, 0.0, 3.0]:
+		var d := MeshInstance3D.new()
+		var dc := CylinderMesh.new()
+		dc.top_radius = 0.022
+		dc.bottom_radius = 0.022
+		dc.height = 0.14
+		d.mesh = dc
+		d.rotation.z = PI / 2
+		d.material_override = md
+		d.position = Vector3(xx, 0, 0)
+		tampa.add_child(d)
+	# lingueta (atuador) da chave de segurança presa na tampa: entra na caixinha vermelha quando fecha
+	var lg := MeshInstance3D.new()
+	var lb2 := BoxMesh.new()
+	lb2.size = Vector3(0.025, 0.07, 0.012)
+	lg.mesh = lb2
+	lg.material_override = md
+	lg.position = Vector3(X_E0 + 1.0 - (X_E0 + X_E1) * 0.5, -0.03, 1.36)
+	tampa.add_child(lg)
+	var placa := Label3D.new()
+	placa.text = "⚠ PERIGO — ROLOS EM MOVIMENTO\nNÃO ABRIR COM A MÁQUINA LIGADA"
+	placa.font_size = 30
+	placa.pixel_size = 0.0022
+	placa.modulate = Color(0.1, 0.1, 0.1)
+	placa.outline_size = 0
+	placa.position = Vector3(-2.0, 0.012, 1.25)
+	placa.rotation.x = -PI / 2
+	tampa.add_child(placa)
 	Interagivel.criar(self, Vector3(X_E0 + 1.6, 1.0, 0.95), _txt_tampa, _faz_tampa, 1.5)
 
 func _txt_tampa() -> String:

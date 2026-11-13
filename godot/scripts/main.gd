@@ -5,6 +5,7 @@ var maquina: Perfiladeira
 var jogador: Jogador
 var hud: HUD
 var quadro: QuadroEletrico
+var ponte: PonteRolante
 
 func _ready() -> void:
 	_ambiente()
@@ -37,6 +38,17 @@ func _ready() -> void:
 	quadro.position = Vector3(-11.0, 0, 3.2)
 	add_child(quadro)
 	_armario_epi(Vector3(-12.6, 0, 5.6))
+	ponte = PonteRolante.new()
+	ponte.maquina = maquina
+	add_child(ponte)
+	var berco_m := load("res://modelos/berco_bobina.glb")
+	var cods := ["BOB-014", "BOB-015", "BOB-016"]
+	for i in 3:
+		var bx := -10.6 + i * 1.9
+		var b: Node3D = berco_m.instantiate()
+		b.position = Vector3(bx, 0.06, -4.5)
+		add_child(b)
+		ponte.nova_bobina(Vector3(bx, 0.45 + 0.316, -4.5), cods[i])
 	jogador = Jogador.new()
 	jogador.maquina = maquina
 	jogador.position = Vector3(-9.5, 0.05, 5.0)

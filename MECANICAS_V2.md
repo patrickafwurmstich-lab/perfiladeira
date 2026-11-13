@@ -62,12 +62,12 @@ Ponto de partida: o Lucas avaliou a Demo como "3% de um simulador", e as três I
     - Erro < 2 mm com guia boa = **"PRIMEIRA TELHA PERFEITA!"** (conquista e confiança).
     - Fora da tolerância (±5 mm), a peça vira 2ª linha (desconto) ou sucata.
 12. **Automático + LIGA:** a sirene de partida toca 2 s antes de qualquer movimento. Depois roda o ciclo contínuo:
-    - bobina gira e encolhe (raio de 0,32 para 0,254 m, cálculo real pelo peso);
+    - bobina gira e encolhe pelo comprimento restante: R = √(Rc² + L·t/π) (Rc = 0,254 m do furo de 508 mm; t = 0,43 mm; 247 m → R ≈ 0,314 m). A largura não muda. *(V2.1)*
     - fita tangente;
     - rolos girando na velocidade certa;
     - chapa formando estação a estação, a onda nascendo do centro para as bordas;
     - telha crescendo depois da guilhotina;
-    - no comprimento programado: **para 0,4 s**, a lâmina desce (THOC), a telha desliza e **cai na pilha encaixada**, uma por uma.
+    - no comprimento programado (encoder, sem passar nem no x20) a linha **PARA** e roda o ciclo de 0,9 s: pisador desce → lâmina desce (THOC, sensor embaixo) → lâmina sobe (sensor em cima) → pisador sobe → a telha desliza e **cai na pilha encaixada**, uma por uma. *(V2.1 — ver seção 11)*
 
 **Paradas automáticas:**
 - **lote concluído:** buzina curta, torre azul;

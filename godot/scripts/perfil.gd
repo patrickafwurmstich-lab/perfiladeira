@@ -102,12 +102,29 @@ static func malha_telha(L: float, curva_m := 0.0, assimetria := 0.0) -> ArrayMes
 	return st.commit()
 
 ## material de chapa galvalume (fita usa o shader com corte de cabeça/cauda)
+static var _mat_cache: StandardMaterial3D
+
+## galvalume: prata frio fosco, com variação leve de brilho (marca de laminação) — não pode parecer plástico
 static func material_chapa() -> StandardMaterial3D:
+	if _mat_cache:
+		return _mat_cache
 	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.64, 0.68, 0.72)
-	m.metallic = 0.8
-	m.roughness = 0.3
+	m.albedo_color = Color(0.60, 0.62, 0.64)
+	m.metallic = 0.9
+	m.roughness = 0.42
+	var ruido := FastNoiseLite.new()
+	ruido.frequency = 0.02
+	ruido.fractal_octaves = 3
+	var tx := NoiseTexture2D.new()
+	tx.width = 256
+	tx.height = 64
+	tx.noise = ruido
+	tx.seamless = true
+	m.roughness_texture = tx
+	m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
+	m.uv1_scale = Vector3(0.5, 2.0, 1.0)
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_mat_cache = m
 	return m
 
 const SHADER_FITA := """
@@ -117,7 +134,7 @@ uniform float cabeca = 100.0;   // x da ponta da chapa (o que passa disso não e
 uniform float cauda = -100.0;   // x do fim da chapa (fim de bobina passando)
 uniform float desvio = 0.0;     // deslocamento lateral na entrada (guia mal ajustada), some nos rolos
 uniform float x_rolos = 0.0;
-uniform vec3 cor : source_color = vec3(0.64, 0.68, 0.72);
+uniform vec3 cor : source_color = vec3(0.60, 0.62, 0.64);
 varying float vx;
 void vertex() {
 	vx = VERTEX.x;
@@ -127,8 +144,8 @@ void vertex() {
 void fragment() {
 	if (vx > cabeca || vx < cauda) { discard; }
 	ALBEDO = cor;
-	METALLIC = 0.8;
-	ROUGHNESS = 0.3;
+	METALLIC = 0.9;
+	ROUGHNESS = 0.38 + 0.08 * sin(vx * 7.0) * sin(UV.y * 31.0);
 }
 """
 
@@ -138,3 +155,30 @@ static func material_fita() -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = sh
 	return m
+
+## bobina: nas faces laterais aparecem as espiras (anéis concêntricos), no corpo a chapa enrolada
+const SHADER_BOBINA := """
+shader_type spatial;
+varying vec3 lv;
+void vertex() { lv = VERTEX; }
+void fragment() {
+	float r = length(lv.xz);
+	float lado = step(0.595, abs(lv.y));          // face lateral do cilindro (altura 1,2)
+	float anel = 0.5 + 0.5 * sin(r * 1400.0);     // espiras (~4,5 mm por anel, legível)
+	float faixa = 0.5 + 0.5 * sin(r * 90.0);
+	vec3 base = vec3(0.60, 0.62, 0.64);
+	vec3 face = base * (0.82 + 0.10 * anel + 0.06 * faixa);
+	ALBEDO = mix(base, face, lado);
+	METALLIC = mix(0.9, 0.7, lado);
+	ROUGHNESS = mix(0.36, 0.55, lado);
+}
+"""
+static var _mat_bob: ShaderMaterial
+static func material_bobina() -> ShaderMaterial:
+	if _mat_bob:
+		return _mat_bob
+	var sh := Shader.new()
+	sh.code = SHADER_BOBINA
+	_mat_bob = ShaderMaterial.new()
+	_mat_bob.shader = sh
+	return _mat_bob
