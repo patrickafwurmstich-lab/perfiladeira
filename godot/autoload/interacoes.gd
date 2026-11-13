@@ -97,6 +97,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif ev is InputEventKey and foco_dono.has_method("on_foco_tecla"):
 		foco_dono.on_foco_tecla(ev)
+	elif ev is InputEventMouseMotion and foco_dono.has_method("on_foco_movimento"):
+		foco_dono.on_foco_movimento(ev)
 
 ## Controlador temporário do modo manivelas
 class GuiasFoco extends RefCounted:

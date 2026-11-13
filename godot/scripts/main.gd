@@ -7,6 +7,7 @@ var hud: HUD
 var quadro: QuadroEletrico
 var ponte: PonteRolante
 var corte: LinhaCorte
+var dobradeira: Dobradeira
 
 func _ready() -> void:
 	_ambiente()
@@ -38,6 +39,10 @@ func _ready() -> void:
 	corte.name = "LinhaCorte"
 	corte.position = Vector3(3.0, 0, -9.0)
 	add_child(corte)
+	dobradeira = Dobradeira.new()
+	dobradeira.name = "Dobradeira"
+	dobradeira.position = Vector3(15.0, 0, 6.0)
+	add_child(dobradeira)
 	quadro = QuadroEletrico.new()
 	quadro.maquina = maquina
 	quadro.maquinas = {0: maquina, 1: corte}
@@ -67,7 +72,7 @@ func _ready() -> void:
 	hud = HUD.new()
 	hud.jogador = jogador
 	hud.maquina = maquina
-	hud.maquinas = [maquina, corte]
+	hud.maquinas = [maquina, corte, dobradeira]
 	add_child(hud)
 	Bus.aviso.emit("Bom dia! A perfiladeira está desligada. Siga a lista à esquerda: comece pelo quadro elétrico.")
 
