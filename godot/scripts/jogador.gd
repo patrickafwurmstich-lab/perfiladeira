@@ -19,6 +19,10 @@ var anim: AnimationPlayer
 var alvo: Interagivel = null
 var _anim_atual := ""
 var _cam_foco_t := 0.0
+var _foco_xf: Transform3D        # última posição da câmera de foco (para voltar suave, sem pulo)
+var _dist := 2.8                 # distância real da câmera (suavizada; o SpringArm só mede a colisão)
+var _ignorar_mouse := 0.0        # ignora o 1º movimento depois de recapturar o mouse (evita o tranco)
+var _modo_ant := "andar"
 var _cam_xf_jogo: Transform3D
 
 func _ready() -> void:
@@ -42,7 +46,7 @@ func _ready() -> void:
 	cam.fov = 70
 	cam.near = 0.05
 	cam.current = true
-	braco.add_child(cam)
+	cabeca.add_child(cam)
 	_carregar_visual()
 	if DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -125,11 +129,15 @@ func _unhandled_input(ev: InputEvent) -> void:
 	if Interacoes.modo != "andar":
 		return
 	if ev is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		yaw -= ev.relative.x * SENS
-		pitch = clampf(pitch - ev.relative.y * SENS, -1.3, 1.1)
+		if _ignorar_mouse > 0.0:
+			return
+		var rel: Vector2 = ev.relative.limit_length(120.0)    # nenhum tranco grande de uma vez
+		yaw -= rel.x * SENS
+		pitch = clampf(pitch - rel.y * SENS, -1.3, 1.1)
 	elif ev is InputEventMouseButton and ev.pressed:
 		if ev.button_index == MOUSE_BUTTON_LEFT and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+			_ignorar_mouse = 0.15
 		elif ev.button_index == MOUSE_BUTTON_WHEEL_UP and not primeira_pessoa:
 			braco.spring_length = maxf(1.2, braco.spring_length - 0.3)
 		elif ev.button_index == MOUSE_BUTTON_WHEEL_DOWN and not primeira_pessoa:
@@ -178,24 +186,45 @@ func _physics_process(delta: float) -> void:
 		_tocar("Idle_Breathing")
 
 func _process(delta: float) -> void:
+	_ignorar_mouse = maxf(0.0, _ignorar_mouse - delta)
 	cabeca.rotation = Vector3(pitch, yaw, 0)
+	# saiu do foco (caixa de comando, ponte, manivelas): recaptura o mouse e ignora o 1º movimento
+	if _modo_ant == "foco" and Interacoes.modo != "foco":
+		if DisplayServer.get_name() != "headless":
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		_ignorar_mouse = 0.2
+	_modo_ant = Interacoes.modo
+	var alvo_dist: float
 	if primeira_pessoa:
 		braco.spring_length = 0.0
 		braco.position = Vector3(0, 0.05, -0.1)
 		visual.visible = false
+		_dist = 0.0
+		alvo_dist = 0.0
 	else:
 		if braco.spring_length < 1.2:
 			braco.spring_length = 2.8
 		braco.position = Vector3(0.35, 0, 0)
 		visual.visible = true
-	# câmera em foco: interpola até o alvo e volta
+		# aproxima rápido se bater em algo (não atravessa parede), afasta devagar (sem "pulos")
+		alvo_dist = braco.get_hit_length()
+		if alvo_dist < _dist:
+			_dist = move_toward(_dist, alvo_dist, delta * 10.0)
+		else:
+			_dist = move_toward(_dist, alvo_dist, delta * 2.0)
+	var xf_jogo := Transform3D(Basis(), braco.position + Vector3(0, 0, _dist))
+	# câmera em foco: interpola até o alvo e volta pelo mesmo caminho
 	if Interacoes.modo == "foco" and Interacoes.foco_alvo:
+		_foco_xf = Interacoes.foco_alvo.global_transform
 		_cam_foco_t = minf(1.0, _cam_foco_t + delta * 2.5)
 	else:
-		_cam_foco_t = maxf(0.0, _cam_foco_t - delta * 3.0)
-	if _cam_foco_t > 0.0 and Interacoes.foco_alvo:
+		_cam_foco_t = maxf(0.0, _cam_foco_t - delta * 2.5)
+	if _cam_foco_t > 0.0:
 		var k := smoothstep(0.0, 1.0, _cam_foco_t)
-		cam.global_transform = (braco.global_transform * Transform3D(Basis(), Vector3(0, 0, braco.get_hit_length()))).interpolate_with(Interacoes.foco_alvo.global_transform, k)
+		var g_jogo := cabeca.global_transform * xf_jogo
+		cam.global_transform = g_jogo.interpolate_with(_foco_xf, k)
+	else:
+		cam.transform = xf_jogo
 	_escolher_alvo()
 
 func _escolher_alvo() -> void:
