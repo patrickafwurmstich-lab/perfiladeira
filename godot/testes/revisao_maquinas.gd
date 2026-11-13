@@ -96,5 +96,6 @@ func _ready() -> void:
 	await _q(3)
 	await foto("cam_lado_aberto", C.to_global(Vector3(-1.0, 2.2, -7.0)), C.to_global(Vector3(-1.0, 1.0, 0)))
 	await foto("cam_traseira", C.to_global(Vector3(-9.0, 2.4, -2.5)), C.to_global(Vector3(-2.0, 1.0, 0)))
+	await foto("cam_quinas", C.to_global(Vector3(-1.0, 1.8, -1.9)), C.to_global(Vector3(-1.6, 1.2, -0.5)))
 	await foto("cam_calcos", C.to_global(Vector3(-4.2, 0.7, -2.6)), C.to_global(Vector3(-3.0, 0.3, -1.0)))
 	get_tree().quit()

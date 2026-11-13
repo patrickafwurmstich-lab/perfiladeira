@@ -221,6 +221,8 @@ func amarrar() -> void:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.95, 0.75, 0.05)
 	mat.roughness = 0.8
+	var mprot := StandardMaterial3D.new()
+	mprot.albedo_color = Color(0.1, 0.25, 0.75)       # protetor de quina azul (polipropileno)
 	for c in cargas_na_carroceria():
 		var cc: Carga = c
 		if cc.has_meta("cintada"):
@@ -232,11 +234,27 @@ func amarrar() -> void:
 			var fx := lc.x + (k - 0.5) * cc.tamanho.x * 0.55
 			# por cima da carga
 			_cinta(Vector3(fx, topo, -cc.tamanho.z * 0.5 - 0.005), Vector3(fx, topo, cc.tamanho.z * 0.5 + 0.005), mat)
+			# protetor de quina (plástico) nas duas arestas de cima, onde a cinta dobra sobre a chapa
+			for sz in [-1.0, 1.0]:
+				var zq: float = sz * (cc.tamanho.z * 0.5)
+				_quina(Vector3(fx, topo, zq), sz, mprot)
 			# descendo até os ganchos das laterais (z = ±1,25, logo abaixo do piso)
 			for sz in [-1.0, 1.0]:
 				_cinta(Vector3(fx, topo, sz * (cc.tamanho.z * 0.5 + 0.005)), Vector3(fx, Y_PISO - 0.12, sz * 1.25), mat)
 	Som.tocar("tlec", null, global_position + Vector3(0, 1.2, 0), -4.0)
 	Bus.aviso.emit("Carga amarrada: 2 cintas por volume, catracas apertadas.")
+
+## cantoneira de proteção em "L" (8 cm de largura, abas de 6 cm) sobre a aresta da carga
+func _quina(p: Vector3, sz: float, mat: Material) -> void:
+	for k in 2:
+		var m := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.08, 0.004, 0.06) if k == 0 else Vector3(0.08, 0.06, 0.004)
+		m.mesh = bm
+		m.material_override = mat
+		m.position = p + (Vector3(0, 0.003, -sz * 0.03) if k == 0 else Vector3(0, -0.03, sz * 0.004))
+		add_child(m)
+		m.add_to_group("cinta_caminhao")
 
 func _cinta(a: Vector3, b: Vector3, mat: Material) -> void:
 	var m := MeshInstance3D.new()
