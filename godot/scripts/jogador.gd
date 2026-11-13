@@ -23,6 +23,8 @@ var polo_cotovelo: Node3D
 var mao: BoneAttachment3D        # osso RightHandProp: onde a botoeira fica presa
 var dedos: Dedos
 var dedos_esq: Dedos
+var pose_sentado: Sentado
+var sentado := false            # na empilhadeira
 var ik_esq: TwoBoneIK3D
 var alvo_esq: Node3D
 var polo_esq: Node3D
@@ -49,6 +51,7 @@ var _dist := 2.8                 # distância real da câmera (suavizada; o Spri
 var _ignorar_mouse := 0.0        # ignora o 1º movimento depois de recapturar o mouse (evita o tranco)
 var _modo_ant := "andar"
 var preso_a: Node3D = null       # veículo que está levando o jogador (assento)
+var maos_externas: Array = []    # [mão direita, mão esquerda] em coordenadas do mundo (timão da paleteira)
 var _cam_xf_jogo: Transform3D
 
 func _ready() -> void:
@@ -226,6 +229,11 @@ func _montar_ik() -> void:
 	dedos_esq.angulo = deg_to_rad(28.0)         # mão esquerda relaxada, semi-fechada
 	dedos_esq.angulo_polegar = deg_to_rad(15.0)
 	dedos_esq.influence = 0.0
+	pose_sentado = Sentado.new()
+	esq.add_child(pose_sentado)
+	esq.move_child(pose_sentado, 0)             # antes do IK dos braços
+	pose_sentado.configurar(esq)
+	pose_sentado.influence = 0.0
 	if esq.find_bone("RightHandProp") >= 0:
 		mao = BoneAttachment3D.new()
 		mao.bone_name = "RightHandProp"
@@ -290,7 +298,13 @@ func _physics_process(delta: float) -> void:
 		var fw: Vector3 = preso_a.global_transform.basis.z
 		visual.rotation.y = atan2(fw.x, fw.z)
 		velocity = Vector3.ZERO
-		_tocar("Idle_Breathing")
+		# o veículo diz qual animação (andar empurrando a paleteira, parado na empilhadeira)
+		var veic := preso_a.get_parent()
+		var an: Array = veic.anim_jogador() if veic.has_method("anim_jogador") else ["Idle_Breathing", 0.0]
+		_tocar(an[0])
+		if anim:
+			var vn: float = vel_nativa.get(an[0], 0.0)
+			anim.speed_scale = clampf(an[1] / vn, -2.0, 2.0) if vn > 0.1 and absf(an[1]) > 0.02 else 1.0
 		return
 	var dir := Vector3.ZERO
 	var pode := Interacoes.modo == "andar"
@@ -342,13 +356,26 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	_ignorar_mouse = maxf(0.0, _ignorar_mouse - delta)
 	# braço sobe/desce suave para segurar a botoeira
-	_ik_peso = move_toward(_ik_peso, 1.0 if segurando else 0.0, delta * 3.0)
+	var externas := maos_externas.size() == 2
+	if pose_sentado:
+		pose_sentado.influence = move_toward(pose_sentado.influence, 1.0 if sentado else 0.0, delta * 4.0)
+	_ik_peso = move_toward(_ik_peso, 1.0 if (segurando or externas) else 0.0, delta * 3.0)
 	if ik_braco:
 		var k := smoothstep(0.0, 1.0, _ik_peso)
+		if externas:
+			alvo_mao.global_position = maos_externas[0]
+			alvo_esq.global_position = maos_externas[1]
+		elif _ik_peso <= 0.0 or segurando:
+			alvo_mao.position = MAO_ALVO / visual.scale.x
+			alvo_esq.position = MAO_ESQ / visual.scale.x
 		ik_braco.influence = k
-		ik_esq.influence = k * 0.7
+		ik_esq.influence = k * (1.0 if externas else 0.7)
 		dedos.influence = k
 		dedos_esq.influence = k
+		if externas:
+			dedos_esq.angulo = deg_to_rad(65.0)
+		else:
+			dedos_esq.angulo = deg_to_rad(28.0)
 	# segue a posição interpolada do corpo (sem tremido entre física e tela), com leve atraso
 	var corpo := get_global_transform_interpolated().origin + Vector3(0, ALTURA_OLHO, 0)
 	if primeira_pessoa:

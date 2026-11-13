@@ -81,7 +81,7 @@ func _ready() -> void:
 	paleteira = Empilhadeira.new()
 	paleteira.tipo = "paleteira"
 	paleteira.name = "Paleteira"
-	paleteira.position = Vector3(14.0, 0.0, 9.0)
+	paleteira.position = Vector3(12.5, 0.0, 10.5)
 	paleteira.jogador = jogador
 	paleteira.mundo = self
 	add_child(paleteira)

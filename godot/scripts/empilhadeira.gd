@@ -16,6 +16,7 @@ var GARFO_Y0 := 0.06          # topo do garfo baixado
 var V_GARFO := 0.30           # m/s
 var PONTA_Z := 1.93           # ponta dos garfos (frente = +Z local)
 var LARG_GARFOS := 0.80
+var VOLANTE := Vector3(0.0, 1.36, 0.0)   # centro do volante (empilhadeira)
 
 var operando := false
 var jogador
@@ -28,9 +29,11 @@ var avarias := 0
 var modelo: Node3D
 var carro_garfos: Node3D      # parte que sobe
 var assento: Marker3D
-var rodas_esterco: Array = []
+var rodas: Array = []           # [pivô, raio, esterça, base]
+var _giro := 0.0               # metros rodados (para girar as rodas)
 var sobrecarga := false
-var comando := Vector3.ZERO     # (acelera, vira, sobe) quando ninguém está dirigindo
+var comando := Vector3.ZERO
+var _esterco_paleteira := 0.0     # (acelera, vira, sobe) quando ninguém está dirigindo
 var _y_base_carro := 0.0
 
 func _ready() -> void:
@@ -47,11 +50,13 @@ func _ready() -> void:
 		modelo.rotation.y = -PI / 2
 		add_child(modelo)
 		carro_garfos = modelo.find_child("pallet-jack_body", true, false)
+		_roda("pallet-jack_steer_wheels", 0.09, true)
 	else:
 		modelo = load("res://modelos/forklift-light.glb").instantiate()
 		add_child(modelo)
 		carro_garfos = modelo.find_child("forklift_fork_carriage", true, false)
-		rodas_esterco = [modelo.find_child("forklift_wheel_rl", true, false), modelo.find_child("forklift_wheel_rr", true, false)]
+		for par in [["forklift_wheel_fl", 0.33, false], ["forklift_wheel_fr", 0.33, false], ["forklift_wheel_rl", 0.25, true], ["forklift_wheel_rr", 0.25, true]]:
+			_roda(par[0], par[1], par[2])
 	if carro_garfos:
 		_y_base_carro = carro_garfos.position.y
 	var cs := CollisionShape3D.new()
@@ -65,9 +70,23 @@ func _ready() -> void:
 	cs.shape = bx
 	add_child(cs)
 	assento = Marker3D.new()
-	assento.position = Vector3(0, 0.55, -0.85) if tipo == "empilhadeira" else Vector3(0, 0.0, -1.25)
+	assento.position = Vector3(0, 0.33, -0.82) if tipo == "empilhadeira" else Vector3(0, 0.0, -1.18)
 	add_child(assento)
 	Interagivel.criar(self, Vector3(0.9, 1.0, -0.6) if tipo == "empilhadeira" else Vector3(0, 0.9, -1.0), _txt, _faz, 1.6)
+
+## põe a roda num pivô no centro dela (o modelo tem a origem no chão) para girar e esterçar de verdade
+func _roda(nome: String, raio: float, esterca: bool) -> void:
+	var m := modelo.find_child(nome, true, false) as MeshInstance3D
+	if m == null:
+		return
+	var centro := m.global_transform * m.get_aabb().get_center()
+	var piv := Node3D.new()
+	piv.name = "Pivo_" + nome
+	m.get_parent().add_child(piv)
+	piv.global_position = centro
+	piv.global_rotation = global_rotation
+	m.reparent(piv, true)
+	rodas.append([piv, raio, esterca, piv.transform.basis])
 
 func _txt() -> String:
 	if operando:
@@ -78,7 +97,8 @@ func _faz() -> void:
 	operando = true
 	if jogador:
 		jogador.preso_a = assento
-		jogador.visual.visible = tipo == "paleteira"
+		jogador.visual.visible = true
+		jogador.sentado = tipo == "empilhadeira"
 	var dica := "EMPILHADEIRA · W/S acelera/ré · A/D esterça (roda de trás!) · R/F sobe/desce garfos · E desce" if tipo == "empilhadeira" else "PALETEIRA · W/S empurra/puxa · A/D vira · Espaço bombeia (sobe) · Q solta a válvula (desce) · E larga"
 	Interacoes.operar(self, dica)
 
@@ -86,6 +106,8 @@ func on_foco_saiu() -> void:
 	operando = false
 	if jogador:
 		jogador.preso_a = null
+		jogador.maos_externas = []
+		jogador.sentado = false
 		jogador.visual.visible = true
 		if tipo == "empilhadeira":
 			jogador.global_position = to_global(Vector3(1.1, 0.05, -0.9))
@@ -191,6 +213,25 @@ func _physics_process(delta: float) -> void:
 		vira = float(Input.is_physical_key_pressed(KEY_A)) - float(Input.is_physical_key_pressed(KEY_D))
 		sobe = float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))
 	dirigir(acel, vira, sobe, delta)
+	if jogador and jogador.preso_a == assento:
+		jogador.maos_externas = maos_timao() if tipo == "paleteira" else maos_volante()
+
+## animação do operador enquanto preso ao equipamento: na paleteira ele ANDA junto (para trás quando puxa)
+func anim_jogador() -> Array:
+	if tipo == "paleteira" and absf(v) > 0.05:
+		return ["Walk_Forward", v]
+	return ["Idle_Breathing", 0.0]
+
+## pontos do punho do timão (as duas mãos)
+func maos_timao() -> Array:
+	return [to_global(Vector3(-0.09, 1.16, -0.74)), to_global(Vector3(0.09, 1.16, -0.74))]
+
+## mãos no volante: giram em volta do centro do volante conforme o esterço
+func maos_volante() -> Array:
+	var r := 0.16
+	var a := esterco * 2.5
+	var c := VOLANTE
+	return [to_global(c + Vector3(-r * cos(a), r * sin(a) * 0.5, -r * sin(a) * 0.3)), to_global(c + Vector3(r * cos(a), -r * sin(a) * 0.5, r * sin(a) * 0.3))]
 
 ## um passo de física (também usado pelos testes)
 func dirigir(acel: float, vira: float, sobe: float, delta: float) -> void:
@@ -201,22 +242,32 @@ func dirigir(acel: float, vira: float, sobe: float, delta: float) -> void:
 	if acel != 0.0:
 		v = move_toward(v, acel * vmax * (1.0 if acel > 0 else 0.6), ACEL * delta)
 	else:
-		v = move_toward(v, 0.0, ACEL * 1.5 * delta)       # freio motor / paleteira para sozinha
+		# empilhadeira: freio motor; paleteira: quem empurra para de andar, ela para junto (sem embalo)
+		v = move_toward(v, 0.0, (ACEL * 1.5 if tipo == "empilhadeira" else 8.0) * delta)
 	# esterço
 	if tipo == "empilhadeira":
 		esterco = move_toward(esterco, vira * deg_to_rad(60.0), deg_to_rad(120.0) * delta)
-		for r in rodas_esterco:
-			if r:
-				(r as Node3D).rotation.y = -esterco
 		var w := v * tan(esterco) / ENTRE_EIXOS        # gira em torno do eixo da frente (traseira "abre")
 		rotate_y(w * delta)
 		if absf(v * w) > 0.01:
 			_checar_tombo(absf(v * w))
 	else:
 		rotate_y(vira * (0.9 if absf(v) < 0.1 else 1.4) * delta)
+	var pos0 := global_position
 	velocity = frente() * v
 	velocity.y = 0.0
 	move_and_slide()
+	# rodas giram com a distância andada de verdade (bateu na parede: não giram)
+	var andou := (global_position - pos0).dot(frente())
+	_giro += andou
+	var est := esterco if tipo == "empilhadeira" else _esterco_paleteira
+	_esterco_paleteira = move_toward(_esterco_paleteira, vira * 0.9, 3.0 * delta)
+	for r in rodas:
+		var piv: Node3D = r[0]
+		var raio: float = r[1]
+		var b: Basis = r[3]
+		var giro := Basis(Vector3.RIGHT, _giro / raio)
+		piv.transform.basis = (Basis(Vector3.UP, -est if tipo == "empilhadeira" else est) * b * giro) if r[2] else (b * giro)
 	if is_on_wall() and absf(v) > 0.2:
 		Som.tocar("bang", null, global_position, -10.0)
 		v = 0.0
