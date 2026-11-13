@@ -5,15 +5,18 @@ extends Node3D
 ## A carga só sai se estiver inteira sobre a carroceria e dentro do peso; depois de despachar,
 ## o caminhão vai embora com ela e volta vazio com o próximo pedido.
 
-const CAPACIDADE := 6000.0     # kg (toco)
+const CAPACIDADE := 6000.0     # kg de CARGA ÚTIL (toco 4×2; PBT ~ 9,5 t com a tara)
+const X_EIXO_D := 3.00         # eixo dianteiro (local)
+const X_EIXO_T := -2.00        # eixo traseiro
+const CARGA_EIXO_D := 2500.0   # o eixo dianteiro aguenta só isso a mais da tara (6 t legal − ~3,5 t da cabine/motor)
 const Y_PISO := 0.98
 const BED_X0 := -4.40
 const BED_X1 := 1.85
 const BED_Z := 1.17
 const PEDIDOS := [
-	{"cliente": "Casa do Construtor", "telha_m": 120.0, "rufo": 0, "chapa": 0},
-	{"cliente": "Obra Jd. Primavera", "telha_m": 60.0, "rufo": 10, "chapa": 0},
-	{"cliente": "Serralheria Parecis", "telha_m": 0.0, "rufo": 0, "chapa": 8},
+	{"cliente": "Casa do Construtor", "telha_m": 120.0, "rufo": 0, "chapa": 0, "km": 6.0},
+	{"cliente": "Obra Jd. Primavera", "telha_m": 60.0, "rufo": 10, "chapa": 0, "km": 14.0},
+	{"cliente": "Serralheria Parecis", "telha_m": 0.0, "rufo": 0, "chapa": 8, "km": 22.0},
 ]
 
 var pedido := 0
@@ -25,8 +28,14 @@ var modelo: Node3D
 var guarda_aberta: Array = []
 var placa: Label3D
 var origem: Vector3
+var calcado := false            # calços nas rodas (obrigatório antes de a empilhadeira carregar)
+var infracoes := 0
+var calcos: Array = []
+var t_volta := 0.0              # minutos de jogo até voltar
+var _avisou_calco := false
 
 func _ready() -> void:
+	add_to_group("caminhao")
 	origem = position
 	modelo = load("res://modelos/caminhao_carroceria.glb").instantiate()
 	add_child(modelo)
@@ -47,6 +56,21 @@ func _ready() -> void:
 	placa.outline_size = 8
 	add_child(placa)
 	Interagivel.criar(self, Vector3(2.9, 1.2, -1.6), _txt, _faz, 2.2)
+	# calços amarelos atrás das rodas traseiras (aparecem quando calçado)
+	var mc := StandardMaterial3D.new()
+	mc.albedo_color = Color(0.95, 0.8, 0.1)
+	for sz in [-1.0, 1.0]:
+		var k := MeshInstance3D.new()
+		var pm := PrismMesh.new()
+		pm.size = Vector3(0.30, 0.22, 0.25)
+		k.mesh = pm
+		k.material_override = mc
+		k.position = Vector3(-3.05, 0.11, sz * 1.0)
+		k.rotation.z = PI / 2 * 0.0
+		k.visible = false
+		add_child(k)
+		calcos.append(k)
+	Interagivel.criar(self, Vector3(-3.0, 0.6, -1.6), _txt_calco, _faz_calco, 1.6)
 	_placa()
 
 func _caixa(c: Vector3, s: Vector3) -> void:
@@ -62,6 +86,44 @@ func _caixa(c: Vector3, s: Vector3) -> void:
 func _guarda(fechada: bool) -> void:
 	for tb in guarda_aberta:
 		(tb as Node3D).visible = fechada
+
+func _txt_calco() -> String:
+	if estado != "doca":
+		return ""
+	return "Tirar os calços das rodas" if calcado else "Pôr os calços nas rodas (antes de carregar)"
+
+func _faz_calco() -> void:
+	Interacoes.progresso("Calçando as rodas traseiras..." if not calcado else "Tirando os calços...", 2.0, func(): calcar(not calcado))
+
+func calcar(sim: bool) -> void:
+	calcado = sim
+	for k in calcos:
+		(k as Node3D).visible = sim
+	Som.tocar("thoc", null, to_global(Vector3(-3.0, 0.2, 0)), -6.0)
+
+## a empilhadeira acabou de pôr uma carga na carroceria
+func carga_apoiada(c: Carga) -> void:
+	if not cargas_na_carroceria().has(c):
+		return
+	if not calcado:
+		infracoes += 1
+		Bus.alarme.emit("Caminhão", "CARREGANDO SEM CALÇO NAS RODAS: o caminhão pode andar com a empilhadeira em cima. Infração %d." % infracoes)
+	else:
+		Bus.alarme_resolvido.emit("Caminhão")
+
+## carga nos eixos: devolve [kg no dianteiro, kg no traseiro, centro x]
+func cargas_eixos() -> Array:
+	var w := 0.0
+	var mx := 0.0
+	for c in cargas_na_carroceria():
+		var cc: Carga = c
+		w += cc.kg
+		mx += cc.kg * to_local(cc.global_position).x
+	if w <= 0.0:
+		return [0.0, 0.0, 0.0]
+	var xcg := mx / w
+	var fd := w * (xcg - X_EIXO_T) / (X_EIXO_D - X_EIXO_T)
+	return [fd, w - fd, xcg]
 
 func pedido_atual() -> Dictionary:
 	return PEDIDOS[pedido]
@@ -94,7 +156,12 @@ func conferir() -> String:
 				if p.x < BED_X0 - 0.02 or p.x > BED_X1 + 0.02 or absf(p.z) > BED_Z + 0.02:
 					return "%s está para fora da carroceria" % cc.descricao
 	if kg > CAPACIDADE:
-		return "PESO: %.0f kg, o caminhão leva %.0f kg" % [kg, CAPACIDADE]
+		return "PESO: %.0f kg, o caminhão leva %.0f kg de carga útil" % [kg, CAPACIDADE]
+	var ex := cargas_eixos()
+	if ex[0] > CARGA_EIXO_D:
+		return "carga muito para a frente: %.0f kg no eixo dianteiro (máx %.0f) — puxe para trás" % [ex[0], CARGA_EIXO_D]
+	if ex[0] < 0.0:
+		return "carga atrás do eixo traseiro: a frente fica leve (sem direção) — puxe para a frente"
 	return ""
 
 func resumo() -> Dictionary:
@@ -142,11 +209,14 @@ func despachar() -> bool:
 	for c in cargas_na_carroceria():
 		(c as Carga).reparent(self, true)
 	_guarda(true)
+	calcar(false)
 	entregas += 1
+	# viagem: ida e volta a 50 km/h + 30 min para descarregar (minutos de jogo)
+	t_volta = 2.0 * float(p.km) / 50.0 * 60.0 + 30.0
 	kg_entregue += r.kg
 	estado = "saindo"
 	t = 0.0
-	var txt := "Caminhão saiu para %s com %.0f kg." % [p.cliente, r.kg]
+	var txt := "Caminhão saiu para %s (%.0f km) com %.0f kg — volta em %.0f min." % [p.cliente, p.km, r.kg, t_volta]
 	if faltou.is_empty():
 		txt += " Pedido COMPLETO."
 	else:
@@ -172,12 +242,13 @@ func _process(delta: float) -> void:
 					if c is Carga:
 						c.queue_free()
 		"fora":
-			t += delta
-			if t > 15.0:
+			t_volta -= Relogio.dt_industrial(delta) / Relogio.SEG_POR_MINUTO
+			if t_volta <= 0.0:
 				pedido = (pedido + 1) % PEDIDOS.size()
 				position = origem
 				visible = true
 				_guarda(false)
+				calcar(false)
 				estado = "doca"
 				Som.tocar("buzina", null, global_position, -6.0)
 				Bus.aviso.emit("Chegou caminhão: " + _txt_pedido())
@@ -198,4 +269,5 @@ func _placa() -> void:
 	if placa == null:
 		return
 	var r := resumo()
-	placa.text = "PEDIDO: %s\nna carroceria: %.0f m telha · %d rufos · %d chapas · %.0f/%.0f kg" % [_txt_pedido(), r.telha_m, r.rufo, r.chapa, r.kg, CAPACIDADE]
+	var ex := cargas_eixos()
+	placa.text = "PEDIDO: %s\nna carroceria: %.0f m telha · %d rufos · %d chapas · %.0f/%.0f kg úteis\neixo dianteiro +%.0f kg (máx %.0f) · %s" % [_txt_pedido(), r.telha_m, r.rufo, r.chapa, r.kg, CAPACIDADE, ex[0], CARGA_EIXO_D, "CALÇADO" if calcado else "SEM CALÇO"]

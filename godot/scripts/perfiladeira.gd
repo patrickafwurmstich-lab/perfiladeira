@@ -1371,11 +1371,16 @@ func embalar_pilha() -> Carga:
 	for no in pilha_nos:
 		x0 = minf(x0, (no as Node3D).position.x)
 	var h := n * NINHO + (0.008 if PLANO else 0.045)
-	var kg := metros * 1.20 * 3.38
+	# 1,20 m é a largura PLANA da bobina (o que a máquina consome), não a largura útil da telha
+	var n_fitas := maxi(2, int(lmax / 1.0) + 1)
+	var kg := metros * 1.20 * 3.38 + n_fitas * 1.1 * 0.25 + n_fitas * 2.0   # chapa + fitas de aço + pontaletes
 	var desc := "%d %s %.2f m · %.0f kg" % [n, PECAS.to_upper(), lmax, kg]
 	retirar_pilha()
-	var xf := global_transform * Transform3D(Basis(), Vector3(x0 + lmax * 0.5, Y_PILHA0 - 0.002, 0))
-	var c := Carga.criar(get_parent(), xf, "chapa" if PLANO else "telha", n, metros, kg, Vector3(lmax, h, 1.10 if not PLANO else 1.20), desc)
+	# o amarrado leva os próprios pontaletes (8 cm): na perfiladeira eles ficam nos mesmos lugares dos
+	# pontaletes da pilha; na linha de corte a equipe calça a pilha em cima da mesa
+	var y_base := (Y_PILHA0 - 0.08) if not PLANO else Y_PILHA0
+	var xf := global_transform * Transform3D(Basis(), Vector3(x0 + lmax * 0.5, y_base, 0))
+	var c := Carga.criar(get_parent(), xf, "chapa" if PLANO else "telha", n, metros, kg, Vector3(lmax, h + 0.08, 1.10 if not PLANO else 1.20), desc)
 	Bus.aviso.emit("Amarrado pronto: %s. Leve com a empilhadeira (garfos por baixo, pelo lado)." % desc)
 	if falha == "mesa_cheia":
 		Bus.aviso.emit("Tire o amarrado da área da pilha, depois RESET e LIGA.")

@@ -81,14 +81,25 @@ func _ready() -> void:
 	# aba errada
 	r = dobrar(205.0, 93.3)
 	ok(not r.ok and r.defeito.begins_with("aba"), "batente 5 mm a mais → aba 95 mm → reprovada (%s)" % r.defeito)
+	# alavanca do meio aberta: dobra torta
+	d.cmd_colocar_tira()
+	d.ajustar_batente(200.0 - d.batente_mm)
+	d.alavanca(0); d.alavanca(2)
+	ok(d.algum_aperto() and not d.aperto, "só as alavancas 1 e 3 fechadas")
+	for aa in range(0, 94, 3): d.puxar_avental(aa)
+	d.puxar_avental(0.0)
+	d.alavanca(0); d.alavanca(2)
+	r = d.cmd_retirar()
+	ok(not r.ok and r.defeito == "dobra torta", "dobrou com uma alavanca aberta: peça torta → reprovada")
 	# outro pedido: rufo de encosto 135°
 	d.trocar_pedido(); d.trocar_pedido()
+	d.k_retorno = 0.035
 	ok(d.pedido_atual().ang == 135.0 and d.batente_ideal() == 170.0, "pedido RUFO DE ENCOSTO: batente 170 mm")
 	r = dobrar(170.0, 139.9)
 	ok(r.ok, "rufo: avental a 139,9° → %.2f° (retorno 4,9°) → aprovado" % r.ang)
 	r = dobrar(170.0, 150.0)
 	ok(absf(r.ang - (140.0 - 4.9)) < 0.05, "avental para no batente mecânico de 140°")
 	await foto("pilha")
-	ok(d.pecas_ok == 3 and d.pecas_ruins == 3, "contagem: %d boas, %d ruins" % [d.pecas_ok, d.pecas_ruins])
+	ok(d.pecas_ok == 3 and d.pecas_ruins == 4, "contagem: %d boas, %d ruins" % [d.pecas_ok, d.pecas_ruins])
 	print("RESULTADO: %d ok, %d falhas" % [oks, falhas])
 	get_tree().quit(1 if falhas else 0)

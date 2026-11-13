@@ -8,7 +8,7 @@ extends CharacterBody3D
 @export var tipo := "empilhadeira"
 
 var CAPACIDADE := 2500.0      # kg
-var V_MAX := 3.3              # m/s (12 km/h)
+var V_MAX := 2.2              # m/s (8 km/h): limite de operação dentro do galpão (vazia)
 var ACEL := 1.4
 var ENTRE_EIXOS := 1.37
 var GARFO_MAX := 1.80
@@ -16,6 +16,7 @@ var GARFO_Y0 := 0.06          # topo do garfo baixado
 var V_GARFO := 0.30           # m/s
 var PONTA_Z := 1.93           # ponta dos garfos (frente = +Z local)
 var LARG_GARFOS := 0.80
+var COMPR_GARFO := 1.20       # comprimento dos garfos (calcanhar até a ponta)
 var VOLANTE := Vector3(0.0, 1.36, 0.0)   # centro do volante (empilhadeira)
 
 var operando := false
@@ -33,6 +34,10 @@ var volante: Node3D
 var rodas: Array = []           # [pivô, raio, esterça, base]
 var _giro := 0.0               # metros rodados (para girar as rodas)
 var sobrecarga := false
+var tombada := false
+var a_tombo := 0.0
+var _t_tombo := 0.0
+var _lado_tombo := 1.0
 var comando := Vector3.ZERO
 var _esterco_paleteira := 0.0     # (acelera, vira, sobe) quando ninguém está dirigindo
 var _y_base_carro := 0.0
@@ -40,12 +45,13 @@ var _y_base_carro := 0.0
 func _ready() -> void:
 	if tipo == "paleteira":
 		CAPACIDADE = 2000.0
-		V_MAX = 1.3
+		V_MAX = 1.0                # passo de quem empurra
 		ACEL = 1.2
 		GARFO_MAX = 0.12
 		GARFO_Y0 = 0.075
 		PONTA_Z = 0.74
 		LARG_GARFOS = 0.54
+		COMPR_GARFO = 1.15
 		modelo = load("res://modelos/pallet-jack.glb").instantiate()
 		# o modelo aponta os garfos para +X: gira para os garfos ficarem em +Z como na empilhadeira
 		modelo.rotation.y = -PI / 2
@@ -91,6 +97,8 @@ func _roda(nome: String, raio: float, esterca: bool) -> void:
 	rodas.append([piv, raio, esterca, piv.transform.basis])
 
 func _txt() -> String:
+	if tombada:
+		return ""
 	if operando:
 		return ""
 	return ("Subir na empilhadeira" if tipo == "empilhadeira" else "Pegar a paleteira") + (" (carga: %s, %.0f kg)" % [carga.descricao, carga.kg] if carga else "")
@@ -133,8 +141,7 @@ func on_foco_tecla(ev: InputEventKey) -> void:
 	if tipo == "paleteira":
 		if ev.keycode == KEY_SPACE:
 			bombear()
-		elif ev.keycode == KEY_Q:
-			garfo_para(0.0)
+
 
 ## paleteira: cada bombada do timão sobe 3 cm
 func bombear() -> void:
@@ -193,14 +200,24 @@ func _tentar_pegar_no_proximo(subida: float) -> bool:
 	var c: Carga = r[0]
 	if y_topo_garfo() < c.global_position.y + c.y_vao - 0.003:
 		return false              # os garfos ainda não encostaram embaixo da carga
-	if c.kg > CAPACIDADE:
+	var cap := capacidade_para(c)
+	if c.kg > cap:
 		sobrecarga = true
-		Bus.aviso.emit("SOBRECARGA: %s tem %.0f kg, a %s aguenta %.0f kg." % [c.descricao, c.kg, tipo, CAPACIDADE])
+		Bus.aviso.emit("SOBRECARGA: %s tem %.0f kg; com o centro de carga a %.0f mm a %s aguenta %.0f kg (nominal %.0f kg a 500 mm)." % [c.descricao, c.kg, centro_de_carga(c) * 1000.0, tipo, cap, CAPACIDADE])
 		return false
 	carga = c
 	c.pegar(carro_garfos)
 	Som.tocar("clank", null, c.global_position, -6.0)
 	return true
+
+## distância do encosto dos garfos (calcanhar) até o centro da carga, ao longo dos garfos
+func centro_de_carga(c: Carga) -> float:
+	var calcanhar := PONTA_Z - COMPR_GARFO
+	return maxf(to_local(c.global_position).z - calcanhar, 0.0)
+
+## capacidade residual: a nominal vale para o centro de carga de 500 mm; mais longe, o momento cresce
+func capacidade_para(c: Carga) -> float:
+	return CAPACIDADE * 0.5 / maxf(0.5, centro_de_carga(c))
 
 ## ao baixar: se a carga encostou em algo, ela fica lá
 func _conferir_carga() -> void:
@@ -213,6 +230,8 @@ func _conferir_carga() -> void:
 		c.soltar(mundo if mundo else get_parent())
 		c.global_position.y = apoio
 		Som.tocar("thoc", null, c.global_position, -6.0)
+		for cam in get_tree().get_nodes_in_group("caminhao"):
+			cam.carga_apoiada(c)
 		Bus.aviso.emit("%s apoiada (%.2f m de altura)." % [c.descricao, apoio])
 
 func _physics_process(delta: float) -> void:
@@ -223,6 +242,8 @@ func _physics_process(delta: float) -> void:
 		operando = false
 	if not operando:
 		acel = comando.x; vira = comando.y; sobe = comando.z     # testes / funcionário
+	elif tipo == "paleteira" and Input.is_physical_key_pressed(KEY_Q):
+		sobe = -1.0                                              # segurando a válvula: desce devagar
 	if operando:
 		acel = float(Input.is_physical_key_pressed(KEY_W)) - float(Input.is_physical_key_pressed(KEY_S))
 		vira = float(Input.is_physical_key_pressed(KEY_A)) - float(Input.is_physical_key_pressed(KEY_D))
@@ -253,8 +274,8 @@ func _montar_volante() -> void:
 	mv.roughness = 0.6
 	var aro := MeshInstance3D.new()
 	var tm := TorusMesh.new()
-	tm.inner_radius = 0.175
-	tm.outer_radius = 0.205
+	tm.inner_radius = 0.148
+	tm.outer_radius = 0.175
 	tm.rings = 32
 	aro.mesh = tm
 	aro.material_override = mv
@@ -262,11 +283,11 @@ func _montar_volante() -> void:
 	for i in 3:
 		var raio := MeshInstance3D.new()
 		var bm := BoxMesh.new()
-		bm.size = Vector3(0.025, 0.012, 0.18)
+		bm.size = Vector3(0.025, 0.012, 0.155)
 		raio.mesh = bm
 		raio.material_override = mv
 		var a := TAU * i / 3.0
-		raio.position = Vector3(sin(a), 0, cos(a)) * 0.09
+		raio.position = Vector3(sin(a), 0, cos(a)) * 0.078
 		raio.rotation.y = a
 		volante.add_child(raio)
 	var cubo := MeshInstance3D.new()
@@ -286,7 +307,7 @@ func _montar_volante() -> void:
 	pm.height = 0.07
 	pomo.mesh = pm
 	pomo.material_override = mv
-	pomo.position = Vector3(-0.19, 0.035, 0.0)     # lado direito do motorista (ele olha para +Z)
+	pomo.position = Vector3(-0.162, 0.035, 0.0)     # lado direito do motorista (ele olha para +Z)
 	volante.add_child(pomo)
 	# coluna de direção até o painel
 	var col := MeshInstance3D.new()
@@ -311,7 +332,7 @@ func _girar_volante() -> void:
 func maos_volante() -> Array:
 	if volante == null:
 		return [to_global(VOLANTE), to_global(VOLANTE)]
-	var r := 0.19
+	var r := 0.162
 	var dir_p := volante.global_transform * Vector3(-r, 0.05, 0.0)              # mão direita no pomo
 	var esq_p := volante.global_transform * Vector3(r * 0.87, 0.0, -r * 0.5)    # esquerda no aro, 10h
 	return [dir_p, esq_p]
@@ -319,9 +340,12 @@ func maos_volante() -> Array:
 ## um passo de física (também usado pelos testes)
 func dirigir(acel: float, vira: float, sobe: float, delta: float) -> void:
 	var peso := carga.kg if carga else 0.0
-	var vmax := V_MAX * (1.0 - 0.35 * clampf(peso / CAPACIDADE, 0.0, 1.0))
+	if tombada:
+		acel = 0.0; vira = 0.0; sobe = 0.0
+	# carregada anda mais devagar (empilhadeira até -30%, paleteira até -20%); garfo alto com carga: 0,8 m/s
+	var vmax := V_MAX * (1.0 - (0.30 if tipo == "empilhadeira" else 0.20) * clampf(peso / CAPACIDADE, 0.0, 1.0))
 	if tipo == "empilhadeira" and garfo > 0.5 and carga:
-		vmax = minf(vmax, 1.0)      # carga alta: anda devagar
+		vmax = minf(vmax, 0.8)
 	if acel != 0.0:
 		v = move_toward(v, acel * vmax * (1.0 if acel > 0 else 0.6), ACEL * delta)
 	else:
@@ -333,7 +357,7 @@ func dirigir(acel: float, vira: float, sobe: float, delta: float) -> void:
 		var w := v * tan(esterco) / ENTRE_EIXOS        # gira em torno do eixo da frente (traseira "abre")
 		rotate_y(w * delta)
 		if absf(v * w) > 0.01:
-			_checar_tombo(absf(v * w))
+			_checar_tombo(absf(v * w), signf(w))
 	else:
 		rotate_y(vira * (0.9 if absf(v) < 0.1 else 1.4) * delta)
 	var pos0 := global_position
@@ -368,19 +392,67 @@ func dirigir(acel: float, vira: float, sobe: float, delta: float) -> void:
 				carro_garfos.position.y = _y_base_carro + garfo
 		if sobe < 0.0:
 			_conferir_carga()
+	elif tipo == "paleteira" and sobe < 0.0 and garfo > 0.0:
+		# válvula de descida: vazão limitada (≈6 cm/s), a carga não despenca
+		garfo = maxf(garfo - 0.06 * delta, 0.0)
+		if carro_garfos:
+			carro_garfos.position.y = _y_base_carro + garfo
+		_conferir_carga()
 
-## aceleração lateral máxima antes de a carga tombar: quanto mais alta, menos aguenta
-func _checar_tombo(a_lat: float) -> void:
+## dois limites físicos na curva (aceleração lateral a = v·ω):
+##  1) a carga solta escorrega dos garfos quando a > μ·g (aço sobre aço/madeira, μ ≈ 0,30 → 2,9 m/s²)
+##  2) a empilhadeira tomba de lado quando a > g·b/h, com b = 0,33 m (meia base do triângulo de
+##     estabilidade de uma contrabalançada com eixo traseiro pivotado) e h = altura do centro de gravidade
+##     combinado (máquina 3.600 kg a 0,62 m + carga na altura dos garfos)
+const MU_GARFO := 0.30
+const MASSA := 3600.0
+const H_CG := 0.62
+const B_ESTAB := 0.33
+
+func h_cg_combinado() -> float:
 	if carga == null:
+		return H_CG
+	var hc := GARFO_Y0 + garfo + carga.tamanho.y * 0.5
+	return (MASSA * H_CG + carga.kg * hc) / (MASSA + carga.kg)
+
+func limite_tombo() -> float:
+	return 9.8 * B_ESTAB / h_cg_combinado()
+
+func _checar_tombo(a_lat: float, lado_curva: float) -> void:
+	if tombada:
 		return
-	var limite := 1.9 / (0.4 + garfo + carga.tamanho.y * 0.5)
-	if a_lat > limite:
+	var fora := -global_transform.basis.x * lado_curva      # para fora da curva
+	if carga and a_lat > MU_GARFO * 9.8:
 		var c := carga
 		carga = null
 		c.soltar(mundo if mundo else get_parent())
-		c.global_position = Vector3(c.global_position.x, 0.0, c.global_position.z) + global_transform.basis.x * signf(esterco) * 0.6
+		c.global_position = Vector3(c.global_position.x, 0.0, c.global_position.z) + fora * 0.6
 		c.rotation.z = deg_to_rad(8.0)
-		c.descricao += " (AVARIADA)"
+		c.espalhar(fora)
 		avarias += 1
 		Som.tocar("bang", null, c.global_position, 0.0)
-		Bus.alarme.emit("Empilhadeira", "CARGA TOMBOU na curva (%.1f m/s² com garfo a %.2f m). Avaria registrada." % [a_lat, garfo])
+		Bus.alarme.emit("Empilhadeira", "CARGA ESCORREGOU dos garfos na curva (%.1f m/s², limite %.1f). Ande mais devagar nas curvas." % [a_lat, MU_GARFO * 9.8])
+	if a_lat > limite_tombo():
+		tombada = true
+		a_tombo = a_lat
+		_t_tombo = 0.0
+		_lado_tombo = lado_curva
+		avarias += 1
+		v = 0.0
+		Som.tocar("bang", null, global_position, 4.0)
+		Bus.alarme.emit("Empilhadeira", "EMPILHADEIRA TOMBOU (%.1f m/s² na curva, limite %.1f com o CG a %.2f m). Sempre de cinto!" % [a_lat, limite_tombo(), h_cg_combinado()])
+		if operando:
+			Interacoes.sair_foco()
+
+func _process(delta: float) -> void:
+	if not tombada or modelo == null:
+		return
+	_t_tombo += delta
+	# rola para fora da curva até deitar (~80°); depois de 5 s o guincho põe de pé
+	var alvo := deg_to_rad(80.0) * -_lado_tombo if _t_tombo < 5.0 else 0.0
+	modelo.rotation.z = move_toward(modelo.rotation.z, alvo, delta * (3.0 if _t_tombo < 5.0 else 1.0))
+	if _t_tombo >= 5.0 and absf(modelo.rotation.z) < 0.01:
+		modelo.rotation.z = 0.0
+		tombada = false
+		Bus.alarme_resolvido.emit("Empilhadeira")
+		Bus.aviso.emit("Empilhadeira levantada pelo guincho. Avaria registrada (%d)." % avarias)

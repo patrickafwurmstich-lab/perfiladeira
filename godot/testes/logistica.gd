@@ -68,7 +68,7 @@ func _ready() -> void:
 		m.pilha.append({"L": 3.0, "curva": 0.0, "assim": 0.0, "defeito": ""}); m.pilha_nos.append(no)
 	var am: Carga = m.embalar_pilha()
 	ok(am != null and m.pilha.is_empty() and absf(am.metros - 120.0) < 0.01, "pilha vira amarrado no lugar: %s" % (am.descricao if am else "-"))
-	ok(absf(am.kg - 120.0 * 1.2 * 3.38) < 0.5, "peso do amarrado = 120 m × 1,20 m × 3,38 kg/m² = %.0f kg" % am.kg)
+	ok(absf(am.kg - (120.0 * 1.2 * 3.38 + 4 * 1.1 * 0.25 + 4 * 2.0)) < 0.5, "peso do amarrado = 120 m × 1,20 m × 3,38 kg/m² + fitas + pontaletes = %.0f kg" % am.kg)
 	ok(m.amarrado_na_saida(), "máquina sabe que tem amarrado na área da pilha (LIGA recusa)")
 	await foto("amarrado", am.global_position + Vector3(2.5, 2.0, 3.0), am.global_position)
 	print("== empilhadeira")
@@ -84,20 +84,36 @@ func _ready() -> void:
 	await foto("garfos_enfiados", E.global_position + Vector3(3.5, 2.0, 0.5), am.global_position)
 	await rodar(Vector3(0, 0, 1), 1.0)
 	ok(E.carga == am and am.global_position.y > m.Y_PILHA0 + 0.15, "R levanta: amarrado nos garfos (%.2f m)" % am.global_position.y)
-	# sobrecarga
-	var pesada := Carga.criar(main, Transform3D(Basis(), Vector3(26, 0, -4)), "chapa", 1, 0, 3200.0, Vector3(1.2, 0.5, 1.0), "BOBINA FALSA 3200 kg", true)
-	ok(pesada.kg > E.CAPACIDADE, "carga de teste de %.0f kg" % pesada.kg)
-	# tombo: curva rápida com o garfo lá em cima
-	var g0 := E.garfo
-	await rodar(Vector3(0, 0, 1), 4.0)
-	ok(E.garfo > 1.0, "garfo a %.2f m" % E.garfo)
-	await rodar(Vector3(1, 1, 0), 3.0, func(): return E.carga == null)
-	ok(E.carga == null and E.avarias == 1, "curva rápida com carga alta: TOMBOU (avaria registrada)")
-	ok(am.descricao.ends_with("(AVARIADA)"), "amarrado marcado como avariado")
+	# capacidade residual pelo centro de carga (nominal 2.500 kg a 500 mm)
+	var cc := E.centro_de_carga(am)
+	ok(absf(E.capacidade_para(am) - 2500.0 * 0.5 / maxf(0.5, cc)) < 1.0, "centro de carga %.0f mm → capacidade residual %.0f kg" % [cc * 1000.0, E.capacidade_para(am)])
+	# garfo alto com carga: limitador de 0,8 m/s
+	await rodar(Vector3(0, 0, 1), 3.0)
+	await rodar(Vector3(1, 0, 0), 3.0)
+	ok(E.garfo > 0.5 and E.v <= 0.81, "garfo a %.2f m com carga: anda no máximo 0,8 m/s (%.2f)" % [E.garfo, E.v])
+	# desce para altura de transporte e faz curva fechada rápido: a carga solta escorrega (μ·g = 2,9 m/s²)
+	await rodar(Vector3(0, 0, -1), 6.0, func(): return E.garfo < 0.25)
+	await rodar(Vector3(1, 1, 0), 4.0, func(): return E.carga == null)
+	ok(E.carga == null and E.avarias >= 1, "curva rápida: a carga ESCORREGOU dos garfos (avaria registrada)")
+	ok(am.descricao.ends_with("(AVARIADA)"), "amarrado marcado como avariado e com telhas espalhadas")
 	await foto("tombou", E.global_position + Vector3(4, 3, 4), E.global_position)
+	# empilhadeira vazia em curva fechada no máximo (num lugar livre do galpão)
+	E.global_position = Vector3(45.0, 0.0, -6.0); E.v = 0.0; E.esterco = 0.0; E.reset_physics_interpolation()
+	await rodar(Vector3(1, 0, 0), 2.5)    # tomba de lado se a > g·b/h (5,2 m/s² vazia)
+	var amax := 0.0
+	for i in 360:
+		E.comando = Vector3(1, 1, 0)
+		await _q()
+		amax = maxf(amax, absf(E.v) * absf(E.v) * tan(absf(E.esterco)) / E.ENTRE_EIXOS)
+		if E.tombada: break
+	E.comando = Vector3.ZERO
+	ok(E.tombada, "vazia, a 8 km/h com o volante todo virado: a EMPILHADEIRA TOMBA (%.1f m/s² > %.1f)" % [E.a_tombo, E.limite_tombo()])
+	await foto("empilhadeira_tombada", E.global_position + Vector3(4, 3, 4), E.global_position)
+	await get_tree().create_timer(9.0).timeout
+	ok(not E.tombada and absf(E.modelo.rotation.z) < 0.01, "guincho põe de pé de novo")
 	# nova carga boa para levar ao caminhão
 	await rodar(Vector3(0, 0, -1), 8.0)
-	var boa := Carga.criar(main, Transform3D(Basis(), Vector3(24.0, 0.10, 6.0)), "telha", 30, 90.0, 90.0 * 1.2 * 3.38, Vector3(3.0, 0.22, 1.10), "30 TELHAS 3,00 m")
+	var boa := Carga.criar(main, Transform3D(Basis(), Vector3(24.0, 0.0, 6.0)), "telha", 30, 90.0, 90.0 * 1.2 * 3.38, Vector3(3.0, 0.30, 1.10), "30 TELHAS 3,00 m")
 	posicionar(E, boa.global_position, Vector3(0, 0, 1), 2.9)
 	await _q(2)
 	await rodar(Vector3(0.5, 0, 0), 6.0, func(): return E.carga_alvo()[1] == "")
@@ -106,6 +122,7 @@ func _ready() -> void:
 	# leva até o lado aberto do caminhão (garfos apontando para +Z, para dentro da carroceria)
 	await rodar(Vector3(0, 0, 1), 3.0)
 	ok(E.garfo * 1.0 + E.GARFO_Y0 > 1.05, "garfos acima do piso da carroceria (%.2f m)" % (E.GARFO_Y0 + E.garfo))
+	ok(not C.calcado, "caminhão chega sem calço")
 	var alvo: Vector3 = C.to_global(Vector3(-1.5, C.Y_PISO, 0.0))
 	posicionar(E, alvo, C.global_transform.basis.z, 1.93 + 0.55 + 1.4)
 	await _q(2)
@@ -113,6 +130,10 @@ func _ready() -> void:
 	ok(C.to_local(boa.global_position).z > -1.17 + 0.55, "amarrado sobre a carroceria (z local %.2f)" % C.to_local(boa.global_position).z)
 	await rodar(Vector3(0, 0, -1), 4.0, func(): return E.carga == null)
 	ok(E.carga == null and absf(boa.global_position.y - (C.global_position.y + C.Y_PISO)) < 0.02, "baixou: amarrado apoiado no piso da carroceria (%.2f m)" % boa.global_position.y)
+	ok(C.infracoes == 1, "carregou sem calço: infração registrada")
+	C.calcar(true)
+	var ex: Array = C.cargas_eixos()
+	ok(ex[0] <= C.CARGA_EIXO_D and ex[0] >= 0.0, "eixo dianteiro +%.0f kg, traseiro +%.0f kg" % [ex[0], ex[1]])
 	await rodar(Vector3(0, 0, -1), 1.0)
 	await rodar(Vector3(-0.5, 0, 0), 3.0)
 	await foto("no_caminhao", C.to_global(Vector3(-1, 3.5, -6)), C.to_global(Vector3(-1, 1, 0)))
@@ -123,13 +144,13 @@ func _ready() -> void:
 	ok(pal != null and pal.qtd == 12 and pal.tipo == "rufo", "palete de rufos fechado: %s" % pal.descricao)
 	posicionar(P, pal.global_position, pal.global_transform.basis.z, 0.5 + 0.74 + 0.6)
 	await _q(2)
-	for i in 120:
+	for i in 300:
 		P.comando = Vector3(0.6, 0, 0)
 		await _q()
 		if P.carga_alvo()[1] == "": break
 	P.comando = Vector3.ZERO
 	await _q(30)
-	ok(P.carga_alvo()[1] == "", "paleteira enfiou no palete")
+	ok(P.carga_alvo()[1] == "", "paleteira enfiou no palete (%s)" % P.carga_alvo()[1])
 	P.bombear(); P.bombear(); P.bombear()
 	ok(P.carga == pal and pal.global_position.y > 0.03, "3 bombadas: palete levantado (%.2f m)" % pal.global_position.y)
 	var x0 := pal.global_position
@@ -147,6 +168,6 @@ func _ready() -> void:
 	ok(C.conferir() == "", "conferência ok (dentro da carroceria e do peso)")
 	ok(C.despachar() and C.estado == "saindo", "despachado")
 	await get_tree().create_timer(8.0).timeout
-	ok(C.estado == "fora" and C.entregas == 1, "caminhão foi embora com a carga")
+	ok(C.estado == "fora" and C.entregas == 1 and not C.calcado and C.t_volta > 30.0, "caminhão foi embora com a carga (volta em %.0f min de jogo)" % C.t_volta)
 	print("RESULTADO: %d ok, %d falhas" % [oks, falhas])
 	get_tree().quit(1 if falhas else 0)

@@ -23,6 +23,7 @@ const BATENTE_MAX := 560.0
 const ANG_MAX := 140.0        # o avental para no batente mecânico
 const TOL_ABA := 2.0          # mm
 const TOL_ANG := 2.0          # graus
+const PALETE_MAX := 60        # peças por palete (altura ~0,5 m)
 
 ## pedidos (desenvolvimento = largura da tira que vem da guilhotina)
 const PEDIDOS := [
@@ -36,7 +37,12 @@ var estoque_tiras := 20       # tiras no palete ao lado (cada pedido usa a largu
 var chapa := false            # tem tira na bancada
 var escorregou := false
 var batente_mm := 400.0       # distância da linha de dobra até o batente
-var aperto := false
+var travas := [false, false, false]   # as 3 alavancas do aperto (esquerda, meio, direita)
+var aperto: bool:                      # aperto completo = as três fechadas
+	get:
+		return travas[0] and travas[1] and travas[2]
+var torta := false                     # dobrou com alguma alavanca aberta
+var k_retorno := 0.035                 # retorno elástico do lote (muda a cada lote de tiras)
 var ang_avental := 0.0        # graus
 var ang_permanente := 0.0     # dobra plástica já feita na chapa
 var ang_max_puxado := 0.0
@@ -59,6 +65,10 @@ var pilha_ok: Node3D
 var pilha_tiras: Node3D
 var lb_regua: Label3D
 var _arrastando := false
+var viga_y0 := 0.92
+var bases_alavanca: Array = []
+var mat_fechada: StandardMaterial3D
+var mat_aberta: StandardMaterial3D
 
 func _ready() -> void:
 	modelo = load("res://modelos/dobradeira.glb").instantiate()
@@ -70,14 +80,50 @@ func _ready() -> void:
 	pivo_avental.position = Vector3(0, Y_MESA, Z_DOBRA)
 	raiz.add_child(pivo_avental)
 	avental.reparent(pivo_avental)
+	# braços do avental: no modelo apontavam para cima/frente (no fim do curso iam por cima da máquina).
+	# Na dobradeira real eles saem para a frente e para baixo, e sobem com o avental até ~50° acima da horizontal.
+	var bracos := Node3D.new()
+	avental.add_child(bracos)
+	bracos.global_position = pivo_avental.global_position
+	for n in ["braco_alavanca", "punho", "braco_alavanca2", "punho2"]:
+		var b := avental.get_node_or_null(n)
+		if b:
+			b.reparent(bracos, true)
+	bracos.rotation.x = deg_to_rad(-77.6)
 	# viga de fixação: alinhada com a linha de dobra (o modelo vinha 30 cm para trás)
 	viga = raiz.get_node("viga_fixacao")
 	viga.position.z += -0.30
+	viga_y0 = viga.position.y
+	var k := 0
 	for n in ["alavanca_aperto", "alavanca_aperto2", "alavanca_aperto3"]:
-		alavancas.append(viga.get_node(n))
+		var al: MeshInstance3D = viga.get_node(n)
+		var mano := viga.get_node_or_null("manopla" + ("" if k == 0 else str(k + 1)))
+		if mano:
+			mano.reparent(al, true)        # a bola da alavanca vai junto
+		alavancas.append(al)
+		bases_alavanca.append(al.transform.basis)
+		k += 1
 	for n in ["batente_traseiro", "manipulo_batente", "manipulo_batente2", "batente", "batente2"]:
 		var b: Node3D = raiz.get_node(n)
 		moveis_batente.append([b, b.position])
+	mat_fechada = StandardMaterial3D.new()
+	mat_fechada.albedo_color = Color(0.15, 0.75, 0.25)
+	mat_aberta = StandardMaterial3D.new()
+	mat_aberta.albedo_color = Color(0.85, 0.15, 0.1)
+	# pino da dobradiça ao longo da linha de dobra (articulação do avental)
+	var pino := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.022
+	cm.bottom_radius = 0.022
+	cm.height = 4.0
+	pino.mesh = cm
+	var mp := StandardMaterial3D.new()
+	mp.albedo_color = Color(0.3, 0.32, 0.35)
+	mp.metallic = 0.7
+	pino.material_override = mp
+	pino.rotation.z = PI / 2
+	pino.position = Vector3(0, Y_MESA - 0.022, Z_DOBRA - 0.005)
+	raiz.add_child(pino)
 	# chapa (duas partes: a que fica presa e a aba que dobra)
 	no_chapa = Node3D.new()
 	add_child(no_chapa)
@@ -146,8 +192,11 @@ func aba_mm() -> float:
 	return pedido_atual().largura - batente_mm
 
 ## ângulo de retorno elástico do galvalume 0,43 mm (cresce com a dobra: ~3° a 90°, ~4,5° a 135°)
-static func retorno(ang: float) -> float:
-	return 0.035 * ang
+func retorno(ang: float) -> float:
+	return k_retorno * ang
+
+func algum_aperto() -> bool:
+	return travas[0] or travas[1] or travas[2]
 
 ## ângulo que a chapa fica (aba) — segue o avental enquanto ele empurra, senão fica no permanente
 func ang_chapa() -> float:
@@ -159,12 +208,12 @@ func etapas() -> Array:
 	var p: Dictionary = pedido_atual()
 	return [
 		["Luvas (EPI) — chapa corta", Interacoes.epi],
-		["Pedido: %s · tira %d mm · aba %d mm a %d°" % [p.nome, p.largura, p.aba, p.ang], true],
+		["Pedido: %s · tira %d mm · aba %d mm · dobra %d° (ângulo interno %d°)" % [p.nome, p.largura, p.aba, p.ang, 180 - p.ang], true],
 		["Tira na bancada, encostada no batente", chapa],
 		["Batente em %d mm (largura − aba)" % batente_ideal(), chapa and absf(batente_mm - batente_ideal()) < 0.6],
-		["Fechar o aperto (alavancas)", aperto or ang_permanente > 1.0],
+		["Fechar as 3 alavancas do aperto (1, 2, 3 ou Espaço)", aperto or ang_permanente > 1.0],
 		["Puxar o avental passando do ângulo (retorno elástico)", ang_permanente > 1.0],
-		["Soltar o avental e abrir o aperto", ang_permanente > 1.0 and ang_avental < 1.0 and not aperto],
+		["Soltar o avental e abrir o aperto", ang_permanente > 1.0 and ang_avental < 1.0 and not algum_aperto()],
 		["Tirar a peça e conferir (aba ±2 mm, ângulo ±2°)", false],
 	]
 
@@ -174,15 +223,19 @@ func cmd_colocar_tira() -> bool:
 	if not Interacoes.epi:
 		Bus.aviso.emit("Sem luva não: a borda da chapa corta. Pegue as luvas no armário de EPI.")
 		return false
+	if pecas_palete >= PALETE_MAX:
+		Bus.aviso.emit("Palete de peças cheio (%d). Feche o palete antes de continuar." % PALETE_MAX)
+		return false
 	if estoque_tiras <= 0:
 		Bus.aviso.emit("Acabaram as tiras: corte mais na guilhotina.")
 		return false
-	if aperto or ang_avental > 1.0:
+	if algum_aperto() or ang_avental > 1.0:
 		Bus.aviso.emit("Abra o aperto e abaixe o avental antes de pôr a tira.")
 		return false
 	estoque_tiras -= 1
 	chapa = true
 	escorregou = false
+	torta = false
 	ang_permanente = 0.0
 	ang_max_puxado = 0.0
 	Som.tocar("tlec", null, global_position + Vector3(0, Y_MESA, 0), -6.0)
@@ -191,7 +244,7 @@ func cmd_colocar_tira() -> bool:
 	return true
 
 func ajustar_batente(delta_mm: float) -> void:
-	if aperto:
+	if algum_aperto():
 		Bus.aviso.emit("Com o aperto fechado a chapa não corre: abra o aperto para mexer no batente.")
 		return
 	batente_mm = clampf(snappedf(batente_mm + delta_mm, 0.5), BATENTE_MIN, BATENTE_MAX)
@@ -201,12 +254,12 @@ func ajustar_batente(delta_mm: float) -> void:
 	mudou.emit()
 
 func cmd_aperto(fechar: bool) -> void:
-	if aperto == fechar:
+	if aperto == fechar and algum_aperto() == fechar:
 		return
 	if not fechar and ang_avental > 2.0:
 		Bus.aviso.emit("Abaixe o avental antes de abrir o aperto.")
 		return
-	aperto = fechar
+	travas = [fechar, fechar, fechar]
 	Som.tocar("clank" if fechar else "trava", null, global_position + Vector3(0, 1.2, 0), -4.0)
 	_atualizar_visual()
 	mudou.emit()
@@ -214,14 +267,18 @@ func cmd_aperto(fechar: bool) -> void:
 ## puxa (ou devolve) o avental até "ang" graus
 func puxar_avental(ang: float) -> void:
 	ang = clampf(ang, 0.0, ANG_MAX)
-	if chapa and not escorregou and ang > 3.0 and not aperto:
+	if chapa and not escorregou and ang > 3.0 and algum_aperto() and not aperto and not torta:
+		torta = true
+		Som.tocar("tlec", null, global_position + Vector3(0, Y_MESA, 0), -4.0)
+		Bus.aviso.emit("Uma alavanca do aperto está ABERTA: a chapa está saindo torta (dobra desigual ao longo dos 2 m).")
+	if chapa and not escorregou and ang > 3.0 and not algum_aperto():
 		escorregou = true
 		Som.tocar("bang", null, global_position + Vector3(0, Y_MESA, 0), -6.0)
 		Bus.aviso.emit("A chapa ESCORREGOU: o aperto estava aberto. Essa peça foi perdida — tire e ponha outra.")
-	if chapa and not escorregou and aperto and pedido_atual().largura - batente_mm <= 2.0:
+	if chapa and not escorregou and algum_aperto() and pedido_atual().largura - batente_mm <= 2.0:
 		ang = minf(ang, 0.0)
 	ang_avental = ang
-	if chapa and not escorregou and aperto:
+	if chapa and not escorregou and algum_aperto():
 		ang_max_puxado = maxf(ang_max_puxado, ang)
 		# dobra plástica: o que o avental empurrou, menos o retorno elástico quando ele soltar
 		ang_permanente = maxf(ang_permanente, ang_max_puxado - retorno(ang_max_puxado))
@@ -232,7 +289,7 @@ func puxar_avental(ang: float) -> void:
 func cmd_retirar() -> Dictionary:
 	if not chapa:
 		return {}
-	if aperto or ang_avental > 1.0:
+	if algum_aperto() or ang_avental > 1.0:
 		Bus.aviso.emit("Solte o avental e abra o aperto para tirar a peça.")
 		return {}
 	var p: Dictionary = pedido_atual()
@@ -246,6 +303,8 @@ func cmd_retirar() -> Dictionary:
 		_atualizar_visual()
 		mudou.emit()
 		return {}
+	elif torta:
+		r.defeito = "dobra torta"
 	elif absf(r.aba - p.aba) > TOL_ABA:
 		r.defeito = "aba %+.1f mm" % (r.aba - p.aba)
 	elif absf(r.ang - p.ang) > TOL_ANG:
@@ -254,6 +313,7 @@ func cmd_retirar() -> Dictionary:
 		r.ok = true
 	chapa = false
 	escorregou = false
+	torta = false
 	ang_permanente = 0.0
 	ang_max_puxado = 0.0
 	ultima = r
@@ -273,12 +333,23 @@ func cmd_retirar() -> Dictionary:
 	mudou.emit()
 	return r
 
+## mexe numa alavanca só (1 esquerda, 2 meio, 3 direita)
+func alavanca(i: int) -> void:
+	if travas[i] and ang_avental > 2.0:
+		Bus.aviso.emit("Abaixe o avental antes de abrir o aperto.")
+		return
+	travas[i] = not travas[i]
+	Som.tocar("clank" if travas[i] else "trava", null, global_position + Vector3(-1.6 + i * 1.6, 1.2, 0), -6.0)
+	_atualizar_visual()
+	mudou.emit()
+
 func trocar_pedido() -> void:
 	if chapa:
 		Bus.aviso.emit("Tire a peça da bancada antes de trocar de pedido.")
 		return
 	pedido = (pedido + 1) % PEDIDOS.size()
 	estoque_tiras = 20
+	k_retorno = randf_range(0.032, 0.038)       # lote novo de chapa: o retorno elástico varia um pouco
 	Bus.aviso.emit("Pedido: %s — tira %d mm, aba %d mm a %d°. Batente em %d mm." % [pedido_atual().nome, pedido_atual().largura, pedido_atual().aba, pedido_atual().ang, batente_ideal()])
 	mudou.emit()
 
@@ -321,9 +392,12 @@ func _atualizar_visual() -> void:
 		no.position = orig + Vector3(0, 0, (Z_DOBRA + d) - 0.275)
 	lb_regua.text = "%.1f mm" % batente_mm
 	lb_regua.position = Vector3(-1.45, Y_MESA + 0.003, Z_DOBRA + d - 0.06)
-	viga.position.y = 0.0 if aperto else 0.05
-	for a in alavancas:
-		(a as Node3D).rotation.x = deg_to_rad(-55.0) if aperto else 0.0
+	viga.position.y = viga_y0 + (0.0 if algum_aperto() else 0.04)
+	for i in alavancas.size():
+		var a: MeshInstance3D = alavancas[i]
+		# fechada: a alavanca deita para trás (excêntrico aperta a viga); aberta: em pé
+		a.transform.basis = (Basis(Vector3.RIGHT, deg_to_rad(45.0)) * bases_alavanca[i]) if travas[i] else bases_alavanca[i]
+		a.material_override = mat_fechada if travas[i] else mat_aberta
 	pivo_avental.rotation.x = deg_to_rad(ang_avental)
 	no_chapa.visible = chapa
 	if chapa:
@@ -375,7 +449,7 @@ func _faz() -> void:
 	Interacoes.focar(foco, self, _dica())
 
 func _dica() -> String:
-	return "DOBRADEIRA · roda/A-D batente (Shift ×10) · Espaço aperto · arraste o mouse p/ cima (ou W/S) puxa o avental · R tira a peça · P troca pedido · E sai   |   batente %.1f mm · aba %.1f mm · avental %.0f° · chapa %.1f°" % [batente_mm, aba_mm(), ang_avental, ang_chapa()]
+	return "DOBRADEIRA · roda/A-D batente (Shift ×10) · 1/2/3 alavancas · Espaço todas · arraste o mouse p/ cima (ou W/S) puxa o avental · R tira a peça · P troca pedido · E sai   |   batente %.1f mm · aba %.1f mm · avental %.0f° · chapa %.1f°" % [batente_mm, aba_mm(), ang_avental, ang_chapa()]
 
 func on_foco_tecla(ev: InputEventKey) -> void:
 	if not ev.pressed:
@@ -387,7 +461,9 @@ func on_foco_tecla(ev: InputEventKey) -> void:
 		KEY_D:
 			ajustar_batente(passo)
 		KEY_SPACE:
-			cmd_aperto(not aperto)
+			cmd_aperto(not algum_aperto())
+		KEY_1, KEY_2, KEY_3:
+			alavanca(ev.keycode - KEY_1)
 		KEY_W:
 			puxar_avental(ang_avental + (5.0 if ev.shift_pressed else 1.0))
 		KEY_S:
