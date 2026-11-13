@@ -231,13 +231,20 @@ func _physics_process(delta: float) -> void:
 		maquina.ponta_mao = mao
 	# animação e direção do corpo
 	var vh := Vector2(velocity.x, velocity.z).length()
-	if dir.length() > 0.1 and vh > 0.05:
+	if primeira_pessoa:
+		visual.rotation.y = yaw + PI         # 1ª pessoa: o corpo olha para onde a câmera olha
+	if dir.length() > 0.1 and vh > 0.05 and not primeira_pessoa:
 		# vira suave para onde anda (independe do FPS)
 		visual.rotation.y = lerp_angle(visual.rotation.y, atan2(dir.x, dir.z), 1.0 - exp(-10.0 * delta))
 		var nome := "Run_Forward" if vel > 2.0 else "Walk_Forward"
 		_tocar(nome)
 		if anim and vel_nativa.has(nome) and vel_nativa[nome] > 0.1:
 			anim.speed_scale = clampf(vh / vel_nativa[nome], 0.5, 2.0)
+	elif dir.length() > 0.1 and vh > 0.05:
+		var nome1 := "Run_Forward" if vel > 2.0 else "Walk_Forward"
+		_tocar(nome1)
+		if anim and vel_nativa.has(nome1) and vel_nativa[nome1] > 0.1:
+			anim.speed_scale = clampf(vh / vel_nativa[nome1], 0.5, 2.0)
 	else:
 		_tocar("Idle_Breathing")
 		if anim:
@@ -248,7 +255,10 @@ func _process(delta: float) -> void:
 	_ignorar_mouse = maxf(0.0, _ignorar_mouse - delta)
 	# segue a posição interpolada do corpo (sem tremido entre física e tela), com leve atraso
 	var corpo := get_global_transform_interpolated().origin + Vector3(0, ALTURA_OLHO, 0)
-	cabeca.global_position = cabeca.global_position.lerp(corpo, 1.0 - exp(-16.0 * delta))
+	if primeira_pessoa:
+		cabeca.global_position = corpo + Vector3(0, 0.07, 0)    # 1ª pessoa: preso nos olhos, sem atraso
+	else:
+		cabeca.global_position = cabeca.global_position.lerp(corpo, 1.0 - exp(-16.0 * delta))
 	if cabeca.global_position.distance_to(corpo) > 3.0:
 		cabeca.global_position = corpo          # teleporte de verdade (spawn): não arrasta
 	cabeca.rotation = Vector3(pitch, yaw, 0)
