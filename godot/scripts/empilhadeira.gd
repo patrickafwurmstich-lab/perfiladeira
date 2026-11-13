@@ -29,6 +29,7 @@ var avarias := 0
 var modelo: Node3D
 var carro_garfos: Node3D      # parte que sobe
 var assento: Marker3D
+var volante: Node3D
 var rodas: Array = []           # [pivô, raio, esterça, base]
 var _giro := 0.0               # metros rodados (para girar as rodas)
 var sobrecarga := false
@@ -55,6 +56,7 @@ func _ready() -> void:
 		modelo = load("res://modelos/forklift-light.glb").instantiate()
 		add_child(modelo)
 		carro_garfos = modelo.find_child("forklift_fork_carriage", true, false)
+		_montar_volante()
 		for par in [["forklift_wheel_fl", 0.33, false], ["forklift_wheel_fr", 0.33, false], ["forklift_wheel_rl", 0.25, true], ["forklift_wheel_rr", 0.25, true]]:
 			_roda(par[0], par[1], par[2])
 	if carro_garfos:
@@ -213,6 +215,7 @@ func _physics_process(delta: float) -> void:
 		vira = float(Input.is_physical_key_pressed(KEY_A)) - float(Input.is_physical_key_pressed(KEY_D))
 		sobe = float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))
 	dirigir(acel, vira, sobe, delta)
+	_girar_volante()
 	if jogador and jogador.preso_a == assento:
 		jogador.maos_externas = maos_timao() if tipo == "paleteira" else maos_volante()
 
@@ -226,12 +229,79 @@ func anim_jogador() -> Array:
 func maos_timao() -> Array:
 	return [to_global(Vector3(-0.09, 1.16, -0.74)), to_global(Vector3(0.09, 1.16, -0.74))]
 
-## mãos no volante: giram em volta do centro do volante conforme o esterço
+## volante de verdade (aro, 3 raios e pomo), no lugar do volante do modelo, inclinado 24° para o motorista;
+## gira 2,5 voltas de batente a batente, como numa empilhadeira
+func _montar_volante() -> void:
+	volante = Node3D.new()
+	volante.position = VOLANTE
+	add_child(volante)
+	var mv := StandardMaterial3D.new()
+	mv.albedo_color = Color(0.08, 0.08, 0.09)
+	mv.roughness = 0.6
+	var aro := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.175
+	tm.outer_radius = 0.205
+	tm.rings = 32
+	aro.mesh = tm
+	aro.material_override = mv
+	volante.add_child(aro)
+	for i in 3:
+		var raio := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.025, 0.012, 0.18)
+		raio.mesh = bm
+		raio.material_override = mv
+		var a := TAU * i / 3.0
+		raio.position = Vector3(sin(a), 0, cos(a)) * 0.09
+		raio.rotation.y = a
+		volante.add_child(raio)
+	var cubo := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.045
+	cm.bottom_radius = 0.05
+	cm.height = 0.04
+	cubo.mesh = cm
+	var mc := StandardMaterial3D.new()
+	mc.albedo_color = Color(0.85, 0.65, 0.1)
+	cubo.material_override = mc
+	volante.add_child(cubo)
+	var pomo := MeshInstance3D.new()
+	var pm := CylinderMesh.new()
+	pm.top_radius = 0.018
+	pm.bottom_radius = 0.018
+	pm.height = 0.07
+	pomo.mesh = pm
+	pomo.material_override = mv
+	pomo.position = Vector3(-0.19, 0.035, 0.0)     # lado direito do motorista (ele olha para +Z)
+	volante.add_child(pomo)
+	# coluna de direção até o painel
+	var col := MeshInstance3D.new()
+	var clm := CylinderMesh.new()
+	clm.top_radius = 0.025
+	clm.bottom_radius = 0.03
+	clm.height = 0.42
+	col.mesh = clm
+	col.material_override = mv
+	col.position = VOLANTE + Vector3(0, -0.19, 0.09)
+	col.rotation.x = deg_to_rad(24.0)
+	add_child(col)
+
+const VOLTAS_VOLANTE := 2.5
+
+func _girar_volante() -> void:
+	if volante:
+		var giro := esterco / deg_to_rad(60.0) * VOLTAS_VOLANTE * PI    # ±60° nas rodas = ±1,25 volta
+		volante.basis = Basis(Vector3.RIGHT, deg_to_rad(24.0)) * Basis(Vector3.UP, giro)
+
+## mãos no aro do volante (posições 10h10 que giram junto; a direita fica no pomo)
 func maos_volante() -> Array:
-	var r := 0.16
-	var a := esterco * 2.5
-	var c := VOLANTE
-	return [to_global(c + Vector3(-r * cos(a), r * sin(a) * 0.5, -r * sin(a) * 0.3)), to_global(c + Vector3(r * cos(a), -r * sin(a) * 0.5, r * sin(a) * 0.3))]
+	if volante == null:
+		return [to_global(VOLANTE), to_global(VOLANTE)]
+	var r := 0.19
+	var dir_p := volante.global_transform * Vector3(-r, 0.05, 0.0)              # mão direita no pomo
+	var esq_p := volante.global_transform * Vector3(r * 0.87, 0.0, -r * 0.5)    # esquerda no aro, 10h
+	return [dir_p, esq_p]
 
 ## um passo de física (também usado pelos testes)
 func dirigir(acel: float, vira: float, sobe: float, delta: float) -> void:

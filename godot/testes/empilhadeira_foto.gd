@@ -30,5 +30,8 @@ func _ready() -> void:
 	E.comando = Vector3(0.0, 1.0, 0)
 	for i in 5: await get_tree().physics_frame
 	await foto("curva", E, Vector3(-2.6, 1.6, -2.6), Vector3(0, 0.8, -0.8))
-	await foto("volante", E, Vector3(1.6, 2.4, 1.2), Vector3(0, 1.2, -0.4))
+	await foto("volante", E, Vector3(0.7, 2.3, -1.6), Vector3(0, 1.3, 0.0))
+	E.comando = Vector3.ZERO
+	for i in 40: await get_tree().physics_frame
+	await foto("volante_reto", E, Vector3(0.7, 2.3, -1.6), Vector3(0, 1.3, 0.0))
 	get_tree().quit()
