@@ -49,6 +49,17 @@ func _ready() -> void:
 	await _q(5)
 	main.hud.visible = false
 	E = main.empilhadeira; P = main.paleteira; C = main.caminhao
+	print("== subir no veículo não pode fazer ele andar sozinho")
+	for veic in [E, P]:
+		var p0: Vector3 = veic.global_position
+		var r0: float = veic.rotation.y
+		veic._faz()
+		await _q(120)
+		var andou: float = veic.global_position.distance_to(p0)
+		ok(andou < 0.01 and absf(veic.rotation.y - r0) < 0.01, "%s parada com o operador nela por 2 s (andou %.3f m)" % [veic.tipo, andou])
+		Interacoes.sair_foco()
+		await _q(5)
+		ok(not veic.operando and main.jogador.preso_a == null, "%s: E larga e o operador desce" % veic.tipo)
 	var m: Perfiladeira = main.maquina
 	print("== amarrado da perfiladeira")
 	# simula 40 telhas de 3 m na pilha (como se a máquina tivesse produzido)

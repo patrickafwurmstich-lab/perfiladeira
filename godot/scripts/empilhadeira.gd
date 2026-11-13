@@ -97,7 +97,12 @@ func _txt() -> String:
 
 func _faz() -> void:
 	operando = true
+	v = 0.0
 	if jogador:
+		# o corpo do operador fica DENTRO da caixa de colisão do veículo: sem essa exceção a física
+		# empurrava a empilhadeira/paleteira (ela "andava sozinha", de lado)
+		add_collision_exception_with(jogador)
+		jogador.add_collision_exception_with(self)
 		jogador.preso_a = assento
 		jogador.visual.visible = true
 		jogador.sentado = tipo == "empilhadeira"
@@ -110,9 +115,17 @@ func on_foco_saiu() -> void:
 		jogador.preso_a = null
 		jogador.maos_externas = []
 		jogador.sentado = false
+		if tipo == "paleteira":
+			jogador.global_position = to_global(Vector3(0.0, 0.05, -1.45))
+		_tirar_excecao.call_deferred()
 		jogador.visual.visible = true
 		if tipo == "empilhadeira":
 			jogador.global_position = to_global(Vector3(1.1, 0.05, -0.9))
+
+func _tirar_excecao() -> void:
+	if jogador and not operando:
+		remove_collision_exception_with(jogador)
+		jogador.remove_collision_exception_with(self)
 
 func on_foco_tecla(ev: InputEventKey) -> void:
 	if not ev.pressed or ev.echo:
