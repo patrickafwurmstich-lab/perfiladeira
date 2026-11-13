@@ -31,7 +31,7 @@ const MEIA_BOCA := 0.60             # metade da largura da bobina (as pernas ent
 # do centro da bobina até a origem do gancho: topo do furo (0,242) + altura do V − curva do gancho (0,075)
 var OFF_PERNAS := sqrt(PERNA * PERNA - MEIA_BOCA * MEIA_BOCA) + (Perfiladeira.R_FURO - 0.012) - 0.075
 const CABO_BOTOEIRA := 9.0
-const BOTOEIRA_NA_MAO := Vector3(0.0, -0.06, 0.0)    # a pegada (y 0,06 no modelo) fica na palma # alcance horizontal do cabo da botoeira (do carro até a mão)
+const BOTOEIRA_NA_MAO := Vector3(0.0, -0.06, 0.015)  # a pegada (y 0,06 no modelo) fica dentro da mão fechada # alcance horizontal do cabo da botoeira (do carro até a mão)
 
 var maquina                    # máquina mais perto do gancho (a ponte serve todas as do galpão)
 var maquinas: Array = []
@@ -59,10 +59,12 @@ var gancho: Node3D
 var cabo: MeshInstance3D
 var cinta: Node3D             # cinta de poliéster de 2 pernas: gancho → furo → gancho
 var fitas: Array = []
-var olhal: MeshInstance3D         # [perna_frente, perna_tras, trecho dentro do furo, laço no gancho]
+var olhais: Array = []
+var mangas: Array = []         # [perna_frente, perna_tras, trecho dentro do furo, laço no gancho]
 var botoeira: Node3D
 var cabo_bot: MeshInstance3D
 var cabo_bot2: MeshInstance3D
+var cabo_bot3: MeshInstance3D
 var foco: Marker3D
 var som_motor: AudioStreamPlayer3D
 
@@ -90,7 +92,7 @@ func _ready() -> void:
 	cinta.visible = false
 	add_child(cinta)
 	var mci := StandardMaterial3D.new()
-	mci.albedo_color = Color(0.92, 0.07, 0.04)     # vermelho saturado de cinta de poliéster nova
+	mci.albedo_color = Color(0.88, 0.17, 0.08)     # vermelho-alaranjado da cinta de poliéster da foto
 	mci.roughness = 0.8
 	mci.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var mfx := StandardMaterial3D.new()
@@ -98,7 +100,7 @@ func _ready() -> void:
 	for i in 4:
 		var f := MeshInstance3D.new()
 		var bm := BoxMesh.new()
-		bm.size = Vector3(0.10, 1.0, 0.012)        # fita de 100 mm × 12 mm
+		bm.size = Vector3(0.10, 1.0, 0.008)        # fita de 100 mm × 8 mm (cinta de 2 t)
 		f.mesh = bm
 		f.material_override = mci
 		cinta.add_child(f)
@@ -109,16 +111,29 @@ func _ready() -> void:
 	etq.mesh = be
 	etq.material_override = mfx
 	fitas[0].add_child(etq)
-	# olhal da cinta abraçando a curva do gancho
-	olhal = MeshInstance3D.new()
-	var tmo := TorusMesh.new()
-	tmo.inner_radius = 0.035
-	tmo.outer_radius = 0.06
-	tmo.rings = 16
-	tmo.ring_segments = 8
-	olhal.mesh = tmo
-	olhal.material_override = mci
-	cinta.add_child(olhal)
+	# olhais costurados (um por perna): anel de fita chata montado com segmentos
+	for k in 2:
+		var segs := []
+		for i in 12:
+			var sg := MeshInstance3D.new()
+			var sb := BoxMesh.new()
+			sb.size = Vector3(0.09, 1.0, 0.008)
+			sg.mesh = sb
+			sg.material_override = mci
+			cinta.add_child(sg)
+			segs.append(sg)
+		olhais.append(segs)
+	var mpro := StandardMaterial3D.new()
+	mpro.albedo_color = Color(0.12, 0.12, 0.13)       # manga de proteção (poliuretano preto) na borda do furo
+	mpro.roughness = 0.9
+	for i in 2:
+		var pr := MeshInstance3D.new()
+		var pb := BoxMesh.new()
+		pb.size = Vector3(0.125, 1.0, 0.02)
+		pr.mesh = pb
+		pr.material_override = mpro
+		cinta.add_child(pr)
+		mangas.append(pr)
 	botoeira = load("res://modelos/botoeira.glb").instantiate()
 	var cabo_modelo := botoeira.find_child("cabo", true, false)
 	if cabo_modelo:
@@ -138,6 +153,10 @@ func _ready() -> void:
 	cabo_bot2.mesh = cy2
 	cabo_bot2.material_override = mb
 	add_child(cabo_bot2)
+	cabo_bot3 = MeshInstance3D.new()
+	cabo_bot3.mesh = cy2
+	cabo_bot3.material_override = mb
+	add_child(cabo_bot3)
 	foco = Marker3D.new()
 	add_child(foco)
 	som_motor = Som.laco("hidraulica", self)
@@ -488,17 +507,36 @@ func _desenhar_cinta() -> void:
 	var eixo: Vector3 = carga.no.global_transform.basis.z.normalized()   # eixo da bobina (furo)
 	var lado := eixo.cross(Vector3.UP).normalized()                      # largura da fita
 	var topo_furo := Perfiladeira.R_FURO - 0.012
-	var e1 := c + eixo * 0.6 + Vector3.UP * topo_furo                     # boca do furo, face 1
-	var e2 := c - eixo * 0.6 + Vector3.UP * topo_furo                     # boca do furo, face 2
+	# as pernas passam pela boca e entram no furo (somem lá dentro), não ficam apoiadas na borda
+	var e1 := c + eixo * 0.52 + Vector3.UP * (topo_furo - 0.02)           # já dentro do furo, face 1
+	var e2 := c - eixo * 0.52 + Vector3.UP * (topo_furo - 0.02)           # já dentro do furo, face 2
 	var g := Vector3(x, h, z) + FUNDO_GANCHO                             # fundo da curva do gancho (medido no modelo)
 	_fita(fitas[0], g, e1, lado)
 	_fita(fitas[1], g, e2, lado)
 	_fita(fitas[2], e1, e2, lado)                                        # trecho que passa por dentro do furo
+	# mangas de proteção cobrindo a dobra da fita na boca do furo (25 cm, metade fora, metade dentro)
+	for k in 2:
+		var face: Vector3 = c + eixo * (0.6 if k == 0 else -0.6) + Vector3.UP * topo_furo
+		var dentro: Vector3 = (e1 if k == 0 else e2)
+		var fora: Vector3 = face + (g - face).normalized() * 0.13
+		_fita(mangas[k], dentro.lerp(face, 0.3), fora, lado)
 	_fita(fitas[3], g - eixo * 0.06, g + eixo * 0.06, lado)              # laço apoiado na curva do gancho
-	olhal.global_transform = Transform3D(Basis(lado, PI / 2), g + Vector3(0, 0.02, 0))
+	# olhais de fita (chatos, 100 mm) abraçando o fundo do gancho: o arame do gancho corre em X do modelo
+	var arame := Vector3(1, 0, 0)
+	for k in 2:
+		var cen: Vector3 = g + Vector3(0, 0.035, 0) + arame * (0.03 if k == 0 else -0.03)
+		var segs: Array = olhais[k]
+		var n := segs.size()
+		for i in n:
+			var a0 := TAU * float(i) / n
+			var a1 := TAU * float(i + 1) / n
+			var p0 := cen + Vector3(0, cos(a0), sin(a0)) * 0.045
+			var p1 := cen + Vector3(0, cos(a1), sin(a1)) * 0.045
+			_fita(segs[i], p0, p1, arame)
 	var L0 := maxf((e1 - g).length(), 0.01)
 	var etq := fitas[0].get_child(0) as Node3D
 	etq.scale = Vector3(1, 1.0 / L0, 1)                    # etiqueta não estica junto com a perna
+	etq.rotation = Vector3(deg_to_rad(4.0), 0, deg_to_rad(6.0))   # costurada meio torta, como na vida real
 	etq.position = Vector3(0, 0.5 - 0.35 / L0, 0.008)
 
 func _atualizar(_delta: float) -> void:
@@ -524,7 +562,7 @@ func _atualizar(_delta: float) -> void:
 		var mp: Vector3 = jogador.mao.global_position
 		bpos = mp + Basis(Vector3.UP, yv) * BOTOEIRA_NA_MAO
 		# painel virado para o rosto do operador, inclinado ~25° para ele ler os botões
-		botoeira.rotation = Vector3(deg_to_rad(-31.0), yv + PI, 0)
+		botoeira.rotation = Vector3(deg_to_rad(-27.0), yv + PI, 0)
 	elif operando and jogador:
 		var yv: float = jogador.visual.rotation.y
 		bpos = jogador.global_position + Basis(Vector3.UP, yv) * Vector3(-0.22, 0.62, 0.32)
@@ -539,8 +577,11 @@ func _atualizar(_delta: float) -> void:
 	var ancora := Vector3(x + 0.5, Y_CARRO - 0.3, z + 0.5)
 	var saida := botoeira.global_transform.basis.y.normalized()
 	var curva := topo_b + saida * 0.18 + Vector3(0, 0.12, 0)
+	var dir_h := Vector3(ancora.x - curva.x, 0, ancora.z - curva.z).normalized()
+	var curva2 := curva + (ancora - curva).normalized() * 0.5 - dir_h * 0.09    # barriga natural (o cabo não carrega peso)
 	_tubo(cabo_bot, topo_b, curva)
-	_tubo(cabo_bot2, curva, ancora)
+	_tubo(cabo_bot3, curva, curva2)
+	_tubo(cabo_bot2, curva2, ancora)
 	# anel guia do mandril
 	var mostra_guia := false
 	if carga and encaixando <= 0.0 and maquina and not maquina.bobina.presente:

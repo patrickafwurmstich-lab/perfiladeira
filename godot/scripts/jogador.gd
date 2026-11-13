@@ -22,15 +22,16 @@ var alvo_mao: Node3D
 var polo_cotovelo: Node3D
 var mao: BoneAttachment3D        # osso RightHandProp: onde a botoeira fica presa
 var dedos: Dedos
+var dedos_esq: Dedos
 var ik_esq: TwoBoneIK3D
 var alvo_esq: Node3D
 var polo_esq: Node3D
 var segurando := false
 var _ik_peso := 0.0
-const MAO_ALVO := Vector3(-0.11, 1.14, 0.17)    # na frente do peito, lado direito (o boneco olha para +Z)
+const MAO_ALVO := Vector3(-0.10, 1.11, 0.11)    # na frente do peito, lado direito (o boneco olha para +Z)
 const COTOVELO_POLO := Vector3(-0.35, 0.55, -0.45)
 const MAO_ESQ := Vector3(0.25, 0.80, 0.02)       # mão esquerda solta ao lado da coxa
-const COTOVELO_ESQ := Vector3(0.45, 1.0, -0.35)
+const COTOVELO_ESQ := Vector3(0.40, 0.95, -0.45)
 var maquina
 var primeira_pessoa := false
 var yaw := 0.0
@@ -216,7 +217,14 @@ func _montar_ik() -> void:
 	dedos = Dedos.new()
 	esq.add_child(dedos)
 	dedos.configurar(esq, "Right")
+	dedos.angulo_polegar = deg_to_rad(55.0)     # polegar por cima da pegada
 	dedos.influence = 0.0
+	dedos_esq = Dedos.new()
+	esq.add_child(dedos_esq)
+	dedos_esq.configurar(esq, "Left")
+	dedos_esq.angulo = deg_to_rad(28.0)         # mão esquerda relaxada, semi-fechada
+	dedos_esq.angulo_polegar = deg_to_rad(15.0)
+	dedos_esq.influence = 0.0
 	if esq.find_bone("RightHandProp") >= 0:
 		mao = BoneAttachment3D.new()
 		mao.bone_name = "RightHandProp"
@@ -331,6 +339,7 @@ func _process(delta: float) -> void:
 		ik_braco.influence = k
 		ik_esq.influence = k * 0.7
 		dedos.influence = k
+		dedos_esq.influence = k
 	# segue a posição interpolada do corpo (sem tremido entre física e tela), com leve atraso
 	var corpo := get_global_transform_interpolated().origin + Vector3(0, ALTURA_OLHO, 0)
 	if primeira_pessoa:

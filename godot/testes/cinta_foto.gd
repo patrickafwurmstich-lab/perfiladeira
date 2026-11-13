@@ -20,4 +20,17 @@ func _ready() -> void:
 	for i in 6: await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(OS.get_cmdline_user_args()[0])
+	var base: String = OS.get_cmdline_user_args()[0].get_basename()
+	# close do gancho (olhais) e da boca do furo (manga de proteção)
+	cam.global_position = Vector3(P.x, P.h, P.z) + Vector3(0.55, 0.15, 0.55)
+	cam.look_at(Vector3(P.x, P.h + 0.05, P.z))
+	for i in 4: await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(base + "_gancho.png")
+	var pc: Vector3 = b0.no.global_position
+	cam.global_position = pc + Vector3(0.9, 0.55, 1.1)
+	cam.look_at(pc + Vector3(0, 0.2, 0.55))
+	for i in 4: await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(base + "_furo.png")
 	get_tree().quit()

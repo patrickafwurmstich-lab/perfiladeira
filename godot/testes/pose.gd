@@ -27,5 +27,12 @@ func _ready() -> void:
 		for i in 4: await get_tree().process_frame
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/pose_%s.png" % [dir, nome])
+	var fr: Vector3 = Basis(Vector3.UP, j.visual.rotation.y) * Vector3(0, 0, 1)
+	var di: Vector3 = Basis(Vector3.UP, j.visual.rotation.y) * Vector3(-1, 0, 0)
+	cam.global_position = j.mao.global_position + fr * 0.45 + di * 0.25 + Vector3(0, -0.05, 0)
+	cam.look_at(j.mao.global_position + Vector3(0, 0.08, 0))
+	for i in 4: await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("%s/pose_mao.png" % dir)
 	print("mao ", j.mao.global_position if j.mao else "sem", " botoeira ", P.botoeira.global_position, " ik ", j.ik_braco.influence if j.ik_braco else -1)
 	get_tree().quit()
