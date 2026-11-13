@@ -8,6 +8,9 @@ var quadro: QuadroEletrico
 var ponte: PonteRolante
 var corte: LinhaCorte
 var dobradeira: Dobradeira
+var empilhadeira: Empilhadeira
+var paleteira: Empilhadeira
+var caminhao: Caminhao
 
 func _ready() -> void:
 	_ambiente()
@@ -69,6 +72,23 @@ func _ready() -> void:
 	jogador.yaw = -0.4
 	add_child(jogador)
 	ponte.jogador = jogador
+	empilhadeira = Empilhadeira.new()
+	empilhadeira.name = "Empilhadeira"
+	empilhadeira.position = Vector3(23.0, 0.0, 2.0)
+	empilhadeira.jogador = jogador
+	empilhadeira.mundo = self
+	add_child(empilhadeira)
+	paleteira = Empilhadeira.new()
+	paleteira.tipo = "paleteira"
+	paleteira.name = "Paleteira"
+	paleteira.position = Vector3(14.0, 0.0, 9.0)
+	paleteira.jogador = jogador
+	paleteira.mundo = self
+	add_child(paleteira)
+	caminhao = Caminhao.new()
+	caminhao.name = "Caminhao"
+	caminhao.position = Vector3(30.0, 0.0, 12.0)
+	add_child(caminhao)
 	hud = HUD.new()
 	hud.jogador = jogador
 	hud.maquina = maquina

@@ -48,6 +48,7 @@ var _foco_xf: Transform3D        # última posição da câmera de foco (para vo
 var _dist := 2.8                 # distância real da câmera (suavizada; o SpringArm só mede a colisão)
 var _ignorar_mouse := 0.0        # ignora o 1º movimento depois de recapturar o mouse (evita o tranco)
 var _modo_ant := "andar"
+var preso_a: Node3D = null       # veículo que está levando o jogador (assento)
 var _cam_xf_jogo: Transform3D
 
 func _ready() -> void:
@@ -283,6 +284,14 @@ func _unhandled_input(ev: InputEvent) -> void:
 		Relogio.alternar_vel()
 
 func _physics_process(delta: float) -> void:
+	if preso_a:
+		# sentado na empilhadeira / empurrando a paleteira: o corpo vai junto com o veículo
+		global_position = preso_a.global_position
+		var fw: Vector3 = preso_a.global_transform.basis.z
+		visual.rotation.y = atan2(fw.x, fw.z)
+		velocity = Vector3.ZERO
+		_tocar("Idle_Breathing")
+		return
 	var dir := Vector3.ZERO
 	var pode := Interacoes.modo == "andar"
 	if pode:

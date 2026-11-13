@@ -88,7 +88,7 @@ func _ready() -> void:
 	ajuda = _lab(15, Color(1, 1, 1))
 	ajuda.anchor_left = 0; ajuda.anchor_right = 0; ajuda.anchor_top = 1; ajuda.anchor_bottom = 1
 	ajuda.offset_left = 16; ajuda.offset_top = -100; ajuda.offset_right = 360; ajuda.offset_bottom = -10
-	ajuda.text = "WASD andar · Shift correr · Mouse olhar\nE usar/sair · V 1ª/3ª pessoa · roda zoom\nT velocidade do relógio · H esconde a lista\nEsc solta o mouse"
+	ajuda.text = "WASD andar · Shift correr · Mouse olhar\nE usar/sair · V 1ª/3ª pessoa · roda zoom\nT velocidade do relógio · H esconde a lista\nEsc solta o mouse · empilhadeira: R/F garfos"
 	add_child(ajuda)
 	# NADA do HUD pode segurar o mouse: com o mouse preso o ponteiro fica no centro da tela,
 	# em cima da mira, e um elemento que "para" o evento travava a câmera em 1ª pessoa

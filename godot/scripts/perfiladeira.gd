@@ -360,6 +360,8 @@ func cmd_liga() -> void:
 		Bus.aviso.emit("LIGA recusado: proteção dos rolos aberta (chave de segurança)."); return
 	if cauda_s >= 0.0:
 		Bus.aviso.emit("LIGA recusado: fim de chapa. Só AVANÇO LENTO para tirar o resto."); return
+	if amarrado_na_saida():
+		Bus.aviso.emit("LIGA recusado: tem um amarrado em cima da área da pilha. Tire com a empilhadeira."); return
 	if not ponta_refilada or not medida_ok:
 		Bus.aviso.emit("LIGA recusado: refile a ponta e aprove a peça teste com a trena antes da produção."); return
 	if pilha.size() >= MESA_CAP:
@@ -1345,18 +1347,50 @@ func _faz_trena() -> void:
 		txt += " → corrija %+.0f mm na IHM" % -m.erro_mm
 	Bus.aviso.emit(txt)
 
-# --- retirar pilha ---
+# --- embalar a pilha (vira um amarrado que a empilhadeira leva) ---
 func _txt_retirar() -> String:
 	if pilha.is_empty() or rodando:
 		return ""
-	return "Retirar a pilha (%d %s) — ajudante com a paleteira" % [pilha.size(), PECAS]
+	return "Amarrar a pilha (%d %s) com fita de aço" % [pilha.size(), PECAS]
 
 func _faz_retirar() -> void:
-	Interacoes.progresso("Ajudante amarrando e levando a pilha...", 3.0, func():
-		var n := retirar_pilha()
-		Bus.aviso.emit("%d %s foram para o estoque." % [n, PECAS])
-		if falha == "mesa_cheia":
-			Bus.aviso.emit("Sensor da mesa livre. Aperte RESET e LIGA."))
+	Interacoes.progresso("Amarrando a pilha com fita de aço...", 3.0, embalar_pilha)
+
+## a pilha vira uma Carga no MESMO lugar (o que a tela mostra é o que existe): amarrado de telhas
+## sobre os pontaletes ou pilha de chapas na mesa. Peso: chapa 0,43 mm = 3,38 kg/m², bobina de 1,20 m.
+func embalar_pilha() -> Carga:
+	if pilha.is_empty():
+		return null
+	var n := pilha.size()
+	var metros := 0.0
+	var lmax := 0.0
+	var x0 := 1e9
+	for t in pilha:
+		metros += t.L
+		lmax = maxf(lmax, t.L)
+	for no in pilha_nos:
+		x0 = minf(x0, (no as Node3D).position.x)
+	var h := n * NINHO + (0.008 if PLANO else 0.045)
+	var kg := metros * 1.20 * 3.38
+	var desc := "%d %s %.2f m · %.0f kg" % [n, PECAS.to_upper(), lmax, kg]
+	retirar_pilha()
+	var xf := global_transform * Transform3D(Basis(), Vector3(x0 + lmax * 0.5, Y_PILHA0 - 0.002, 0))
+	var c := Carga.criar(get_parent(), xf, "chapa" if PLANO else "telha", n, metros, kg, Vector3(lmax, h, 1.10 if not PLANO else 1.20), desc)
+	Bus.aviso.emit("Amarrado pronto: %s. Leve com a empilhadeira (garfos por baixo, pelo lado)." % desc)
+	if falha == "mesa_cheia":
+		Bus.aviso.emit("Tire o amarrado da área da pilha, depois RESET e LIGA.")
+	return c
+
+func amarrado_na_saida() -> bool:
+	for c in Carga.todas:
+		var cc: Carga = c
+		if cc.no_garfo or not is_instance_valid(cc):
+			continue
+		var l := to_local(cc.global_position)
+		var xp := _x_pilha(COMPRIMENTO_PADRAO)
+		if l.x > xp - 0.5 and l.x < xp + 7.0 and absf(l.z) < 1.0 and l.y < Y_PILHA0 + 0.5:
+			return true
+	return false
 
 # --- graxeiras ---
 func _txt_graxa(i: int) -> String:

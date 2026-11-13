@@ -42,6 +42,7 @@ var ang_permanente := 0.0     # dobra plástica já feita na chapa
 var ang_max_puxado := 0.0
 var pecas_ok := 0
 var pecas_ruins := 0
+var pecas_palete := 0         # peças boas no palete atual (ainda não fechado)
 var ultima := {}              # última peça conferida {aba, ang, ok}
 
 var modelo: Node3D
@@ -115,6 +116,7 @@ func _ready() -> void:
 	add_child(foco)
 	foco.transform = Transform3D(Basis(), Vector3(0.0, 1.75, -1.55)).looking_at(Vector3(0, 0.95, -0.1), Vector3.UP)
 	Interagivel.criar(self, Vector3(0, 1.0, -0.9), _txt, _faz, 1.8)
+	Interagivel.criar(self, Vector3(3.0, 0.8, -0.8), _txt_palete, fechar_palete, 1.6)
 	_atualizar_visual()
 
 func _palete(p: Vector3) -> Node3D:
@@ -257,6 +259,7 @@ func cmd_retirar() -> Dictionary:
 	ultima = r
 	if r.ok:
 		pecas_ok += 1
+		pecas_palete += 1
 		Bus.peca_na_pilha.emit(NOME, pecas_ok)
 		Bus.aviso.emit("%s OK: aba %.1f mm, ângulo %.1f° (%d prontas)" % [p.nome, r.aba, r.ang, pecas_ok])
 		if pecas_ok == 1:
@@ -278,6 +281,34 @@ func trocar_pedido() -> void:
 	estoque_tiras = 20
 	Bus.aviso.emit("Pedido: %s — tira %d mm, aba %d mm a %d°. Batente em %d mm." % [pedido_atual().nome, pedido_atual().largura, pedido_atual().aba, pedido_atual().ang, batente_ideal()])
 	mudou.emit()
+
+## fecha o palete de peças boas: filme + fita, vira uma Carga para a empilhadeira/paleteira
+func fechar_palete() -> Carga:
+	if pecas_palete <= 0 or palete_fechado_no_lugar():
+		return null
+	var n := pecas_palete
+	var kg: float = n * COMPRIMENTO * (pedido_atual().largura / 1000.0) * 3.38 + 25.0    # + palete de madeira
+	var h := 0.14 + maxf(n * 0.006, 0.02)
+	var desc := "%d %s · %.0f kg" % [n, pedido_atual().nome, kg]
+	pecas_palete = 0
+	var c := Carga.criar(get_parent(), global_transform * Transform3D(Basis(), Vector3(3.0, 0, 0)), "rufo", n, n * COMPRIMENTO, kg, Vector3(COMPRIMENTO + 0.05, h, 1.0), desc, true)
+	Bus.aviso.emit("Palete fechado: %s." % desc)
+	_atualizar_visual()
+	return c
+
+func palete_fechado_no_lugar() -> bool:
+	for c in Carga.todas:
+		var cc: Carga = c
+		if is_instance_valid(cc) and not cc.no_garfo and cc.global_position.distance_to(to_global(Vector3(3.0, 0, 0))) < 0.9:
+			return true
+	return false
+
+func _txt_palete() -> String:
+	if palete_fechado_no_lugar():
+		return ""
+	if pecas_palete <= 0:
+		return ""
+	return "Fechar o palete (%d peças boas) — filme e fita" % pecas_palete
 
 # ---------------------------------------------------------------- visual
 
@@ -310,7 +341,8 @@ func _atualizar_visual() -> void:
 		pivo_aba.rotation.x = deg_to_rad(ang_chapa() if not escorregou else minf(ang_avental, 25.0))
 	# palete de tiras e de peças prontas
 	_empilhar(pilha_tiras, estoque_tiras, false)
-	_empilhar(pilha_ok, pecas_ok, true)
+	_empilhar(pilha_ok, pecas_palete, true)
+	pilha_ok.visible = not palete_fechado_no_lugar()
 
 func _empilhar(pal: Node3D, n: int, dobradas: bool) -> void:
 	var nome := "pilha"
