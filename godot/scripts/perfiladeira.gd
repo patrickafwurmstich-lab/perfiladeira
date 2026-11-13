@@ -1404,7 +1404,7 @@ func _montar_protecao() -> void:
 	lg.position = Vector3(X_E0 + 1.0 - (X_E0 + X_E1) * 0.5, -0.03, 1.36)
 	tampa.add_child(lg)
 	var placa := Label3D.new()
-	placa.text = "⚠ PERIGO — ROLOS EM MOVIMENTO\nNÃO ABRIR COM A MÁQUINA LIGADA"
+	placa.text = "! PERIGO — ROLOS EM MOVIMENTO\nNÃO ABRIR COM A MÁQUINA LIGADA"
 	placa.font_size = 30
 	placa.pixel_size = 0.0022
 	placa.modulate = Color(0.1, 0.1, 0.1)

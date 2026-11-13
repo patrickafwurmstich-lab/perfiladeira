@@ -59,7 +59,7 @@ func _ready() -> void:
 	var hs := HBoxContainer.new()
 	hs.add_theme_constant_override("separation", 4)
 	v.add_child(hs)
-	for nome in ["MANDRIL", "PROTEÇÃO", "EMERG.", "CHAPA ENT.", "LÂMINA ↑", "MESA", "FREIO"]:
+	for nome in ["MANDRIL", "PROTEÇÃO", "EMERG.", "CHAPA ENT.", "LÂMINA OK", "MESA", "FREIO"]:
 		var l := _lab(nome, 13, Color(0.05, 0.05, 0.05))
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.custom_minimum_size = Vector2(78, 24)
@@ -107,8 +107,8 @@ func _linha(campo: String, nome: String, uni: String, passo: float, passo_grande
 	var l := _lab(nome, 18, Color(0.7, 0.75, 0.8))
 	l.custom_minimum_size.x = 170
 	h.add_child(l)
-	h.add_child(_bt_mini("−−", func(): maquina.ajustar(campo, -passo_grande)))
-	h.add_child(_bt_mini("−", func(): maquina.ajustar(campo, -passo)))
+	h.add_child(_bt_mini("- -", func(): maquina.ajustar(campo, -passo_grande)))
+	h.add_child(_bt_mini("-", func(): maquina.ajustar(campo, -passo)))
 	var val := _lab("", 22, Color(1, 1, 1))
 	val.custom_minimum_size.x = 150
 	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -147,13 +147,13 @@ func _process(_d: float) -> void:
 	lb_estado.add_theme_color_override("font_color", cor)
 	var al := ""
 	match m.falha:
-		"emergencia": al = "⚠ EMERGÊNCIA ACIONADA — destrave e aperte RESET"
-		"enrosco": al = "⚠ ENROSCO NOS ROLOS — bloqueie a máquina e corte a chapa"
-		"fim_bobina": al = "⚠ FIM DE BOBINA — troque a bobina"
-		"mesa_cheia": al = "⚠ MESA CHEIA — retire a pilha"
-		"lote": al = "✔ LOTE CONCLUÍDO — zere o contador"
-		"energia": al = "⚠ QUEDA DE ENERGIA"
-		"protecao": al = "⚠ PROTEÇÃO ABERTA — feche e aperte RESET"
+		"emergencia": al = "! EMERGÊNCIA ACIONADA — destrave e aperte RESET"
+		"enrosco": al = "! ENROSCO NOS ROLOS — bloqueie a máquina e corte a chapa"
+		"fim_bobina": al = "! FIM DE BOBINA — troque a bobina"
+		"mesa_cheia": al = "! MESA CHEIA — retire a pilha"
+		"lote": al = "OK  LOTE CONCLUÍDO — zere o contador"
+		"energia": al = "! QUEDA DE ENERGIA"
+		"protecao": al = "! PROTEÇÃO ABERTA — feche e aperte RESET"
 	if al == "" and not m.protecao_fechada:
 		al = "! Proteção dos rolos aberta (só AVANÇO LENTO)"
 	elif al == "" and not m.bobina.travada and m.bobina.presente:
@@ -183,6 +183,6 @@ func _process(_d: float) -> void:
 	sensores["PROTEÇÃO"].bg_color = ok if m.protecao_fechada else ruim
 	sensores["EMERG."].bg_color = ok if not m.emergencia else ruim
 	sensores["CHAPA ENT."].bg_color = ok if (m.fita in ["na_mesa", "enfiada"] and m.cauda_s < 0.0) else ruim
-	sensores["LÂMINA ↑"].bg_color = ok if m.lamina_em_cima else Color(0.95, 0.8, 0.2)
+	sensores["LÂMINA OK"].bg_color = ok if m.lamina_em_cima else Color(0.95, 0.8, 0.2)
 	sensores["MESA"].bg_color = ok if m.pilha.size() < m.MESA_CAP else ruim
 	sensores["FREIO"].bg_color = ok if m.freio_ok else Color(0.95, 0.8, 0.2)

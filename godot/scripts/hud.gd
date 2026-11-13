@@ -90,7 +90,7 @@ func _ready() -> void:
 	ajuda.text = "WASD andar · Shift correr · Mouse olhar\nE usar/sair · V 1ª/3ª pessoa · roda zoom\nT velocidade do relógio · H esconde a lista\nEsc solta o mouse"
 	add_child(ajuda)
 	Bus.aviso.connect(_aviso)
-	Bus.alarme.connect(func(_o, t): faixa_alarme.text = "⚠ " + t; faixa_alarme.visible = true)
+	Bus.alarme.connect(func(_o, t): faixa_alarme.text = "! " + t; faixa_alarme.visible = true)
 	Bus.alarme_resolvido.connect(func(_o): faixa_alarme.visible = false)
 	Bus.conquista.connect(_conquista)
 	Interacoes.progresso_mudou.connect(_progresso)
@@ -120,7 +120,7 @@ func _aviso(t: String) -> void:
 	tw.tween_callback(l.queue_free)
 
 func _conquista(nome: String, texto: String) -> void:
-	conq.text = "★ " + nome + " ★\n" + texto
+	conq.text = "* " + nome + " *\n" + texto
 	conq.visible = true
 	_conq_t = 5.0
 	Som.tocar("buzina", null, Vector3.ZERO, -8.0)
@@ -144,12 +144,12 @@ func _process(delta: float) -> void:
 		var achou := false
 		for e in maquina.etapas():
 			if e[1]:
-				s += "[color=#7fd67f]✔ %s[/color]\n" % e[0]
+				s += "[color=#7fd67f]OK  %s[/color]\n" % e[0]
 			elif not achou:
-				s += "[color=#ffd75e]▶ %s[/color]\n" % e[0]
+				s += "[color=#ffd75e]>> %s[/color]\n" % e[0]
 				achou = true
 			else:
-				s += "[color=#9a9a9a]☐ %s[/color]\n" % e[0]
+				s += "[color=#9a9a9a]-  %s[/color]\n" % e[0]
 		lb_check.text = s
 		lb_check.visible = mostrar_check
 	ajuda.visible = mostrar_check and Interacoes.modo == "andar"
