@@ -60,6 +60,7 @@ var cabo: MeshInstance3D
 var cinta: Node3D             # cinta de poliéster de 2 pernas: gancho → furo → gancho
 var fitas: Array = []
 var olhais: Array = []
+var costuras: Array = []
 var mangas: Array = []         # [perna_frente, perna_tras, trecho dentro do furo, laço no gancho]
 var botoeira: Node3D
 var cabo_bot: MeshInstance3D
@@ -75,6 +76,22 @@ func _ready() -> void:
 	add_child(carro)
 	gancho = load("res://modelos/ponte_gancho.glb").instantiate()
 	add_child(gancho)
+	# gancho forjado em aço (não pintado de vermelho: assim ele se separa da cinta); trava amarela fica
+	var mg := gancho.find_child("gancho", true, false) as MeshInstance3D
+	if mg:
+		var maco := StandardMaterial3D.new()
+		maco.albedo_color = Color(0.50, 0.52, 0.55)
+		maco.metallic = 0.85
+		maco.roughness = 0.38
+		mg.material_override = maco
+	# trava de segurança fechando a boca do gancho: da haste (0,03; 0,30) até a ponta (0,166; 0,20)
+	var tv := gancho.find_child("trava", true, false) as Node3D
+	if tv:
+		var a := Vector3(0.03, 0.30, 0.0)
+		var b := Vector3(0.162, 0.205, 0.0)
+		var yv := (b - a).normalized()
+		var xv := Vector3(-yv.y, yv.x, 0.0)
+		tv.transform = Transform3D(Basis(xv, yv * ((b - a).length() / 0.14), Vector3(0, 0, 1)), (a + b) * 0.5)
 	cabo = MeshInstance3D.new()
 	var cy := CylinderMesh.new()
 	cy.top_radius = 0.008
@@ -100,7 +117,7 @@ func _ready() -> void:
 	for i in 4:
 		var f := MeshInstance3D.new()
 		var bm := BoxMesh.new()
-		bm.size = Vector3(0.10, 1.0, 0.008)        # fita de 100 mm × 8 mm (cinta de 2 t)
+		bm.size = Vector3(0.112, 1.0, 0.008)       # fita de 112 mm × 8 mm (cinta de 2 t)
 		f.mesh = bm
 		f.material_override = mci
 		cinta.add_child(f)
@@ -111,15 +128,41 @@ func _ready() -> void:
 	etq.mesh = be
 	etq.material_override = mfx
 	fitas[0].add_child(etq)
-	# olhais costurados (um por perna): anel de fita chata montado com segmentos
+	# costura de fechamento do olhal: faixa mais grossa e escura com pontos claros (uma por perna)
+	var mcos := StandardMaterial3D.new()
+	mcos.albedo_color = Color(0.58, 0.08, 0.04)
+	mcos.roughness = 0.9
+	var mpto := StandardMaterial3D.new()
+	mpto.albedo_color = Color(0.93, 0.90, 0.82)
+	for k in 2:
+		var cs := MeshInstance3D.new()
+		var cb := BoxMesh.new()
+		cb.size = Vector3(0.116, 1.0, 0.016)
+		cs.mesh = cb
+		cs.material_override = mcos
+		cinta.add_child(cs)
+		for j in 4:                                   # linhas de pesponto atravessando a fita
+			var pt := MeshInstance3D.new()
+			var pbx := BoxMesh.new()
+			pbx.size = Vector3(0.10, 0.05, 0.018)     # a caixa da costura é esticada ~0,115 m em Y
+			pt.mesh = pbx
+			pt.material_override = mpto
+			pt.position = Vector3(0, -0.36 + j * 0.24, 0)
+			cs.add_child(pt)
+		costuras.append(cs)
+	# olhais (um por perna): a fita do olhal se junta (franze) no arame do gancho, então fica mais estreita
+	var molh := StandardMaterial3D.new()
+	molh.albedo_color = Color(0.74, 0.13, 0.06)        # mesma fita, um tom mais escuro pelo atrito/sombra no gancho
+	molh.roughness = 0.85
+	molh.cull_mode = BaseMaterial3D.CULL_DISABLED
 	for k in 2:
 		var segs := []
 		for i in 12:
 			var sg := MeshInstance3D.new()
 			var sb := BoxMesh.new()
-			sb.size = Vector3(0.09, 1.0, 0.008)
+			sb.size = Vector3(0.062, 1.0, 0.010)
 			sg.mesh = sb
-			sg.material_override = mci
+			sg.material_override = molh
 			cinta.add_child(sg)
 			segs.append(sg)
 		olhais.append(segs)
@@ -129,7 +172,7 @@ func _ready() -> void:
 	for i in 2:
 		var pr := MeshInstance3D.new()
 		var pb := BoxMesh.new()
-		pb.size = Vector3(0.125, 1.0, 0.02)
+		pb.size = Vector3(0.14, 1.0, 0.022)
 		pr.mesh = pb
 		pr.material_override = mpro
 		cinta.add_child(pr)
@@ -139,6 +182,19 @@ func _ready() -> void:
 	if cabo_modelo:
 		cabo_modelo.visible = false      # o cabo de verdade é desenhado até o carro (sem cabo duplicado)
 	add_child(botoeira)
+	# prensa-cabo no topo da botoeira (de onde o cabo sai)
+	var pc := MeshInstance3D.new()
+	var pcm := CylinderMesh.new()
+	pcm.top_radius = 0.011
+	pcm.bottom_radius = 0.016
+	pcm.height = 0.045
+	pc.mesh = pcm
+	var mpc := StandardMaterial3D.new()
+	mpc.albedo_color = Color(0.16, 0.16, 0.17)
+	mpc.roughness = 0.5
+	pc.material_override = mpc
+	pc.position = Vector3(0, 0.34, -0.03)
+	botoeira.add_child(pc)
 	cabo_bot = MeshInstance3D.new()
 	var cy2 := CylinderMesh.new()
 	cy2.top_radius = 0.006
@@ -518,13 +574,17 @@ func _desenhar_cinta() -> void:
 	for k in 2:
 		var face: Vector3 = c + eixo * (0.6 if k == 0 else -0.6) + Vector3.UP * topo_furo
 		var dentro: Vector3 = (e1 if k == 0 else e2)
-		var fora: Vector3 = face + (g - face).normalized() * 0.13
+		var fora: Vector3 = face + (g - face).normalized() * 0.16
 		_fita(mangas[k], dentro.lerp(face, 0.3), fora, lado)
-	_fita(fitas[3], g - eixo * 0.06, g + eixo * 0.06, lado)              # laço apoiado na curva do gancho
+	fitas[3].visible = false                                             # os olhais já fazem o laço no gancho
 	# olhais de fita (chatos, 100 mm) abraçando o fundo do gancho: o arame do gancho corre em X do modelo
 	var arame := Vector3(1, 0, 0)
 	for k in 2:
-		var cen: Vector3 = g + Vector3(0, 0.035, 0) + arame * (0.03 if k == 0 else -0.03)
+		var pe: Vector3 = (e1 if k == 0 else e2)
+		var dl: Vector3 = (pe - g).normalized()
+		_fita(costuras[k], g + dl * 0.075, g + dl * 0.19, lado)          # costura logo abaixo do olhal
+	for k in 2:
+		var cen: Vector3 = g + Vector3(0, 0.035, 0) + arame * (0.034 if k == 0 else -0.034)
 		var segs: Array = olhais[k]
 		var n := segs.size()
 		for i in n:
@@ -573,12 +633,12 @@ func _atualizar(_delta: float) -> void:
 	botoeira.position = bpos
 	# cabo da botoeira: do carro até o topo da botoeira (fica inclinado quando você se afasta)
 	# cabo da botoeira: sai do prensa-cabo no topo, faz uma curva suave e sobe até o carro
-	var topo_b := botoeira.global_transform * Vector3(0, 0.34, -0.03)
+	var topo_b := botoeira.global_transform * Vector3(0, 0.36, -0.03)
 	var ancora := Vector3(x + 0.5, Y_CARRO - 0.3, z + 0.5)
 	var saida := botoeira.global_transform.basis.y.normalized()
-	var curva := topo_b + saida * 0.18 + Vector3(0, 0.12, 0)
+	var curva := topo_b + saida * 0.20 + Vector3(0, 0.10, 0)
 	var dir_h := Vector3(ancora.x - curva.x, 0, ancora.z - curva.z).normalized()
-	var curva2 := curva + (ancora - curva).normalized() * 0.5 - dir_h * 0.09    # barriga natural (o cabo não carrega peso)
+	var curva2 := curva + (ancora - curva).normalized() * 0.5 - dir_h * 0.14    # barriga natural (o cabo não carrega peso)
 	_tubo(cabo_bot, topo_b, curva)
 	_tubo(cabo_bot3, curva, curva2)
 	_tubo(cabo_bot2, curva2, ancora)

@@ -34,5 +34,13 @@ func _ready() -> void:
 	for i in 4: await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png("%s/pose_mao.png" % dir)
+	# mais dois closes da pegada: pelo lado de fora (dedos) e por cima (polegar)
+	var extras := {"mao_fora": fr * 0.30 + di * 0.38, "mao_cima": fr * 0.25 + di * 0.10 + Vector3(0, 0.35, 0)}
+	for nome in extras:
+		cam.global_position = j.mao.global_position + extras[nome]
+		cam.look_at(j.mao.global_position + Vector3(0, 0.03, 0))
+		for i in 4: await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/pose_%s.png" % [dir, nome])
 	print("mao ", j.mao.global_position if j.mao else "sem", " botoeira ", P.botoeira.global_position, " ik ", j.ik_braco.influence if j.ik_braco else -1)
 	get_tree().quit()

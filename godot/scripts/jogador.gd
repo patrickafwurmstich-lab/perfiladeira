@@ -28,8 +28,8 @@ var alvo_esq: Node3D
 var polo_esq: Node3D
 var segurando := false
 var _ik_peso := 0.0
-const MAO_ALVO := Vector3(-0.10, 1.11, 0.11)    # na frente do peito, lado direito (o boneco olha para +Z)
-const COTOVELO_POLO := Vector3(-0.35, 0.55, -0.45)
+const MAO_ALVO := Vector3(-0.10, 1.11, 0.13)    # na frente do peito, lado direito (o boneco olha para +Z)
+const COTOVELO_POLO := Vector3(-0.40, 0.55, -0.45)
 const MAO_ESQ := Vector3(0.25, 0.80, 0.02)       # mão esquerda solta ao lado da coxa
 const COTOVELO_ESQ := Vector3(0.40, 0.95, -0.45)
 var maquina

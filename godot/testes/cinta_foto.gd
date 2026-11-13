@@ -33,4 +33,31 @@ func _ready() -> void:
 	for i in 4: await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(base + "_furo.png")
+	# vista frontal ortográfica (perpendicular ao eixo da bobina): mede o V entre as pernas
+	var eixo: Vector3 = b0.no.global_transform.basis.z.normalized()
+	var lado := eixo.cross(Vector3.UP).normalized()
+	var meio := (Vector3(P.x, P.h, P.z) + pc) * 0.5
+	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	cam.size = 2.0
+	cam.global_position = meio + lado * 4.0
+	cam.look_at(meio)
+	for i in 4: await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(base + "_frente.png")
+	# vista pelo eixo (olhando dentro do furo): a fita entrando no núcleo
+	cam.size = 1.1
+	cam.global_position = pc + eixo * 4.0 + Vector3(0, 0.35, 0)
+	cam.look_at(pc + Vector3(0, 0.35, 0))
+	for i in 4: await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(base + "_eixo.png")
+	var g: Vector3 = Vector3(P.x, P.h, P.z) + P.FUNDO_GANCHO
+	print("V entre pernas: %.1f graus" % rad_to_deg((pc + eixo * 0.52 - g).angle_to(pc - eixo * 0.52 - g)))
+	# close maior do gancho (perspectiva)
+	cam.projection = Camera3D.PROJECTION_PERSPECTIVE
+	cam.global_position = g + Vector3(0.32, 0.06, 0.30)
+	cam.look_at(g + Vector3(0, -0.02, 0))
+	for i in 4: await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(base + "_gancho2.png")
 	get_tree().quit()
