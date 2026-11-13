@@ -176,7 +176,8 @@ func _tocar(nome: String) -> void:
 		anim.play(nome, 0.25)
 		_anim_atual = nome
 
-func _unhandled_input(ev: InputEvent) -> void:
+## o olhar com o mouse é lido em _input (antes da interface), então nenhum elemento de tela o "engole"
+func _input(ev: InputEvent) -> void:
 	if Interacoes.modo != "andar":
 		return
 	if ev is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -185,7 +186,11 @@ func _unhandled_input(ev: InputEvent) -> void:
 		var rel: Vector2 = ev.relative.limit_length(120.0)    # nenhum tranco grande de uma vez
 		yaw -= rel.x * SENS
 		pitch = clampf(pitch - rel.y * SENS, -1.2, 0.9)
-	elif ev is InputEventMouseButton and ev.pressed:
+
+func _unhandled_input(ev: InputEvent) -> void:
+	if Interacoes.modo != "andar":
+		return
+	if ev is InputEventMouseButton and ev.pressed:
 		if ev.button_index == MOUSE_BUTTON_LEFT and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 			_ignorar_mouse = 0.15

@@ -89,12 +89,21 @@ func _ready() -> void:
 	ajuda.offset_left = 16; ajuda.offset_top = -100; ajuda.offset_right = 360; ajuda.offset_bottom = -10
 	ajuda.text = "WASD andar · Shift correr · Mouse olhar\nE usar/sair · V 1ª/3ª pessoa · roda zoom\nT velocidade do relógio · H esconde a lista\nEsc solta o mouse"
 	add_child(ajuda)
+	# NADA do HUD pode segurar o mouse: com o mouse preso o ponteiro fica no centro da tela,
+	# em cima da mira, e um elemento que "para" o evento travava a câmera em 1ª pessoa
+	_ignorar_mouse(self)
 	Bus.aviso.connect(_aviso)
 	Bus.alarme.connect(func(_o, t): faixa_alarme.text = "! " + t; faixa_alarme.visible = true)
 	Bus.alarme_resolvido.connect(func(_o): faixa_alarme.visible = false)
 	Bus.conquista.connect(_conquista)
 	Interacoes.progresso_mudou.connect(_progresso)
 	Interacoes.dica.connect(func(t): lb_dica.text = t)
+
+func _ignorar_mouse(n: Node) -> void:
+	for c in n.get_children():
+		if c is Control:
+			(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_ignorar_mouse(c)
 
 func _lab(tam: int, cor: Color) -> Label:
 	var l := Label.new()
@@ -106,6 +115,7 @@ func _lab(tam: int, cor: Color) -> Label:
 
 func _aviso(t: String) -> void:
 	var l := _lab(15, Color(1, 1, 1))
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	l.text = t
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
 	l.custom_minimum_size.x = 500

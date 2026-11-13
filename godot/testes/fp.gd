@@ -7,6 +7,7 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	main.hud.visible = false
 	var y_ini: float = j.yaw
+	main.hud.visible = true
 	for modo in [true, true]:
 		j.primeira_pessoa = modo
 		for i in 10: await get_tree().process_frame
@@ -15,7 +16,9 @@ func _ready() -> void:
 		for i in 20:
 			var ev := InputEventMouseMotion.new()
 			ev.relative = Vector2(15, 0)
-			Input.parse_input_event(ev)
+			ev.position = get_viewport().get_visible_rect().size * 0.5   # mouse preso = ponteiro no centro (em cima da mira)
+			ev.global_position = ev.position
+			get_viewport().push_input(ev)
 			await get_tree().process_frame
 		var b1: Vector3 = -j.cam.global_transform.basis.z
 		await RenderingServer.frame_post_draw
