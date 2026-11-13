@@ -92,6 +92,7 @@ func _ready() -> void:
 	var C: Caminhao = main.caminhao
 	var boa := Carga.criar(main, C.global_transform * Transform3D(Basis(), Vector3(-1.6, C.Y_PISO, 0)), "telha", 30, 90.0, 90.0 * 1.2 * 3.38, Vector3(3.0, 0.30, 1.10), "30 TELHAS 3,00 m · 370 kg")
 	C.calcar(true)
+	C.amarrar()
 	await _q(3)
 	await foto("cam_lado_aberto", C.to_global(Vector3(-1.0, 2.2, -7.0)), C.to_global(Vector3(-1.0, 1.0, 0)))
 	await foto("cam_traseira", C.to_global(Vector3(-9.0, 2.4, -2.5)), C.to_global(Vector3(-2.0, 1.0, 0)))

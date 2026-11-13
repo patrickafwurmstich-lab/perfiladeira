@@ -5,7 +5,8 @@ extends Node3D
 ## A carga só sai se estiver inteira sobre a carroceria e dentro do peso; depois de despachar,
 ## o caminhão vai embora com ela e volta vazio com o próximo pedido.
 
-const CAPACIDADE := 6000.0     # kg de CARGA ÚTIL (toco 4×2; PBT ~ 9,5 t com a tara)
+const CAPACIDADE := 6000.0     # kg de CARGA ÚTIL (toco 4×2)
+const PBT := 10000.0           # peso bruto total = tara 4.000 kg + carga útil 6.000 kg
 const X_EIXO_D := 3.00         # eixo dianteiro (local)
 const X_EIXO_T := -2.00        # eixo traseiro
 const TARA_D := 2600.0         # tara sobre o eixo dianteiro (cabine, motor) — toco ~4 t de tara
@@ -167,6 +168,8 @@ func conferir() -> String:
 	if kg > CAPACIDADE:
 		return "PESO: %.0f kg, o caminhão leva %.0f kg de carga útil" % [kg, CAPACIDADE]
 	var ex := cargas_eixos()
+	if ex[0] + ex[1] > PBT:
+		return "PBT: %.0f kg, o limite é %.0f kg" % [ex[0] + ex[1], PBT]
 	if ex[0] > LIM_EIXO_D:
 		return "eixo dianteiro com %.0f kg (limite %.0f): carga muito para a frente — puxe para trás" % [ex[0], LIM_EIXO_D]
 	if ex[1] > LIM_EIXO_T:
@@ -196,17 +199,73 @@ func _txt() -> String:
 	var m := conferir()
 	if m == "carroceria vazia":
 		return ""
-	return "Amarrar a carga e despachar o caminhão" + ("" if m == "" else "  (não dá: %s)" % m)
+	if m != "":
+		return "Despachar o caminhão  (não dá: %s)" % m
+	if not amarrada():
+		return "Amarrar a carga na carroceria (cintas com catraca nos ganchos)"
+	return "Despachar o caminhão (tira os calços e sai)"
 
 func _faz() -> void:
 	var m := conferir()
 	if m != "":
 		Bus.aviso.emit("Não dá para despachar: " + m + ".")
 		return
-	Interacoes.progresso("Amarrando a carga com cinta e catraca...", 4.0, despachar)
+	if not amarrada():
+		Interacoes.progresso("Passando as cintas e apertando as catracas...", 4.0, amarrar)
+		return
+	despachar()
+
+## cada carga sobre a carroceria leva 2 cintas de poliéster amarelas presas nos ganchos de amarração
+## das duas laterais, passando por cima (com cantoneira nos cantos)
+func amarrar() -> void:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.95, 0.75, 0.05)
+	mat.roughness = 0.8
+	for c in cargas_na_carroceria():
+		var cc: Carga = c
+		if cc.has_meta("cintada"):
+			continue
+		cc.set_meta("cintada", true)
+		var lc := to_local(cc.global_position)
+		var topo := lc.y + cc.tamanho.y + 0.006
+		for k in 2:
+			var fx := lc.x + (k - 0.5) * cc.tamanho.x * 0.55
+			# por cima da carga
+			_cinta(Vector3(fx, topo, -cc.tamanho.z * 0.5 - 0.005), Vector3(fx, topo, cc.tamanho.z * 0.5 + 0.005), mat)
+			# descendo até os ganchos das laterais (z = ±1,25, logo abaixo do piso)
+			for sz in [-1.0, 1.0]:
+				_cinta(Vector3(fx, topo, sz * (cc.tamanho.z * 0.5 + 0.005)), Vector3(fx, Y_PISO - 0.12, sz * 1.25), mat)
+	Som.tocar("tlec", null, global_position + Vector3(0, 1.2, 0), -4.0)
+	Bus.aviso.emit("Carga amarrada: 2 cintas por volume, catracas apertadas.")
+
+func _cinta(a: Vector3, b: Vector3, mat: Material) -> void:
+	var m := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	var d := b - a
+	bm.size = Vector3(0.05, d.length(), 0.004)
+	m.mesh = bm
+	m.material_override = mat
+	add_child(m)
+	var y := d.normalized()
+	var x := Vector3.RIGHT
+	var z := x.cross(y).normalized()
+	m.transform = Transform3D(Basis(x, y, z), (a + b) * 0.5)
+	m.add_to_group("cinta_caminhao")
+
+func amarrada() -> bool:
+	var cs := cargas_na_carroceria()
+	if cs.is_empty():
+		return false
+	for c in cs:
+		if not (c as Carga).has_meta("cintada"):
+			return false
+	return true
 
 func despachar() -> bool:
 	if estado != "doca" or conferir() != "":
+		return false
+	if not amarrada():
+		Bus.aviso.emit("Carga solta: amarre com as cintas antes de sair.")
 		return false
 	var p := pedido_atual()
 	var r := resumo()
@@ -250,7 +309,7 @@ func _process(delta: float) -> void:
 				visible = false
 				t = 0.0
 				for c in get_children():
-					if c is Carga:
+					if c is Carga or c.is_in_group("cinta_caminhao"):
 						c.queue_free()
 		"fora":
 			t_volta -= Relogio.dt_industrial(delta) / Relogio.SEG_POR_MINUTO

@@ -166,6 +166,9 @@ func _ready() -> void:
 	var r := C.resumo()
 	ok(absf(r.telha_m - 90.0) < 0.01, "caminhão vê 90 m de telha na carroceria")
 	ok(C.conferir() == "", "conferência ok (dentro da carroceria e do peso)")
+	ok(not C.despachar() and C.estado == "doca", "sem cintas não sai")
+	C.amarrar()
+	ok(C.amarrada(), "carga amarrada com cintas nos ganchos")
 	ok(C.despachar() and C.estado == "saindo", "despachado")
 	await get_tree().create_timer(8.0).timeout
 	ok(C.estado == "fora" and C.entregas == 1 and not C.calcado and C.t_volta > 30.0, "caminhão foi embora com a carga (volta em %.0f min de jogo)" % C.t_volta)
