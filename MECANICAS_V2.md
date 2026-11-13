@@ -138,3 +138,33 @@ Física real de deformação da chapa, torque por estação, temperatura, viscos
 6. Guilhotina e dobradeira no mesmo nível.
 7. Funcionários executando as mesmas etapas, com o tempo de cada uma.
 8. Testes, prints, vídeo e revisão das IAs em cada etapa.
+
+---
+
+## 11. V2.1 — revisão das 3 IAs (13/11, madrugada) e o que já está no Godot
+
+**Aceito e implementado** (fatia vertical `godot/`, teste `testes/roteiro.gd` 59/59):
+| Ponto | Quem levantou | Como ficou |
+|---|---|---|
+| Máquina de estados formal | ChatGPT | `Perfiladeira.fase()`: DESENERGIZADA → … → PRONTA/PRODUÇÃO/CORTANDO/FIM DE CHAPA; a IHM mostra |
+| Proteção dos rolos com chave de segurança | Grok, Gemini, ChatGPT | tampa de tela articulada; aberta = só AVANÇO LENTO; abrir em ciclo = parada + RESET; fechar NÃO religa |
+| Mandril travado (sensor) | Grok, ChatGPT | alavanca; sem trava não corta cinta nem avança |
+| Freio do desbobinador / barriga | Gemini, Grok | sem freio, cada parada solta chapa (barriga visível) e o risco de enrosco sobe ×(1+8·barriga) |
+| EPI | Grok, ChatGPT | armário; sem EPI não mexe em chapa, cinta, retalho ou esmerilhadeira; protetor auricular abafa o som (-6 dB) |
+| Refile da ponta (retalho de setup) | Gemini | CORTE MANUAL de ≥25 cm antes da peça teste; vai para o tambor de sucata; não conta peça |
+| Ciclo da guilhotina com pisador e sensor de lâmina | Gemini, ChatGPT | 0,9 s: pisador desce → lâmina desce (THOC no fundo) → sobe → sensor em cima → pisador sobe → peça liberada |
+| Sirene mais longa + giroflex | Grok | 3 s, torre âmbar piscando antes de mover |
+| JOG mais lento que o automático | Grok | já era: 0,12 m/s × 0,6 m/s |
+| Desvio inicial de guia menor | Grok | ±12 mm (era ±25) |
+| 1ª peça medida de novo após troca de bobina/enrosco | Grok | refile + peça teste + trena voltam a ser obrigatórios |
+| Sensor de fim de chapa na entrada | Gemini (corrigido) | para a LINHA (não desarma a chave geral, como o Gemini sugeriu); RESET → AVANÇO LENTO até a cauda sair dos rolos → retirar retalho à mão |
+| Contrato de eventos / fonte única | ChatGPT | autoload `Registro`: escuta todo o Bus, numera e carimba a hora; o teste confere metros, peças, refiles |
+| Corte exato (encoder) | achado do mediador | no x20 a linha passava até 20 cm do comprimento; agora o passo é limitado ao ponto de corte (erro 0,00 mm) |
+| Conservação da chapa | achado do mediador | o que sai da bobina (incluindo o puxado à mão e a variação do trecho bobina→mesa com o raio) = pilha + estoque + sucata, ao milímetro |
+
+**Recusado ou adiado (com motivo):**
+- Gemini: "economia desacoplada da animação" → recusado (regra do Lucas). "2 t de bobina" → o jogo usa 1 t/247 m até o Lucas confirmar. "Óleo de conformação" → TP-40 em galvalume roda a seco na maioria das fábricas; fica fora até confirmar.
+- Grok: produção de 9.000–11.000 m/dia → erro de conta (corrigido: ~430 m teóricos/turno).
+- ChatGPT: PCP, rastreabilidade por lote, sistema elétrico por circuito, logística → entram depois da ponte rolante (P2).
+
+**Perguntas abertas para o Lucas** (ChatGPT): fabricante/modelo da TP-40 de referência; corte parado ou guilhotina voadora (o jogo assume PARADO, que é o comum em máquinas nacionais); peso e diâmetro externo da bobina padrão; nº real de estações; se o x20 deve acelerar funcionários e veículos (o jogo assume que sim; o jogador não acelera).
