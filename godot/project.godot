@@ -1,0 +1,37 @@
+; PARECIS TELHA — Godot 4.7.2 (Compatibility). Formiguinha Açucarada.
+config_version=5
+
+[application]
+
+config/name="Parecis Telha"
+config/description="Simulador de fábrica de telhas — v2 (perfiladeira de verdade)"
+run/main_scene="res://cenas/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[autoload]
+
+Bus="*res://autoload/bus.gd"
+Relogio="*res://autoload/relogio.gd"
+Som="*res://autoload/som.gd"
+Entrada="*res://autoload/entrada.gd"
+Interacoes="*res://autoload/interacoes.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+common/physics_ticks_per_second=60
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+lights_and_shadows/directional_shadow/size=2048
+anti_aliasing/quality/msaa_3d=1

@@ -1,0 +1,216 @@
+class_name Jogador
+extends CharacterBody3D
+## Operador. 3ª pessoa (SpringArm, não atravessa parede) ou 1ª pessoa (V).
+## O [E] escolhe o ponto de interação mais perto e na frente do olhar.
+## No modo foco a câmera voa até o alvo (caixa de comando, manivelas) e volta depois.
+
+const VEL_ANDAR := 1.6
+const VEL_CORRER := 3.6
+const SENS := 0.0025
+var maquina
+var primeira_pessoa := false
+var yaw := 0.0
+var pitch := -0.25
+var braco: SpringArm3D
+var cam: Camera3D
+var cabeca: Node3D
+var visual: Node3D
+var anim: AnimationPlayer
+var alvo: Interagivel = null
+var _anim_atual := ""
+var _cam_foco_t := 0.0
+var _cam_xf_jogo: Transform3D
+
+func _ready() -> void:
+	var cs := CollisionShape3D.new()
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.3
+	cap.height = 1.8
+	cs.shape = cap
+	cs.position.y = 0.9
+	add_child(cs)
+	cabeca = Node3D.new()
+	cabeca.position.y = 1.62
+	add_child(cabeca)
+	braco = SpringArm3D.new()
+	braco.spring_length = 2.8
+	braco.margin = 0.15
+	braco.position = Vector3(0.35, 0, 0)
+	braco.add_excluded_object(get_rid())
+	cabeca.add_child(braco)
+	cam = Camera3D.new()
+	cam.fov = 70
+	cam.near = 0.05
+	cam.current = true
+	braco.add_child(cam)
+	_carregar_visual()
+	if DisplayServer.get_name() != "headless":
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _carregar_visual() -> void:
+	var cam_p := "res://privado/personagens_ithappy.glb"
+	if ResourceLoader.exists(cam_p):
+		visual = load(cam_p).instantiate()
+		var usar := ["Body_010", "Male_emotion_usual_001", "Outerwear_036", "Pants_014", "Shoe_Sneakers_009", "Gloves_014"]
+		for mi in visual.find_children("*", "MeshInstance3D", true, false):
+			mi.visible = mi.name in usar
+		anim = visual.find_child("AnimationPlayer", true, false)
+		# capacete amarelo preso no osso da cabeça
+		var esq := visual.find_child("Skeleton*", true, false) as Skeleton3D
+		if esq == null:
+			for n in visual.find_children("*", "Skeleton3D", true, false):
+				esq = n
+		if esq and esq.find_bone("Head") >= 0:
+			var ba := BoneAttachment3D.new()
+			ba.bone_name = "Head"
+			esq.add_child(ba)
+			var c := MeshInstance3D.new()
+			var sm := SphereMesh.new()
+			sm.radius = 0.125
+			sm.height = 0.14
+			sm.is_hemisphere = true
+			c.mesh = sm
+			var m := StandardMaterial3D.new()
+			m.albedo_color = Color(0.95, 0.95, 0.93)
+			c.material_override = m
+			c.position = Vector3(0, 0.17, 0.0)
+			ba.add_child(c)
+		var aabb_alt := 1.86
+		visual.scale = Vector3.ONE * (1.80 / aabb_alt)
+	else:
+		visual = Node3D.new()
+		var mi := MeshInstance3D.new()
+		var cm := CapsuleMesh.new()
+		cm.radius = 0.28
+		cm.height = 1.75
+		mi.mesh = cm
+		mi.position.y = 0.875
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(0.2, 0.35, 0.6)
+		mi.material_override = m
+		visual.add_child(mi)
+		var cap := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.2
+		sm.height = 0.25
+		sm.is_hemisphere = true
+		cap.mesh = sm
+		var mc := StandardMaterial3D.new()
+		mc.albedo_color = Color(0.96, 0.78, 0.29)
+		cap.material_override = mc
+		cap.position.y = 1.72
+		visual.add_child(cap)
+	add_child(visual)
+
+func _tocar(nome: String) -> void:
+	if anim == null or _anim_atual == nome:
+		return
+	if anim.has_animation(nome):
+		var a := anim.get_animation(nome)
+		a.loop_mode = Animation.LOOP_LINEAR
+		anim.play(nome, 0.2)
+		_anim_atual = nome
+
+func _unhandled_input(ev: InputEvent) -> void:
+	if Interacoes.modo != "andar":
+		return
+	if ev is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		yaw -= ev.relative.x * SENS
+		pitch = clampf(pitch - ev.relative.y * SENS, -1.3, 1.1)
+	elif ev is InputEventMouseButton and ev.pressed:
+		if ev.button_index == MOUSE_BUTTON_LEFT and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		elif ev.button_index == MOUSE_BUTTON_WHEEL_UP and not primeira_pessoa:
+			braco.spring_length = maxf(1.2, braco.spring_length - 0.3)
+		elif ev.button_index == MOUSE_BUTTON_WHEEL_DOWN and not primeira_pessoa:
+			braco.spring_length = minf(6.0, braco.spring_length + 0.3)
+	elif ev.is_action_pressed("camera"):
+		primeira_pessoa = not primeira_pessoa
+	elif ev.is_action_pressed("interagir") and alvo:
+		alvo.acao.call()
+		get_viewport().set_input_as_handled()
+	elif ev.is_action_pressed("sair"):
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	elif ev.is_action_pressed("relogio"):
+		Relogio.alternar_vel()
+
+func _physics_process(delta: float) -> void:
+	var dir := Vector3.ZERO
+	var pode := Interacoes.modo == "andar"
+	if pode:
+		var i := Input.get_vector("esquerda", "direita", "frente", "tras")
+		dir = (Basis(Vector3.UP, yaw) * Vector3(i.x, 0, i.y))
+	var vel := VEL_CORRER if Input.is_action_pressed("correr") else VEL_ANDAR
+	# puxando a chapa: anda devagar e não pode passar do comprimento que a bobina solta
+	if maquina and maquina.fita == "puxando":
+		vel = 1.0
+	velocity.x = dir.x * vel
+	velocity.z = dir.z * vel
+	if not is_on_floor():
+		velocity.y -= 9.8 * delta
+	else:
+		velocity.y = 0.0
+	move_and_slide()
+	if maquina and maquina.fita == "puxando":
+		var local: Vector3 = maquina.to_local(global_position)
+		var desb := Vector3(maquina.X_DESB, 0, 0)
+		if local.x < maquina.X_DESB - 0.5 or local.distance_to(desb) > 3.2:
+			# a chapa estica: não deixa ir além
+			var lim := desb + (Vector3(local.x, 0, local.z) - desb).limit_length(3.2)
+			global_position = maquina.to_global(Vector3(lim.x, local.y, lim.z))
+		var mao: Vector3 = maquina.to_local(global_position + Vector3(0, 0.95, 0))
+		maquina.ponta_mao = mao
+	# animação e direção do corpo
+	if dir.length() > 0.1:
+		visual.rotation.y = lerp_angle(visual.rotation.y, atan2(dir.x, dir.z), 0.2)
+		_tocar("Run_Forward" if vel > 2.0 else "Walk_Forward")
+	else:
+		_tocar("Idle_Breathing")
+
+func _process(delta: float) -> void:
+	cabeca.rotation = Vector3(pitch, yaw, 0)
+	if primeira_pessoa:
+		braco.spring_length = 0.0
+		braco.position = Vector3(0, 0.05, -0.1)
+		visual.visible = false
+	else:
+		if braco.spring_length < 1.2:
+			braco.spring_length = 2.8
+		braco.position = Vector3(0.35, 0, 0)
+		visual.visible = true
+	# câmera em foco: interpola até o alvo e volta
+	if Interacoes.modo == "foco" and Interacoes.foco_alvo:
+		_cam_foco_t = minf(1.0, _cam_foco_t + delta * 2.5)
+	else:
+		_cam_foco_t = maxf(0.0, _cam_foco_t - delta * 3.0)
+	if _cam_foco_t > 0.0 and Interacoes.foco_alvo:
+		var k := smoothstep(0.0, 1.0, _cam_foco_t)
+		cam.global_transform = (braco.global_transform * Transform3D(Basis(), Vector3(0, 0, braco.get_hit_length()))).interpolate_with(Interacoes.foco_alvo.global_transform, k)
+	_escolher_alvo()
+
+func _escolher_alvo() -> void:
+	alvo = null
+	if Interacoes.modo != "andar":
+		return
+	var melhor := 1e9
+	var frente := -cam.global_transform.basis.z
+	frente.y = 0
+	frente = frente.normalized()
+	for n in get_tree().get_nodes_in_group("interagivel"):
+		var it := n as Interagivel
+		if not it.is_visible_in_tree():
+			continue
+		var d := it.global_position - (global_position + Vector3(0, 1.0, 0))
+		var dh := Vector2(d.x, d.z)
+		if dh.length() > it.raio:
+			continue
+		var dirh := Vector3(d.x, 0, d.z).normalized()
+		if dh.length() > 0.5 and dirh.dot(frente) < 0.25:
+			continue
+		var t := it.texto()
+		if t == "":
+			continue
+		var custo := dh.length() - dirh.dot(frente) * 0.5
+		if custo < melhor:
+			melhor = custo
+			alvo = it
