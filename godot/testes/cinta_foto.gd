@@ -52,6 +52,10 @@ func _ready() -> void:
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(base + "_eixo.png")
 	var g: Vector3 = Vector3(P.x, P.h, P.z) + P.FUNDO_GANCHO
+	var mg: MeshInstance3D = P.gancho.find_child("gancho", true, false)
+	var ab: AABB = mg.global_transform * mg.get_aabb()
+	print("gancho aabb ", ab, " g ", g, " gancho_pos ", P.gancho.global_position, " escala ", P.gancho.global_transform.basis.get_scale())
+	print("olhal seg0 ", P.olhais[0][4].global_position)
 	print("V entre pernas: %.1f graus" % rad_to_deg((pc + eixo * 0.52 - g).angle_to(pc - eixo * 0.52 - g)))
 	# close maior do gancho (perspectiva)
 	cam.projection = Camera3D.PROJECTION_PERSPECTIVE
@@ -60,4 +64,10 @@ func _ready() -> void:
 	for i in 4: await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(base + "_gancho2.png")
+	# close do gancho pelo lado da perna (olhal visto de perfil, contorno do arame)
+	cam.global_position = g + eixo * 0.30 + lado * 0.12 + Vector3(0, 0.02, 0)
+	cam.look_at(g + Vector3(0, -0.03, 0))
+	for i in 4: await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(base + "_gancho3.png")
 	get_tree().quit()
