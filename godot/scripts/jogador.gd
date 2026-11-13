@@ -16,6 +16,15 @@ const ALTURA_OLHO := 1.55
 const ALT_CAPACETE := 0.215      # do osso Head (nuca) até a base do capacete, no espaço do osso
 var vel_nativa := {}             # m/s que cada animação "anda" sozinha (para os pés não escorregarem)
 var _fov_alvo := 70.0
+# pose de segurar a botoeira: IK de 2 ossos no braço direito (ombro→cotovelo→mão)
+var ik_braco: TwoBoneIK3D
+var alvo_mao: Node3D
+var polo_cotovelo: Node3D
+var mao: BoneAttachment3D        # osso RightHandProp: onde a botoeira fica presa
+var segurando := false
+var _ik_peso := 0.0
+const MAO_ALVO := Vector3(-0.13, 1.10, 0.22)    # na frente do peito, lado direito (o boneco olha para +Z)
+const COTOVELO_POLO := Vector3(-0.35, 0.55, -0.45)
 var maquina
 var primeira_pessoa := false
 var yaw := 0.0
@@ -73,6 +82,7 @@ func _carregar_visual() -> void:
 			mi.visible = mi.name in usar
 		anim = visual.find_child("AnimationPlayer", true, false)
 		_tirar_root_motion()
+		_montar_ik()
 		atualizar_epi()
 		# capacete amarelo preso no osso da cabeça
 		var esq := visual.find_child("Skeleton*", true, false) as Skeleton3D
@@ -157,6 +167,34 @@ func _tirar_root_motion() -> void:
 			for k in n:
 				var v: Vector3 = a.track_get_key_value(t, k)
 				a.track_set_key_value(t, k, Vector3(ini.x, v.y, ini.z))
+
+func _montar_ik() -> void:
+	var esq: Skeleton3D = null
+	for n in visual.find_children("*", "Skeleton3D", true, false):
+		esq = n
+	if esq == null or esq.find_bone("RightArm") < 0:
+		return
+	alvo_mao = Node3D.new()
+	alvo_mao.name = "AlvoMao"
+	visual.add_child(alvo_mao)
+	alvo_mao.position = MAO_ALVO / visual.scale.x
+	polo_cotovelo = Node3D.new()
+	polo_cotovelo.name = "PoloCotovelo"
+	visual.add_child(polo_cotovelo)
+	polo_cotovelo.position = COTOVELO_POLO / visual.scale.x
+	ik_braco = TwoBoneIK3D.new()
+	esq.add_child(ik_braco)
+	ik_braco.set_setting_count(1)
+	ik_braco.set_root_bone_name(0, "RightArm")
+	ik_braco.set_middle_bone_name(0, "RightForeArm")
+	ik_braco.set_end_bone_name(0, "RightHand")
+	ik_braco.set_target_node(0, ik_braco.get_path_to(alvo_mao))
+	ik_braco.set_pole_node(0, ik_braco.get_path_to(polo_cotovelo))
+	ik_braco.influence = 0.0
+	if esq.find_bone("RightHandProp") >= 0:
+		mao = BoneAttachment3D.new()
+		mao.bone_name = "RightHandProp"
+		esq.add_child(mao)
 
 func atualizar_epi() -> void:
 	if visual == null:
@@ -260,6 +298,10 @@ func _physics_process(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	_ignorar_mouse = maxf(0.0, _ignorar_mouse - delta)
+	# braço sobe/desce suave para segurar a botoeira
+	_ik_peso = move_toward(_ik_peso, 1.0 if segurando else 0.0, delta * 3.0)
+	if ik_braco:
+		ik_braco.influence = smoothstep(0.0, 1.0, _ik_peso)
 	# segue a posição interpolada do corpo (sem tremido entre física e tela), com leve atraso
 	var corpo := get_global_transform_interpolated().origin + Vector3(0, ALTURA_OLHO, 0)
 	if primeira_pessoa:

@@ -26,7 +26,8 @@ const CAPACIDADE_KG := 3000.0
 const OFF_CINTA := 0.95    # do gancho até o centro da bobina pendurada (cinta + moitão)
 const FUNDO_GANCHO := Vector3(0.09, 0.075, 0.0)   # curva do gancho em relação à origem do modelo (origem embaixo)
 const TOPO_MOITAO := 0.70                         # topo do moitão, onde o cabo de aço entra
-const CABO_BOTOEIRA := 9.0 # alcance horizontal do cabo da botoeira (do carro até a mão)
+const CABO_BOTOEIRA := 9.0
+const BOTOEIRA_NA_MAO := Vector3(0.0, -0.06, 0.0)    # a pegada (y 0,06 no modelo) fica na palma # alcance horizontal do cabo da botoeira (do carro até a mão)
 
 var maquina                    # máquina mais perto do gancho (a ponte serve todas as do galpão)
 var maquinas: Array = []
@@ -482,7 +483,16 @@ func _atualizar(_delta: float) -> void:
 		_desenhar_cinta()
 	# botoeira: na mão do operador quando em uso; senão pendurada ao lado do gancho (fora da carga)
 	var bpos: Vector3
-	if operando and jogador:
+	if jogador:
+		jogador.segurando = operando
+	if operando and jogador and jogador.mao and jogador._ik_peso > 0.5:
+		# presa no osso da mão direita: segue o braço e a animação
+		var yv: float = jogador.visual.rotation.y
+		var mp: Vector3 = jogador.mao.global_position
+		bpos = mp + Basis(Vector3.UP, yv) * BOTOEIRA_NA_MAO
+		# painel virado para o rosto do operador, inclinado ~25° para ele ler os botões
+		botoeira.rotation = Vector3(deg_to_rad(-25.0), yv + PI, 0)
+	elif operando and jogador:
 		var yv: float = jogador.visual.rotation.y
 		bpos = jogador.global_position + Basis(Vector3.UP, yv) * Vector3(-0.22, 0.62, 0.32)
 		botoeira.rotation.y = yv
