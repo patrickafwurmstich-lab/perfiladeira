@@ -99,16 +99,31 @@ func _rodar() -> void:
 	P._engatar_ou_soltar()
 	ok(P.carga != null, "não solta a carga no ar")
 	# acelera a ponte: a carga tem que balançar
-	P.operando = true
-	Interacoes.modo = "foco"
+	await foto("berco", Vector3(-11.8, 1.6, -2.6), Vector3(-10.0, 0.6, -4.5))
+	j.global_position = Vector3(P.x + 1.5, 0.05, P.z + 3.5)
+	j.reset_physics_interpolation()
+	await _q(3)
+	P._pegar()
+	ok(Interacoes.modo == "ponte" and P.operando, "botoeira na mão (modo ponte)")
 	Input.action_press("direita")
 	await _seg(1.0)
 	Input.action_release("direita")
 	await _seg(0.3)
 	ok(P.balanco.length() > 0.005, "carga balança quando a ponte acelera (%.1f°)" % rad_to_deg(P.balanco.length()))
-	await foto("ponte_levando", Vector3(-6.0, 3.0, 4.0), P._pos_carga())
-	P.operando = false
-	Interacoes.modo = "andar"
+	ok(P.botoeira.global_position.distance_to(j.global_position) < 1.2, "a botoeira está na mão do operador")
+	await foto("ponte_na_mao")
+	# cabo da botoeira: tenta levar a ponte para longe do jogador
+	var x0: float = P.x
+	Input.action_press("direita")
+	await _seg(2.0)
+	for k in 60:
+		P.x = clampf(P.x + 0.3, -100, 100)
+		await _q()
+		if Vector2(P.x - j.global_position.x, P.z - j.global_position.z).length() > P.CABO_BOTOEIRA: break
+	Input.action_release("direita")
+	P.x = x0
+	Interacoes.sair_foco()
+	ok(not P.operando and Interacoes.modo == "andar", "E larga a botoeira")
 	P.x = m.to_global(Vector3(m.X_DESB, 0, 0)).x + 0.08
 	P.z = 1.3
 	P.h = m.Y_DESB + P.OFF_CINTA

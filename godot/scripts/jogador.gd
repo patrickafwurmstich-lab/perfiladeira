@@ -178,7 +178,7 @@ func _tocar(nome: String) -> void:
 
 ## o olhar com o mouse é lido em _input (antes da interface), então nenhum elemento de tela o "engole"
 func _input(ev: InputEvent) -> void:
-	if Interacoes.modo != "andar":
+	if Interacoes.modo != "andar" and Interacoes.modo != "ponte":
 		return
 	if ev is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if _ignorar_mouse > 0.0:
@@ -188,6 +188,8 @@ func _input(ev: InputEvent) -> void:
 		pitch = clampf(pitch - rel.y * SENS, -1.2, 0.9)
 
 func _unhandled_input(ev: InputEvent) -> void:
+	if Interacoes.modo == "ponte" and ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if Interacoes.modo != "andar":
 		return
 	if ev is InputEventMouseButton and ev.pressed:

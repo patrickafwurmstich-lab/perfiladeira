@@ -46,14 +46,16 @@ func _ready() -> void:
 	for i in 3:
 		var bx := -10.6 + i * 1.9
 		var b: Node3D = berco_m.instantiate()
-		b.position = Vector3(bx, 0.06, -4.5)
+		b.position = Vector3(bx, 0.0, -4.5)
+		b.rotation.y = PI / 2          # selas em V atravessadas: a bobina deita no mesmo sentido do mandril
 		add_child(b)
-		ponte.nova_bobina(Vector3(bx, 0.45 + 0.316, -4.5), cods[i])
+		ponte.nova_bobina(Vector3(bx, 0.55, -4.5), cods[i])
 	jogador = Jogador.new()
 	jogador.maquina = maquina
 	jogador.position = Vector3(-9.5, 0.05, 5.0)
 	jogador.yaw = -0.4
 	add_child(jogador)
+	ponte.jogador = jogador
 	hud = HUD.new()
 	hud.jogador = jogador
 	hud.maquina = maquina

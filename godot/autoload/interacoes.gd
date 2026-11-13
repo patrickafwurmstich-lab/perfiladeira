@@ -44,6 +44,13 @@ func focar(alvo: Node3D, dono: Object, texto_dica: String) -> void:
 	_mudar("foco")
 	dica.emit(texto_dica)
 
+## operar algo segurando na mão (botoeira): o jogador não anda, mas olha em volta com a câmera normal
+func operar(dono: Object, texto_dica: String) -> void:
+	foco_alvo = null
+	foco_dono = dono
+	_mudar("ponte")
+	dica.emit(texto_dica)
+
 func sair_foco() -> void:
 	if foco_dono and foco_dono.has_method("on_foco_saiu"):
 		foco_dono.on_foco_saiu()
@@ -61,6 +68,13 @@ func _mudar(m: String) -> void:
 	modo_mudou.emit(m)
 
 func _unhandled_input(ev: InputEvent) -> void:
+	if modo == "ponte":
+		if ev.is_action_pressed("sair") or ev.is_action_pressed("interagir"):
+			get_viewport().set_input_as_handled()
+			sair_foco()
+		elif ev is InputEventKey and foco_dono and foco_dono.has_method("on_foco_tecla"):
+			foco_dono.on_foco_tecla(ev)
+		return
 	if modo != "foco":
 		return
 	if ev.is_action_pressed("sair") or ev.is_action_pressed("interagir"):

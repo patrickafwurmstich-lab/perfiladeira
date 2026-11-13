@@ -1,8 +1,11 @@
 class_name PonteRolante
 extends Node3D
-## Ponte rolante 3 t. O jogador pega a BOTOEIRA (pendurada no carro) e opera de verdade:
-##  A/D = ponte (eixo X, ao longo do galpão) · W/S = carro (eixo Z) · R/F = sobe/desce o gancho
-##  G = engatar/soltar a cinta na bobina · Esc/E = larga a botoeira.
+## Ponte rolante 3 t. O jogador pega a BOTOEIRA (pendurada no carro) e opera de verdade, com ela
+## NA MÃO e a câmera normal dele (gira no mouse para acompanhar a carga), como um operador de galpão:
+##  W/S = afasta/aproxima a carga de você · A/D = para os lados (a ponte só anda nos 2 eixos dela:
+##  a tecla escolhe o eixo que mais combina com para onde você está olhando)
+##  R/F = sobe/desce o gancho · G = engatar/soltar a cinta · Esc/E = larga a botoeira.
+## O cabo da botoeira tem 9 m: a ponte não se afasta mais que isso de você (ande junto).
 ## A carga balança (pêndulo com o comprimento real do cabo) quando a ponte/carro aceleram ou freiam.
 ## Bobina no mandril: tem que ficar COAXIAL (±3 cm) ao lado do eixo; aí "empurra" a bobina para dentro.
 ## Velocidades de uma ponte de galpão real (não aceleram com o relógio: quem opera é o jogador).
@@ -21,8 +24,10 @@ const Z_MIN := -18.5
 const Z_MAX := 18.5
 const CAPACIDADE_KG := 3000.0
 const OFF_CINTA := 0.95    # do gancho até o centro da bobina pendurada (cinta + moitão)
+const CABO_BOTOEIRA := 9.0 # alcance horizontal do cabo da botoeira (do carro até a mão)
 
 var maquina
+var jogador
 var x := -7.2
 var z := -2.0
 var h := 4.0               # altura do gancho
@@ -35,6 +40,7 @@ var bobinas: Array = []    # bobinas soltas no galpão: {no: Node3D, pos: Vector
 var balanco := Vector2.ZERO        # ângulo do pêndulo (x, z) em rad
 var balanco_v := Vector2.ZERO
 var encaixando := 0.0
+var _avisou_cabo := false
 
 var viga: Node3D
 var carro: Node3D
@@ -145,8 +151,9 @@ func _txt_botoeira() -> String:
 
 func _pegar() -> void:
 	operando = true
-	Interacoes.focar(foco, self, "")
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	Interacoes.operar(self, "")
+	if DisplayServer.get_name() != "headless":
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_dica()
 
 func on_foco_saiu() -> void:
@@ -160,7 +167,7 @@ func on_foco_clique(_ev, _hit) -> void:
 	pass
 
 func _dica() -> void:
-	var s := "PONTE · A/D ponte · W/S carro · R/F gancho · G engata/solta · Esc larga  |  gancho %.2f m" % h
+	var s := "PONTE · W/S afasta/aproxima · A/D lados · R/F gancho · G engata/solta · mouse olha · E larga  |  gancho %.2f m" % h
 	if carga:
 		s += "  |  CARGA %s %.0f kg" % [carga.codigo, carga.kg]
 	var alvo := _alvo_proximo()
@@ -237,17 +244,44 @@ func _physics_process(delta: float) -> void:
 	var ax := 0.0
 	var az := 0.0
 	var ah := 0.0
-	if operando and Interacoes.modo == "foco" and encaixando <= 0.0:
-		ax = Input.get_axis("esquerda", "direita")
-		az = Input.get_axis("frente", "tras")
+	if operando and Interacoes.modo != "ponte":
+		operando = false
+	if operando and encaixando <= 0.0:
+		# teclas relativas à câmera, travadas no eixo da ponte (X) ou do carro (Z) que mais combina
+		var ent := Vector2(Input.get_axis("esquerda", "direita"), Input.get_axis("frente", "tras"))
+		if ent.length() > 0.1 and jogador:
+			var b: Basis = jogador.cam.global_transform.basis
+			var fr := Vector3(-b.z.x, 0, -b.z.z).normalized()
+			var di := Vector3(b.x.x, 0, b.x.z).normalized()
+			var mundo := di * ent.x - fr * ent.y
+			if absf(mundo.x) >= absf(mundo.z):
+				ax = signf(mundo.x)
+			else:
+				az = signf(mundo.z)
 		ah = float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))
 	var vx0 := vx
 	var vz0 := vz
 	vx = move_toward(vx, ax * V_PONTE, ACEL * delta)
 	vz = move_toward(vz, az * V_CARRO, ACEL * delta)
 	vh = ah * V_GANCHO
-	x = clampf(x + vx * delta, X_MIN, X_MAX)
-	z = clampf(z + vz * delta, Z_MIN, Z_MAX)
+	var nx := clampf(x + vx * delta, X_MIN, X_MAX)
+	var nz := clampf(z + vz * delta, Z_MIN, Z_MAX)
+	if operando and jogador:
+		# o cabo da botoeira não estica: além do alcance a ponte para
+		var pj: Vector3 = jogador.global_position
+		var d_novo := Vector2(nx - pj.x, nz - pj.z).length()
+		if d_novo > CABO_BOTOEIRA and d_novo > Vector2(x - pj.x, z - pj.z).length():
+			if not _avisou_cabo:
+				_avisou_cabo = true
+				Bus.aviso.emit("Cabo da botoeira no limite: largue (E), ande junto e pegue de novo.")
+			nx = x
+			nz = z
+			vx = 0.0
+			vz = 0.0
+		else:
+			_avisou_cabo = false
+	x = nx
+	z = nz
 	var h_min := H_MIN
 	if carga:
 		h_min = maxf(H_MIN, carga.r + OFF_CINTA)       # a bobina apoia no chão
@@ -298,13 +332,24 @@ func _atualizar(_delta: float) -> void:
 		cinta.scale.y = maxf((Vector3(x, h, z) - p).length(), 0.01)
 		cinta.look_at(Vector3(x, h, z), Vector3(1, 0, 0))
 		cinta.rotate_object_local(Vector3.RIGHT, PI / 2)
-	# botoeira pendurada a 1,3 m do chão; o cabo sobe até o carro
-	var bpos := Vector3(x + 0.6, 0.9, z + 0.6)
+	# botoeira: na mão do operador quando em uso; senão pendurada ao lado do gancho (fora da carga)
+	var bpos: Vector3
+	if operando and jogador:
+		var yv: float = jogador.visual.rotation.y
+		bpos = jogador.global_position + Basis(Vector3.UP, yv) * Vector3(-0.22, 0.62, 0.32)
+		botoeira.rotation.y = yv
+	else:
+		bpos = Vector3(x + 0.9, 0.85, z + 1.3)
+		botoeira.rotation.y = 0.0
 	botoeira.position = bpos
-	cabo_bot.position = (bpos + Vector3(0, 0.72, 0) + Vector3(x + 0.6, Y_CARRO, z + 0.6)) * 0.5
-	cabo_bot.scale = Vector3(1, Y_CARRO - (bpos.y + 0.72), 1)
-	# câmera do operador: atrás da botoeira, olhando para o gancho/carga
-	var olho := bpos + Vector3(0.0, 1.0, 3.2)
-	var alvo := _pos_carga() if carga else Vector3(x, maxf(h - 0.5, 0.8), z)
-	foco.global_transform = Transform3D(Basis(), olho).looking_at(alvo.lerp(bpos, 0.35), Vector3.UP)
+	# cabo da botoeira: do carro até o topo da botoeira (fica inclinado quando você se afasta)
+	var topo_b := bpos + Vector3(0, 0.72, 0)
+	var ancora := Vector3(x + 0.5, Y_CARRO - 0.3, z + 0.5)
+	var dcb := ancora - topo_b
+	cabo_bot.position = (topo_b + ancora) * 0.5
+	if dcb.length() > 0.01:
+		var yv2 := dcb.normalized()
+		var ref := Vector3.FORWARD if absf(yv2.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT
+		var xv := yv2.cross(ref).normalized()
+		cabo_bot.basis = Basis(xv, yv2 * dcb.length(), xv.cross(yv2))
 	som_motor.volume_db = -10.0 if (absf(vx) + absf(vz) + absf(vh)) > 0.01 else -80.0
