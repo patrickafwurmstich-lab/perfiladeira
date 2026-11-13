@@ -15,6 +15,7 @@ Relogio="*res://autoload/relogio.gd"
 Som="*res://autoload/som.gd"
 Entrada="*res://autoload/entrada.gd"
 Interacoes="*res://autoload/interacoes.gd"
+Registro="*res://autoload/registro.gd"
 
 [display]
 

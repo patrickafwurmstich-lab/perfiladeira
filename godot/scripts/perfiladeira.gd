@@ -30,6 +30,10 @@ const FATOR_VISUAL := 3.0      # decisão da sala: 3x a real = 0,6 m/s (telha de
 const V_JOG := 0.12
 const MESA_CAP := 60
 const NINHO := 0.006           # altura de cada telha encaixada na pilha
+const LARG_UTIL := 0.98        # largura útil da TP-40 (m² vendável = L × 0,98)
+const X_SENSOR_FIM := X_E0 - 0.6   # sensor de fim de chapa (alavanca na entrada)
+const T_CORTE := 0.9           # ciclo da guilhotina: pisador desce, lâmina desce/sobe, pisador sobe
+const T_SIRENE := 3.0          # sirene + giroflex antes de qualquer movimento automático
 
 # ---- estado físico ----
 var energia := false            # disjuntor do quadro
@@ -52,7 +56,7 @@ var velocidade := 1.0           # 0,6 a 1,0 da nominal
 var correcao_mm := 0.0
 
 # bobina e chapa
-var bobina := {"presente": true, "metros_total": 247.0, "metros": 247.0, "cinta": true, "travada": true, "codigo": "BOB-001", "kg": 1000.0}
+var bobina := {"presente": true, "metros_total": 247.0, "metros": 247.0, "cinta": true, "travada": false, "codigo": "BOB-001", "kg": 1000.0}
 var fita := "presa"             # "presa" (cinta) | "solta" | "puxando" | "na_mesa" | "enfiada" | "nenhuma"
 var cabeca := X_ENTRADA         # x da ponta da chapa dentro da máquina
 var cauda_s := -1.0             # distância andada desde que a bobina acabou (-1 = bobina não acabou)
@@ -64,7 +68,11 @@ var desgaste := 0.12            # máquina usada
 var graxa := [0.3, 0.6, 0.2, 0.5, 0.4, 0.3]
 var produzidas := 0
 var sucata_m := 0.0
+var puxado_mao_m := 0.0
+var _comp_ult := 0.0
+var consumido_m := 0.0          # chapa que saiu de bobinas (conservação: = pilha + sucata + estoque + o que está na linha)
 var estoque_retirado := 0
+var estoque_retirado_m := 0.0
 var energia_kwh := 0.0
 var ultima_medida := {}
 var teste_feito := false
@@ -73,6 +81,12 @@ var perfeita_dada := false
 var enrosco_x := 0.0
 var enrosco_iminente := 0.0     # segundos até enroscar (o chiado avisa antes)
 var aviso_10 := false
+var protecao_fechada := true    # tampa de tela sobre os rolos, com chave de segurança
+var freio_ok := false           # freio do desbobinador ajustado (sem ele a bobina embala e faz barriga)
+var barriga_m := 0.0            # chapa frouxa entre bobina e mesa
+var ponta_refilada := false     # a ponta da bobina vem amassada: corta-se fora antes da peça teste
+var lamina_em_cima := true      # sensor de lâmina em repouso
+var enrosco_aleatorio := true   # testes automáticos desligam o sorteio para serem repetíveis
 
 # ---- nós visuais ----
 var modelo: Node3D
@@ -85,7 +99,8 @@ var bobina_grp: Node3D
 var bobina_malha: MeshInstance3D
 var bobina_furo: MeshInstance3D
 var cintas: Array = []
-var fita_alim: MeshInstance3D   # da bobina até a mesa
+var fita_alim: MeshInstance3D   # da bobina até a mesa (2 trechos para mostrar a barriga)
+var fita_alim2: MeshInstance3D
 var fita_mat: ShaderMaterial
 var fita_malha: MeshInstance3D  # dentro da máquina (formando)
 var peca_malha: MeshInstance3D  # telha crescendo depois do corte
@@ -126,6 +141,9 @@ func _ready() -> void:
 	_montar_bobina_visual()
 	_montar_fita()
 	_montar_pontaletes()
+	_montar_pisador_e_tambor()
+	_montar_protecao()
+	_montar_alavancas()
 	_montar_manivelas()
 	_montar_graxeiras()
 	_montar_colisao()
@@ -157,18 +175,39 @@ func _ready() -> void:
 # ======================================================================
 func etapas() -> Array:
 	return [
+		["Vestir o EPI no armário (luva, óculos, protetor auricular)", Interacoes.epi],
 		["Ligar o disjuntor da perfiladeira no quadro elétrico", energia],
 		["Ligar a CHAVE GERAL na caixa de comando", chave_geral],
 		["Emergência liberada e RESET apertado", chave_geral and not emergencia and not precisa_reset],
-		["Bobina no desbobinador com o mandril travado", bobina.presente and bobina.travada],
+		["Travar o mandril da bobina (alavanca)", bobina.presente and bobina.travada],
+		["Ajustar o freio do desbobinador", freio_ok],
 		["Cortar as cintas da bobina", bobina.presente and not bobina.cinta],
 		["Puxar a ponta da chapa até a mesa de entrada", fita in ["na_mesa", "enfiada"]],
 		["Passar a chapa até a guilhotina (AVANÇO LENTO, modo manual)", fita == "enfiada"],
+		["Refilar a ponta amassada (CORTE MANUAL — vai para a sucata)", ponta_refilada],
 		["Centralizar as guias (desvio ≤ 2 mm, folga ≤ 3 mm)", absf(desvio_mm) <= 2.0 and folga_mm <= 3.0 and fita == "enfiada"],
 		["Cortar uma PEÇA TESTE (IHM, modo manual)", teste_feito],
 		["Medir a peça com a trena e corrigir (erro ≤ 2 mm)", medida_ok],
-		["Modo AUTOMÁTICO e apertar LIGA", rodando],
+		["Proteção dos rolos fechada, modo AUTOMÁTICO e LIGA", rodando],
 	]
+
+## estado industrial formal (o que a IHM e os outros sistemas leem)
+func fase() -> String:
+	if not energia: return "DESENERGIZADA"
+	if not chave_geral: return "CHAVE GERAL DESLIGADA"
+	if emergencia: return "EMERGÊNCIA"
+	if falha != "": return "FALHA: " + falha.to_upper()
+	if precisa_reset: return "AGUARDA RESET"
+	if not bobina.presente: return "SEM BOBINA"
+	if fita in ["presa", "solta", "puxando"]: return "PREPARANDO BOBINA"
+	if fita == "na_mesa": return "ENFIANDO"
+	if cauda_s >= 0.0: return "FIM DE CHAPA"
+	if corte_t > 0.0: return "CORTANDO"
+	if rodando: return "PRODUÇÃO"
+	if teste_ativo: return "PEÇA TESTE"
+	if not ponta_refilada: return "AGUARDA REFILE"
+	if not medida_ok: return "AGUARDA APROVAÇÃO DA PEÇA"
+	return "PRONTA"
 
 func proxima_etapa() -> String:
 	for e in etapas():
@@ -223,8 +262,11 @@ func cmd_reset() -> void:
 	if falha == "enrosco" and amassado.visible:
 		Bus.aviso.emit("RESET recusado: ainda tem chapa enroscada nos rolos.")
 		return
+	if falha == "protecao" and not protecao_fechada:
+		Bus.aviso.emit("RESET recusado: a proteção dos rolos está aberta.")
+		return
 	precisa_reset = false
-	if falha in ["emergencia", "enrosco", "lote", "mesa_cheia", "fim_bobina", "energia"]:
+	if falha in ["emergencia", "enrosco", "lote", "mesa_cheia", "fim_bobina", "energia", "protecao"]:
 		if falha == "mesa_cheia" and pilha.size() >= MESA_CAP:
 			Bus.aviso.emit("Sensor da mesa ainda ocupado: retire a pilha.")
 			precisa_reset = true
@@ -252,12 +294,18 @@ func cmd_liga() -> void:
 		Bus.aviso.emit("LIGA só funciona no modo AUTOMÁTICO. No manual use AVANÇO LENTO ou PEÇA TESTE."); return
 	if fita != "enfiada":
 		Bus.aviso.emit("LIGA recusado: a chapa não chegou na guilhotina (passe com AVANÇO LENTO)."); return
+	if not protecao_fechada:
+		Bus.aviso.emit("LIGA recusado: proteção dos rolos aberta (chave de segurança)."); return
+	if cauda_s >= 0.0:
+		Bus.aviso.emit("LIGA recusado: fim de chapa. Só AVANÇO LENTO para tirar o resto."); return
+	if not ponta_refilada or not medida_ok:
+		Bus.aviso.emit("LIGA recusado: refile a ponta e aprove a peça teste com a trena antes da produção."); return
 	if pilha.size() >= MESA_CAP:
 		Bus.aviso.emit("LIGA recusado: sensor da mesa de saída ocupado."); return
 	if produzidas >= quantidade:
 		Bus.aviso.emit("Lote já concluído. Zere o contador na IHM ou aumente a quantidade."); return
 	rodando = true
-	sirene_t = 2.0                # sirene de partida antes de qualquer movimento
+	sirene_t = T_SIRENE           # sirene + giroflex antes de qualquer movimento
 	Som.tocar("sirene", self, global_position + Vector3(-1, 2.2, 1))
 	_estado()
 
@@ -284,6 +332,10 @@ func cmd_jog(segura: bool) -> void:
 			Bus.aviso.emit("AVANÇO LENTO só no modo MANUAL."); return
 		if fita not in ["na_mesa", "enfiada"]:
 			Bus.aviso.emit("Não tem chapa nos rolos para avançar."); return
+		if not bobina.travada:
+			Bus.aviso.emit("AVANÇO LENTO recusado: sensor do mandril — bobina destravada."); return
+		if cauda_s >= 0.0 and _cauda_x() >= X_E1:
+			Bus.aviso.emit("A chapa já saiu dos rolos: retire o retalho com a mão."); return
 	jog = segura
 
 func cmd_peca_teste() -> void:
@@ -294,15 +346,26 @@ func cmd_peca_teste() -> void:
 		Bus.aviso.emit("PEÇA TESTE é no modo MANUAL."); return
 	if fita != "enfiada":
 		Bus.aviso.emit("Passe a chapa até a guilhotina antes da peça teste."); return
+	if not ponta_refilada:
+		Bus.aviso.emit("Refile a ponta primeiro: avance uns 30 cm com AVANÇO LENTO e use CORTE MANUAL."); return
+	if not protecao_fechada:
+		Bus.aviso.emit("PEÇA TESTE recusada: proteção dos rolos aberta."); return
+	if not bobina.travada:
+		Bus.aviso.emit("PEÇA TESTE recusada: mandril destravado."); return
 	teste_ativo = true
-	sirene_t = 1.0
+	sirene_t = T_SIRENE * 0.5
 	Som.tocar("sirene", self, global_position + Vector3(-1, 2.2, 1), -6.0)
 	_estado()
 
 func cmd_cortar_manual() -> void:
-	if pode_mover() != "" or modo != "manual" or fita != "enfiada" or peca_m < 0.3:
-		Bus.aviso.emit("Corte manual: precisa de chapa passada do corte (pelo menos 30 cm) e modo manual."); return
-	_cortar()
+	var p := pode_mover()
+	if p == "" and modo == "manual" and fita == "enfiada" and peca_m >= 0.25 and corte_t <= 0.0:
+		_cortar()
+		return
+	if fita == "enfiada" and peca_m < 0.25:
+		Bus.aviso.emit("Corte manual: avance pelo menos 25 cm de chapa depois da faca (AVANÇO LENTO).")
+	else:
+		Bus.aviso.emit("Corte manual recusado: %s" % (p if p != "" else "precisa de modo MANUAL e chapa na guilhotina"))
 
 func cmd_zerar() -> void:
 	produzidas = 0
@@ -323,7 +386,7 @@ func _parar_tudo(motivo: String) -> void:
 	jog = false
 	teste_ativo = false
 	sirene_t = 0.0
-	if motivo == "emergencia" or motivo == "energia":
+	if motivo in ["emergencia", "energia", "protecao"]:
 		v = 0.0                    # parada brusca
 	if motivo != "":
 		falha = motivo
@@ -340,9 +403,9 @@ func _physics_process(delta: float) -> void:
 	var alvo := 0.0
 	var ok := pode_mover() == ""
 	if ok and corte_t <= 0.0 and sirene_t <= 0.0:
-		if jog:
+		if jog and bobina.travada and not (cauda_s >= 0.0 and _cauda_x() >= X_E1):
 			alvo = V_JOG
-		elif (rodando or teste_ativo) and fita == "enfiada":
+		elif (rodando or teste_ativo) and fita == "enfiada" and protecao_fechada:
 			alvo = V_REAL * FATOR_VISUAL * velocidade
 	if not ok:
 		alvo = 0.0
@@ -353,7 +416,15 @@ func _physics_process(delta: float) -> void:
 		corte_t -= dt
 	var ds := v * dt
 	if ds > 0.0:
-		_avancar(ds, dt)
+		_avancar(_limitar(ds), dt)
+	# sem freio, quando a linha desacelera a bobina embala e solta chapa a mais (barriga)
+	var v_ant := _v_ant
+	_v_ant = v
+	if not freio_ok and bobina.presente and v < v_ant and fita in ["na_mesa", "enfiada"]:
+		var antes := barriga_m
+		barriga_m = minf(0.6, barriga_m + (v_ant - v) * 0.9)
+		if antes < 0.15 and barriga_m >= 0.15:
+			Bus.aviso.emit("A bobina embalou e fez BARRIGA de chapa: ajuste o freio do desbobinador!")
 	# energia: motor em vazio 15% ligado, 100% formando. 1 h de jogo = 72 s reais.
 	if energia and chave_geral:
 		var kw := KW * (1.0 if v > 0.01 else 0.15)
@@ -364,25 +435,46 @@ func _physics_process(delta: float) -> void:
 	_deslizar(dt)
 	_atualizar_visual(dt)
 
+var _v_ant := 0.0
+var _fim_reconhecido := false
+## o encoder para a linha no ponto exato: nunca passa do comprimento (nem no x20)
+func _limitar(ds: float) -> float:
+	var r := ds
+	if fita == "na_mesa" and cabeca < X_CORTE:
+		r = minf(r, X_CORTE - cabeca)
+	if fita == "enfiada" and (rodando or teste_ativo):
+		r = minf(r, maxf(_alvo_corte() - peca_m, 0.0))
+	if cauda_s >= 0.0 and not _fim_reconhecido and _cauda_x() < X_SENSOR_FIM:
+		r = minf(r, X_SENSOR_FIM - _cauda_x())
+	return r
+
 func _avancar(ds: float, dt: float) -> void:
+	if ds <= 0.0:
+		if fita == "enfiada" and (rodando or teste_ativo) and peca_m >= _alvo_corte() - 0.00001:
+			_cortar()
+		return
 	# 1) material sai da bobina (ou a cauda anda depois que ela acabou)
 	if cauda_s < 0.0:
-		var usa := minf(ds, bobina.metros)
+		# o trecho bobina→mesa muda de comprimento conforme o raio diminui: entra na conta
+		var c := _comp_alimentacao()
+		var usa := minf(ds + (c - _comp_ult), bobina.metros)
+		_comp_ult = c
 		bobina.metros -= usa
+		consumido_m += usa
 		if not aviso_10 and bobina.metros < bobina.metros_total * 0.10:
 			aviso_10 = true
 			Som.tocar("bip", caixa)
 			Bus.bobina_acabando.emit(NOME, bobina.metros)
 			Bus.aviso.emit("Bobina com 10%% (%.0f m). Prepare a próxima." % bobina.metros)
 		if bobina.metros <= 0.0:
-			cauda_s = 0.0
+			cauda_s = maxf(0.0, ds - usa)
 			Bus.aviso.emit("Fim da bobina: a ponta final está passando pela máquina.")
 	else:
 		cauda_s += ds
 	# 2) a chapa anda dentro da máquina
 	if fita == "na_mesa":
 		cabeca += ds
-		if cabeca >= X_CORTE:
+		if cabeca >= X_CORTE - 0.00001:
 			cabeca = X_CORTE
 			fita = "enfiada"
 			jog = false
@@ -391,8 +483,10 @@ func _avancar(ds: float, dt: float) -> void:
 			Bus.procedimento.emit(NOME, "enfiada", true)
 	elif fita == "enfiada":
 		peca_m += ds
-		if peca_m >= _alvo_corte():
+		if (rodando or teste_ativo) and peca_m >= _alvo_corte() - 0.00001:
 			_cortar()
+	if barriga_m > 0.0:
+		barriga_m = maxf(0.0, barriga_m - ds * 0.5)
 	# 3) desgaste, graxa e aviso para os outros sistemas
 	var secura := _secura()
 	desgaste = minf(1.0, desgaste + ds * 0.00002 * (1.0 + secura * 2.5))
@@ -400,24 +494,19 @@ func _avancar(ds: float, dt: float) -> void:
 		graxa[i] = maxf(0.0, graxa[i] - ds / 350.0)
 	Bus.metros_formados.emit(NOME, ds)
 	# 4) risco de enrosco (o chiado sobe antes — dá tempo de apertar a emergência)
-	if fita == "enfiada" and enrosco_iminente <= 0.0:
-		var risco := 0.00025 * (1.0 + desgaste * 5.0) * (1.0 + secura * 2.0) * (1.0 + maxf(0.0, absf(desvio_mm) - 8.0) / 4.0) * (1.6 if folga_mm > 6.0 else 1.0) * (1.4 if velocidade > 0.9 else 1.0)
+	if fita == "enfiada" and enrosco_iminente <= 0.0 and enrosco_aleatorio:
+		var risco := 0.00025 * (1.0 + barriga_m * 8.0) * (1.0 + desgaste * 5.0) * (1.0 + secura * 2.0) * (1.0 + maxf(0.0, absf(desvio_mm) - 8.0) / 4.0) * (1.6 if folga_mm > 6.0 else 1.0) * (1.4 if velocidade > 0.9 else 1.0)
 		if rng.randf() < risco * ds:
 			enrosco_iminente = 3.0
 			enrosco_x = X_E0 + PASSO * rng.randi_range(2, N_EST - 2)
-	# 5) cauda passou do corte: a última peça incompleta vira retalho
-	if cauda_s >= 0.0 and _cauda_x() >= X_CORTE:
-		if peca_m > 0.0:
-			sucata_m += peca_m
-			Bus.aviso.emit("Retalho de %.2f m (fim de chapa) foi para a sucata." % peca_m)
-		peca_m = 0.0
-		fita = "nenhuma"
-		bobina.presente = false
+	# 5) sensor de fim de chapa na entrada: a cauda passou → para tudo e avisa
+	if cauda_s >= 0.0 and not _fim_reconhecido and _cauda_x() >= X_SENSOR_FIM - 0.0001:
+		_fim_reconhecido = true
 		_parar_tudo("fim_bobina")
 		precisa_reset = true
 		Som.tocar("buzina", self, global_position + Vector3(0, 2, 1))
 		Bus.bobina_acabou.emit(NOME)
-		Bus.alarme.emit(NOME, "FIM DE BOBINA")
+		Bus.alarme.emit(NOME, "FIM DE CHAPA — RESET, AVANÇO LENTO para tirar o resto e retire o retalho")
 		_estado()
 
 func _alvo_corte() -> float:
@@ -464,11 +553,16 @@ func _enroscar() -> void:
 
 func limpar_enrosco() -> void:
 	# chapa cortada no ponto do enrosco: o que estava depois vira sucata e é preciso passar de novo
-	sucata_m += (X_CORTE - enrosco_x) + peca_m + 0.8
+	# corta-se a chapa 40 cm antes do enrosco: tudo dali até a faca (e o que passou dela) vira sucata
+	var novo := enrosco_x - 0.4
+	sucata_m += (X_CORTE - novo) + peca_m
 	peca_m = 0.0
 	amassado.visible = false
-	cabeca = enrosco_x - 0.4
+	cabeca = novo
 	fita = "na_mesa"
+	ponta_refilada = false
+	teste_feito = false
+	medida_ok = false
 	Bus.aviso.emit("Enrosco cortado. Aperte RESET e passe a chapa de novo com AVANÇO LENTO.")
 	_estado()
 
@@ -478,8 +572,23 @@ func limpar_enrosco() -> void:
 func _cortar() -> void:
 	var L := peca_m
 	peca_m = 0.0
-	corte_t = 0.75
-	Som.tocar("thoc", self, global_position + Vector3(X_CORTE, 1.3, 0), 3.0)
+	corte_t = T_CORTE
+	_thoc_tocado = false
+	Som.tocar("hidraulica_pulso" if Som.bancos.has("hidraulica_pulso") else "click", self, global_position + Vector3(X_CORTE, 1.1, 0), -4.0)
+	if not ponta_refilada:
+		# refile: a ponta amassada da bobina vai para o tambor de sucata (não conta como telha)
+		ponta_refilada = true
+		sucata_m += L
+		var r := MeshInstance3D.new()
+		r.mesh = _malha_telha(L, 0.0, 0.0)
+		r.material_override = _mat_chapa
+		r.position = Vector3(X_CORTE, Y_PASSE, 0)
+		add_child(r)
+		deslizando.append({"no": r, "L": L, "curva": 0.0, "assim": 0.0, "defeito": "refile", "fase": 0, "t": 0.0, "sucata": true, "preso": true})
+		Bus.peca_cortada.emit(NOME, L, "refile")
+		Bus.aviso.emit("Ponta refilada (%.2f m para a sucata). Agora a PEÇA TESTE." % L)
+		_estado()
+		return
 	# defeitos que se veem: guia fora de centro entorta (camber), folga deixa a chapa "nadar",
 	# cassete gasto deixa o perfil assimétrico
 	var curva := (desvio_mm / 1000.0) * 0.18 * L + (rng.randf_range(-1, 1) * (folga_mm - 3.0) * 0.0006 * L if folga_mm > 3.0 else 0.0)
@@ -494,7 +603,7 @@ func _cortar() -> void:
 	no.material_override = _mat_chapa
 	no.position = Vector3(X_CORTE, Y_PASSE, desvio_mm / 1000.0 * 0.3)
 	add_child(no)
-	deslizando.append({"no": no, "L": L, "curva": curva, "assim": assim, "defeito": defeito, "fase": 0, "t": 0.0})
+	deslizando.append({"no": no, "L": L, "curva": curva, "assim": assim, "defeito": defeito, "fase": 0, "t": 0.0, "preso": true})
 	produzidas += 1
 	if teste_ativo:
 		teste_ativo = false
@@ -508,6 +617,9 @@ func _cortar() -> void:
 		Bus.aviso.emit("Lote concluído: %d telhas de %.2f m." % [produzidas, comprimento])
 	_estado()
 
+const TAMBOR := Vector3(5.6, 0.0, 1.35)
+var _thoc_tocado := true
+
 func _malha_telha(L: float, curva: float, assim: float) -> ArrayMesh:
 	var k := "%d_%d_%d" % [int(L * 1000), int(curva * 1000), int(assim * 10)]
 	if not _cache_telha.has(k):
@@ -518,6 +630,22 @@ func _deslizar(dt_ind: float) -> void:
 	for i in range(deslizando.size() - 1, -1, -1):
 		var d: Dictionary = deslizando[i]
 		var no: MeshInstance3D = d.no
+		if d.get("preso", false):
+			# o pisador segura a peça até a lâmina subir (sensor de lâmina em cima)
+			if corte_t > T_CORTE * 0.15:
+				continue
+			d.preso = false
+		if d.get("sucata", false):
+			# retalho escorrega da mesa e cai no tambor de sucata ao lado
+			d.t += dt_ind
+			var k := clampf(d.t / 0.8, 0.0, 1.0)
+			no.position = Vector3(X_CORTE, Y_PASSE, 0).lerp(TAMBOR + Vector3(-d.L * 0.5, 0.5, 0), k)
+			no.rotation.z = -k * 1.2
+			if k >= 1.0:
+				Som.tocar("clank", null, global_position + TAMBOR, -4.0)
+				no.queue_free()
+				deslizando.remove_at(i)
+			continue
 		if d.fase == 0:
 			# desliza sobre o apoio de rolos até a traseira passar do fim do apoio
 			no.position.x += 1.6 * dt_ind
@@ -545,6 +673,8 @@ func _deslizar(dt_ind: float) -> void:
 
 func retirar_pilha() -> int:
 	var n := pilha.size()
+	for t in pilha:
+		estoque_retirado_m += t.L
 	for no in pilha_nos:
 		no.queue_free()
 	pilha_nos.clear()
@@ -631,11 +761,13 @@ func _atualizar_visual(dt: float) -> void:
 		fim = Vector2(X_DESB + r + 0.12, Y_DESB - r - 0.5)
 		mostra = true
 	fita_alim.visible = mostra and bobina.presente or (mostra and cauda_s >= 0.0)
+	fita_alim2.visible = fita_alim.visible
 	if fita_alim.visible:
-		var dd := fim - ini
-		fita_alim.position = Vector3((ini.x + fim.x) * 0.5, (ini.y + fim.y) * 0.5, desvio_mm / 1000.0 if fita != "puxando" else clampf(ponta_mao.z, -0.6, 1.2) * 0.5)
-		fita_alim.rotation.z = atan2(dd.y, dd.x)
-		fita_alim.scale.x = maxf(dd.length(), 0.01)
+		var zf := desvio_mm / 1000.0 if fita != "puxando" else clampf(ponta_mao.z, -0.6, 1.2) * 0.5
+		# barriga: o meio da chapa cai (sem freio a bobina solta chapa a mais)
+		var meio := (ini + fim) * 0.5 - Vector2(0, barriga_m * 0.55 if fita in ["na_mesa", "enfiada"] else 0.0)
+		_segmento(fita_alim, ini, meio, zf)
+		_segmento(fita_alim2, meio, fim, zf)
 	# fita dentro da máquina: shader corta na ponta (cabeça) e no fim (cauda)
 	var cab := cabeca if fita in ["na_mesa", "enfiada"] else X_ENTRADA - 1.0
 	fita_mat.set_shader_parameter("cabeca", cab)
@@ -646,18 +778,33 @@ func _atualizar_visual(dt: float) -> void:
 	peca_malha.visible = fita == "enfiada" and peca_m > 0.005
 	if peca_malha.visible:
 		peca_malha.scale.x = peca_m
+	# tampa de proteção abre/fecha (articulada no lado de trás)
+	_tampa_ang = move_toward(_tampa_ang, 0.0 if protecao_fechada else 1.6, dt * 2.5 / maxf(Relogio.vel, 1))
+	tampa.rotation.x = -_tampa_ang
+	alav_mandril.rotation.z = -1.2 if bobina.travada else 0.0
+	volante_freio.rotation.z = -2.0 if freio_ok else 0.0
 	# rolos giram só onde tem chapa puxando; todos estão engrenados pela corrente
 	if dsv > 0.0:
 		for i in N_EST:
 			if rolos_inf[i]: rolos_inf[i].rotation.z -= dsv / R_INF
 			if rolos_sup[i]: rolos_sup[i].rotation.z += dsv / R_SUP
-	# lâmina da guilhotina (desce 0,25 m e volta)
+	# guilhotina: pisador desce → lâmina desce (THOC no fundo) → lâmina sobe → pisador sobe
+	var tt := 1.0 - corte_t / T_CORTE if corte_t > 0.0 else 1.0
+	var kl := 0.0
+	var kp := 0.0
+	if corte_t > 0.0:
+		kp = clampf(tt / 0.17, 0.0, 1.0) if tt < 0.83 else clampf((1.0 - tt) / 0.17, 0.0, 1.0)
+		if tt >= 0.17 and tt < 0.5:
+			kl = (tt - 0.17) / 0.33
+		elif tt >= 0.5 and tt < 0.83:
+			kl = 1.0 - (tt - 0.5) / 0.33
+		if tt >= 0.5 and not _thoc_tocado:
+			_thoc_tocado = true
+			Som.tocar("thoc", null, global_position + Vector3(X_CORTE, 1.3, 0), 3.0)
+	lamina_em_cima = kl < 0.02
 	if lamina:
-		var k := 0.0
-		if corte_t > 0.0:
-			var tt := 1.0 - corte_t / 0.75
-			k = tt / 0.35 if tt < 0.35 else (1.0 if tt < 0.5 else maxf(0.0, 1.0 - (tt - 0.5) / 0.4))
-		lamina.position.y = Y_LAMINA - 0.25 * k
+		lamina.position.y = Y_LAMINA - 0.25 * kl
+	pisador.position.y = 1.10 - 0.13 * kp
 	# guias: centro deslocado e folga visíveis
 	for g in guias:
 		var no: Node3D = g[0]
@@ -675,6 +822,12 @@ func _atualizar_visual(dt: float) -> void:
 	# faíscas da esmerilhadeira (ligadas pela interação)
 	_atualizar_torre()
 
+func _segmento(no: MeshInstance3D, a: Vector2, b: Vector2, z: float) -> void:
+	var dd := b - a
+	no.position = Vector3((a.x + b.x) * 0.5, (a.y + b.y) * 0.5, z)
+	no.rotation.z = atan2(dd.y, dd.x)
+	no.scale.x = maxf(dd.length(), 0.01)
+
 func _atualizar_torre() -> void:
 	var cor := ""
 	var piscar := false
@@ -682,9 +835,11 @@ func _atualizar_torre() -> void:
 		cor = ""
 	elif emergencia or falha == "enrosco" or falha == "emergencia":
 		cor = "vermelha"; piscar = true
-	elif falha in ["fim_bobina", "mesa_cheia", "energia"] or precisa_reset:
+	elif falha in ["fim_bobina", "mesa_cheia", "energia", "protecao"] or precisa_reset:
 		cor = "ambar"; piscar = precisa_reset
-	elif v > 0.01 or sirene_t > 0.0:
+	elif sirene_t > 0.0:
+		cor = "ambar"; piscar = true          # giroflex: vai partir, saia da linha
+	elif v > 0.01:
 		cor = "verde"
 	elif falha == "lote":
 		cor = "verde"; piscar = true
@@ -758,6 +913,10 @@ func _montar_fita() -> void:
 	fita_alim.mesh = bm
 	fita_alim.material_override = _mat_chapa
 	add_child(fita_alim)
+	fita_alim2 = MeshInstance3D.new()
+	fita_alim2.mesh = bm
+	fita_alim2.material_override = _mat_chapa
+	add_child(fita_alim2)
 	# fita formando (uma malha só; o shader esconde o que ainda não chegou)
 	fita_malha = MeshInstance3D.new()
 	fita_malha.mesh = Perfil.malha_fita(X_ENTRADA, X_CORTE, X_E0, X_E1)
@@ -790,6 +949,38 @@ func _montar_fita() -> void:
 	amassado.material_override = _mat_chapa
 	amassado.visible = false
 	add_child(amassado)
+
+var pisador: MeshInstance3D
+func _montar_pisador_e_tambor() -> void:
+	pisador = MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.05, 0.03, 1.15)
+	pisador.mesh = bm
+	var mp := StandardMaterial3D.new()
+	mp.albedo_color = Color(0.2, 0.2, 0.22)
+	mp.metallic = 0.6
+	pisador.material_override = mp
+	pisador.position = Vector3(X_CORTE - 0.1, 1.10, 0)
+	add_child(pisador)
+	var tambor := MeshInstance3D.new()
+	var cy := CylinderMesh.new()
+	cy.top_radius = 0.29
+	cy.bottom_radius = 0.29
+	cy.height = 0.88
+	tambor.mesh = cy
+	var mt := StandardMaterial3D.new()
+	mt.albedo_color = Color(0.25, 0.32, 0.45)
+	mt.metallic = 0.4
+	tambor.material_override = mt
+	tambor.position = TAMBOR + Vector3(0, 0.44, 0)
+	add_child(tambor)
+	var lb := Label3D.new()
+	lb.text = "SUCATA"
+	lb.font_size = 40
+	lb.pixel_size = 0.004
+	lb.position = TAMBOR + Vector3(0, 0.5, 0.3)
+	lb.modulate = Color(1, 1, 1)
+	add_child(lb)
 
 func _montar_pontaletes() -> void:
 	var mm := StandardMaterial3D.new()
@@ -959,7 +1150,18 @@ func _txt_bobina() -> String:
 		return "Montar bobina nova (provisório — a ponte rolante entra na próxima etapa)"
 	return ""
 
+func _sem_epi(acao: String) -> bool:
+	if Interacoes.epi:
+		return false
+	Bus.aviso.emit("SEM EPI: %s sem luva e óculos não. Vista o EPI no armário." % acao)
+	return true
+
 func _faz_bobina() -> void:
+	if (bobina.presente and (bobina.cinta or fita == "solta")) and _sem_epi("mexer em chapa"):
+		return
+	if bobina.presente and bobina.cinta and not bobina.travada:
+		Bus.aviso.emit("Trave o mandril antes de cortar a cinta: a bobina solta pode rolar.")
+		return
 	if bobina.presente and bobina.cinta:
 		Interacoes.progresso("Cortando as cintas...", 1.6, func():
 			bobina.cinta = false
@@ -975,11 +1177,19 @@ func _faz_bobina() -> void:
 		Interacoes.progresso("Montando bobina e travando o mandril...", 3.0, _montar_bobina_nova)
 
 func _montar_bobina_nova() -> void:
-	bobina = {"presente": true, "metros_total": 247.0, "metros": 247.0, "cinta": true, "travada": true, "codigo": "BOB-%03d" % rng.randi_range(2, 99), "kg": 1000.0}
+	bobina = {"presente": true, "metros_total": 247.0, "metros": 247.0, "cinta": true, "travada": false, "codigo": "BOB-%03d" % rng.randi_range(2, 99), "kg": 1000.0}
 	cauda_s = -1.0
 	aviso_10 = false
+	_fim_reconhecido = false
 	fita = "presa"
 	cabeca = X_ENTRADA
+	# bobina nova = setup novo: refile, peça teste e medição obrigatórios de novo
+	ponta_refilada = false
+	teste_feito = false
+	medida_ok = false
+	freio_ok = false
+	barriga_m = 0.0
+	erro_encoder_mm = clampf(erro_encoder_mm + rng.randf_range(-3.0, 3.0), -15.0, 15.0)
 	Som.tocar("trava", null, global_position + Vector3(X_DESB, 1.1, 0))
 	_estado()
 
@@ -995,7 +1205,13 @@ func _faz_mesa() -> void:
 	if fita == "puxando":
 		fita = "na_mesa"
 		cabeca = X_ENTRADA + 0.35
-		desvio_mm = snappedf(rng.randf_range(-25.0, 25.0), 0.5)
+		# a chapa puxada à mão também saiu da bobina (trecho bobina→mesa + o que passou da entrada)
+		var puxado := minf(_comp_alimentacao() + 0.35, bobina.metros)
+		bobina.metros -= puxado
+		consumido_m += puxado
+		puxado_mao_m += puxado
+		_comp_ult = _comp_alimentacao()
+		desvio_mm = snappedf(rng.randf_range(-12.0, 12.0), 0.5)
 		folga_mm = snappedf(rng.randf_range(4.0, 10.0), 0.5)
 		Som.tocar("tlec", null, global_position + Vector3(-5.8, 1.0, 0.5), -6.0)
 		Bus.aviso.emit("Ponta nas guias. Na caixa de comando: modo MANUAL e segure AVANÇO LENTO.")
@@ -1071,6 +1287,11 @@ func _faz_enrosco() -> void:
 	if not (emergencia or not chave_geral or not energia):
 		Bus.aviso.emit("SEGURANÇA: aperte a EMERGÊNCIA ou desligue a chave geral antes de pôr a mão na máquina.")
 		return
+	if protecao_fechada:
+		Bus.aviso.emit("Abra a proteção dos rolos para alcançar o enrosco.")
+		return
+	if _sem_epi("esmerilhadeira"):
+		return
 	faiscas.position = amassado.position + Vector3(0, 0.1, 0.4)
 	faiscas.emitting = true
 	_esm = Som.laco("esmeril", self)
@@ -1084,3 +1305,165 @@ func _faz_enrosco() -> void:
 func _process(_d: float) -> void:
 	if _i_enrosco and amassado.visible:
 		_i_enrosco.position = Vector3(amassado.position.x, 1.0, 0.95)
+
+# ======================================================================
+#  PROTEÇÃO DOS ROLOS, MANDRIL, FREIO E RETALHO DE FIM DE CHAPA
+# ======================================================================
+var tampa: Node3D
+var _tampa_ang := 0.0
+var alav_mandril: Node3D
+var volante_freio: Node3D
+
+func _montar_protecao() -> void:
+	# tampa de tela articulada sobre as estações, com chave de segurança (intertravamento)
+	tampa = Node3D.new()
+	tampa.position = Vector3((X_E0 + X_E1) * 0.5, 1.30, -0.66)
+	add_child(tampa)
+	var tela := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(X_E1 - X_E0 + 0.7, 0.012, 1.32)
+	tela.mesh = bm
+	tela.position = Vector3(0, 0, 0.66)
+	var mt := StandardMaterial3D.new()
+	mt.albedo_color = Color(0.95, 0.8, 0.1, 0.28)
+	mt.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mt.cull_mode = BaseMaterial3D.CULL_DISABLED
+	tela.material_override = mt
+	tampa.add_child(tela)
+	var mq := StandardMaterial3D.new()
+	mq.albedo_color = Color(0.95, 0.78, 0.1)
+	for z in [0.0, 1.32]:
+		var q := MeshInstance3D.new()
+		var qb := BoxMesh.new()
+		qb.size = Vector3(X_E1 - X_E0 + 0.7, 0.04, 0.04)
+		q.mesh = qb
+		q.position = Vector3(0, 0, z)
+		q.material_override = mq
+		tampa.add_child(q)
+	for x in [-(X_E1 - X_E0 + 0.7) * 0.5, 0.0, (X_E1 - X_E0 + 0.7) * 0.5]:
+		var q := MeshInstance3D.new()
+		var qb := BoxMesh.new()
+		qb.size = Vector3(0.04, 0.04, 1.32)
+		q.mesh = qb
+		q.position = Vector3(x, 0, 0.66)
+		q.material_override = mq
+		tampa.add_child(q)
+	# chave de segurança (caixinha vermelha na borda do operador)
+	var ch := MeshInstance3D.new()
+	var cb := BoxMesh.new()
+	cb.size = Vector3(0.06, 0.08, 0.04)
+	ch.mesh = cb
+	var mc := StandardMaterial3D.new()
+	mc.albedo_color = Color(0.8, 0.1, 0.1)
+	ch.material_override = mc
+	ch.position = Vector3(X_E0 + 1.0, 1.27, 0.70)
+	add_child(ch)
+	Interagivel.criar(self, Vector3(X_E0 + 1.6, 1.0, 0.95), _txt_tampa, _faz_tampa, 1.5)
+
+func _txt_tampa() -> String:
+	return "Fechar a proteção dos rolos" if not protecao_fechada else "Abrir a proteção dos rolos (chave de segurança para a máquina)"
+
+func _faz_tampa() -> void:
+	protecao_fechada = not protecao_fechada
+	Som.tocar("trava", null, global_position + Vector3(X_E0 + 1.0, 1.3, 0.7), -4.0)
+	if not protecao_fechada and (v > 0.01 or rodando or teste_ativo):
+		# intertravamento: abriu com a máquina em ciclo → parada imediata, exige RESET
+		_parar_tudo("protecao")
+		precisa_reset = true
+		Bus.alarme.emit(NOME, "PROTEÇÃO ABERTA COM A MÁQUINA EM CICLO")
+	_estado()
+
+func _montar_alavancas() -> void:
+	var ma := StandardMaterial3D.new()
+	ma.albedo_color = Color(0.85, 0.12, 0.1)
+	# alavanca de expansão/trava do mandril (lado do operador, na ponta do eixo)
+	alav_mandril = Node3D.new()
+	alav_mandril.position = Vector3(X_DESB, Y_DESB, 0.80)
+	add_child(alav_mandril)
+	var h := MeshInstance3D.new()
+	var cy := CylinderMesh.new()
+	cy.top_radius = 0.015
+	cy.bottom_radius = 0.015
+	cy.height = 0.32
+	h.mesh = cy
+	h.position.y = 0.16
+	h.material_override = ma
+	alav_mandril.add_child(h)
+	var bola := MeshInstance3D.new()
+	var sp := SphereMesh.new()
+	sp.radius = 0.03
+	sp.height = 0.06
+	bola.mesh = sp
+	bola.position.y = 0.33
+	bola.material_override = ma
+	alav_mandril.add_child(bola)
+	# volante do freio (na pinça do disco do desbobinador)
+	volante_freio = Node3D.new()
+	volante_freio.position = Vector3(X_DESB - 0.35, 0.75, 0.80)
+	add_child(volante_freio)
+	var r := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.06
+	tm.outer_radius = 0.075
+	r.mesh = tm
+	r.rotation.x = PI / 2
+	var mv := StandardMaterial3D.new()
+	mv.albedo_color = Color(0.1, 0.1, 0.1)
+	r.material_override = mv
+	volante_freio.add_child(r)
+	var lb := Label3D.new()
+	lb.text = "FREIO"
+	lb.font_size = 28
+	lb.pixel_size = 0.0015
+	lb.position = Vector3(0, -0.11, 0.02)
+	volante_freio.add_child(lb)
+	Interagivel.criar(self, Vector3(X_DESB + 0.1, 1.1, 1.1), _txt_mandril, _faz_mandril, 1.0)
+	Interagivel.criar(self, Vector3(X_DESB - 0.35, 0.8, 1.1), _txt_freio, _faz_freio, 1.0)
+	Interagivel.criar(self, Vector3(X_E1 + 0.5, 1.0, 0.95), _txt_retalho, _faz_retalho, 1.8)
+
+func _txt_mandril() -> String:
+	if not bobina.presente:
+		return ""
+	return "Destravar o mandril" if bobina.travada else "Travar o mandril (expandir e travar)"
+
+func _faz_mandril() -> void:
+	if bobina.travada and (v > 0.0 or fita in ["na_mesa", "enfiada"]):
+		Bus.aviso.emit("Não destrave o mandril com chapa na máquina.")
+		return
+	Interacoes.progresso("Girando a alavanca do mandril...", 1.2, func():
+		bobina.travada = not bobina.travada
+		Som.tocar("trava", null, global_position + Vector3(X_DESB, Y_DESB, 0.8))
+		Bus.aviso.emit("Mandril %s." % ("expandido e TRAVADO" if bobina.travada else "destravado"))
+		_estado())
+
+func _txt_freio() -> String:
+	if not bobina.presente:
+		return ""
+	return "Afrouxar o freio do desbobinador" if freio_ok else "Ajustar o freio do desbobinador (tensão da chapa)"
+
+func _faz_freio() -> void:
+	Interacoes.progresso("Apertando o volante do freio...", 1.5, func():
+		freio_ok = not freio_ok
+		barriga_m = 0.0 if freio_ok else barriga_m
+		Som.tocar("click", null, global_position + Vector3(X_DESB - 0.35, 0.75, 0.8))
+		_estado())
+
+func _txt_retalho() -> String:
+	if cauda_s < 0.0 or fita != "enfiada" or _cauda_x() < X_E1:
+		return ""
+	return "Retirar o retalho de fim de chapa (vai para a sucata)"
+
+func _faz_retalho() -> void:
+	if v > 0.01:
+		return
+	if _sem_epi("retirar retalho"):
+		return
+	Interacoes.progresso("Puxando o retalho para fora da guilhotina...", 2.0, func():
+		var resto := peca_m + maxf(0.0, X_CORTE - _cauda_x())
+		sucata_m += resto
+		peca_m = 0.0
+		fita = "nenhuma"
+		bobina.presente = false
+		Som.tocar("clank", null, global_position + TAMBOR, -3.0)
+		Bus.aviso.emit("Retalho de %.2f m na sucata. Monte a próxima bobina." % resto)
+		_estado())

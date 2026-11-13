@@ -21,6 +21,7 @@ func _ready() -> void:
 	add_child(main)
 	await _q(10)
 	m = main.maquina
+	m.enrosco_aleatorio = false
 	j = main.jogador
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	await _rodar()
@@ -81,8 +82,18 @@ func _rodar() -> void:
 	m.cmd_modo("manual")
 	m.cmd_jog(true)
 	ok(not m.jog, "JOG recusado sem chapa")
-	# bobina: cinta
+	# bobina: cinta (precisa de EPI e mandril travado)
 	ok(m.bobina.cinta, "bobina chega com cinta")
+	m._faz_bobina()
+	ok(m.bobina.cinta, "sem EPI não corta a cinta")
+	main._epi()
+	await _seg(2.2)
+	ok(Interacoes.epi, "EPI vestido")
+	m._faz_bobina()
+	ok(m.bobina.cinta, "com mandril destravado não corta a cinta")
+	m._faz_mandril()
+	await _seg(1.4)
+	ok(m.bobina.travada, "mandril travado")
 	m._faz_bobina()
 	await _seg(1.8)
 	ok(not m.bobina.cinta and m.fita == "solta", "cintas cortadas, ponta solta")
@@ -95,7 +106,7 @@ func _rodar() -> void:
 	m._faz_mesa()
 	ok(m.fita == "na_mesa" and absf(m.desvio_mm) <= 25.0, "ponta encaixada na mesa (desvio %.1f mm)" % m.desvio_mm)
 	m.cmd_jog(true)
-	ok(m.jog, "JOG segurado")
+	ok(m.jog, "JOG segurado (sem freio, de propósito)")
 	var t0 := Time.get_ticks_msec()
 	await _seg(3.0)
 	await foto("enfiando", Vector3(-3.0, 2.4, 3.2), Vector3(-3.5, 0.9, 0))
@@ -105,6 +116,27 @@ func _rodar() -> void:
 	Relogio.vel_idx = 0
 	ok(m.fita == "enfiada", "chapa chegou na guilhotina (cabeça %.2f)" % m.cabeca)
 	ok(not m.jog, "JOG solta sozinho no sensor")
+	await _q(3)
+	ok(absf(m.cabeca - m.X_CORTE) < 0.0005, "ponta parou exatamente na faca (x20 sem passar)")
+	ok(m.barriga_m > 0.0, "sem freio a bobina embalou e fez barriga (%.2f m)" % m.barriga_m)
+	await foto("barriga", Vector3(-6.4, 1.3, 2.6), Vector3(-6.7, 0.7, 0))
+	m._faz_freio()
+	await _seg(1.7)
+	ok(m.freio_ok and m.barriga_m == 0.0, "freio ajustado, barriga recolhida")
+	# refile
+	m.cmd_peca_teste()
+	ok(not m.teste_ativo, "peça teste recusada antes do refile")
+	m.cmd_cortar_manual()
+	ok(not m.ponta_refilada, "corte manual recusado com menos de 25 cm")
+	m.cmd_jog(true)
+	while m.peca_m < 0.3:
+		await _q()
+	m.cmd_jog(false)
+	m.cmd_cortar_manual()
+	ok(m.ponta_refilada and m.sucata_m > 0.29, "ponta refilada (%.2f m na sucata)" % m.sucata_m)
+	await _seg(0.5)
+	await foto("refile", Vector3(6.6, 1.6, 2.6), Vector3(5.4, 0.8, 0.6))
+	await _seg(1.5)
 	await foto("chapa_enfiada", Vector3(2.0, 2.2, 3.4), Vector3(1.0, 0.9, 0))
 	# guias
 	var antes: float = absf(m.desvio_mm)
@@ -127,6 +159,7 @@ func _rodar() -> void:
 	var med := m.medir_trena()
 	ok(not med.is_empty(), "trena mediu %.3f m (erro %+.0f mm)" % [med.L, med.erro_mm])
 	await foto("trena", Vector3(8.6, 1.6, 2.2), Vector3(8.6, 0.2, 0))
+	ok(m.pilha.size() == 1 and m.produzidas == 1, "o refile não entrou na pilha nem no contador")
 	# corrige e faz outra
 	m.ajustar("correcao", -round(med.erro_mm))
 	m.cmd_peca_teste()
@@ -141,6 +174,10 @@ func _rodar() -> void:
 	m.cmd_liga()
 	ok(not m.rodando, "LIGA recusado em manual")
 	m.cmd_modo("auto")
+	m._faz_tampa()
+	m.cmd_liga()
+	ok(not m.rodando, "LIGA recusado com a proteção aberta")
+	m._faz_tampa()
 	m.cmd_liga()
 	ok(m.rodando and m.sirene_t > 0.0, "LIGA em auto: sirene antes de mover")
 	await _q(10)
@@ -158,7 +195,16 @@ func _rodar() -> void:
 	await _seg(1.0)
 	ok(m.produzidas == 6, "lote de 6 concluído (falha=lote)")
 	var usado: float = met0 - m.bobina.metros
-	ok(absf(usado - 6 * m.comprimento) < 0.6, "metros tirados da bobina = metros produzidos (%.2f m)" % usado)
+	var soma := 0.0
+	for t in m.pilha.slice(m.pilha.size() - 6):
+		soma += t.L
+	ok(absf(usado - soma) < 0.002, "bobina gastou %.3f m = soma das 6 telhas %.3f m (x20, sem sobra)" % [usado, soma])
+	var maxerr := 0.0
+	for t in m.pilha.slice(m.pilha.size() - 6):
+		maxerr = maxf(maxerr, absf(t.L - m._alvo_corte()))
+	ok(maxerr < 0.0005, "todas as telhas no comprimento do encoder em x20 (erro máx %.2f mm)" % (maxerr * 1000))
+	ok(absf(Registro.totais.metros_formados - (m.consumido_m - m.puxado_mao_m)) < 0.01, "Registro: metros que a máquina puxou (%.3f) = consumo da bobina menos o puxado à mão (%.3f)" % [Registro.totais.metros_formados, m.consumido_m - m.puxado_mao_m])
+	ok(Registro.totais.pecas == m.pilha.size() + m.deslizando.size() and Registro.totais.refiles == 1, "Registro: peças cortadas (%d) = pilha + em trânsito; 1 refile" % Registro.totais.pecas)
 	ok(m.raio_bobina() < r0, "bobina diminuiu (%.4f → %.4f m)" % [r0, m.raio_bobina()])
 	ok(m.energia_kwh > kwh0, "energia consumida (%.3f kWh)" % (m.energia_kwh - kwh0))
 	await foto("pilha", Vector3(10.0, 2.4, 3.5), Vector3(9.0, 0.2, 0))
@@ -174,6 +220,16 @@ func _rodar() -> void:
 	m.cmd_emergencia()
 	m.cmd_reset()
 	ok(m.pode_mover() == "", "destravou + RESET = pronta")
+	# proteção aberta com a máquina andando
+	m.cmd_liga()
+	await _seg(3.6)
+	m._faz_tampa()
+	ok(m.v == 0.0 and m.falha == "protecao" and m.precisa_reset, "abrir a proteção em ciclo para na hora")
+	m.cmd_reset()
+	ok(m.precisa_reset, "RESET recusado com proteção aberta")
+	m._faz_tampa()
+	m.cmd_reset()
+	ok(m.pode_mover() == "" and not m.rodando, "fechou + RESET: pronta, mas NÃO religa sozinha")
 	# enrosco forçado
 	m.cmd_liga()
 	await _seg(2.5)
@@ -185,11 +241,69 @@ func _rodar() -> void:
 	ok(Interacoes.modo != "progresso", "esmerilhadeira recusada sem bloquear a máquina")
 	m.cmd_emergencia()
 	m._faz_enrosco()
+	ok(Interacoes.modo != "progresso", "esmerilhadeira recusada com a proteção fechada")
+	m._faz_tampa()
+	m._faz_enrosco()
 	await _seg(1.0)
 	await foto("esmerilhando", Vector3(-0.3, 1.8, 2.2), Vector3(-0.4, 1.0, 0))
 	await _seg(3.5)
 	ok(not m.amassado.visible and m.fita == "na_mesa", "enrosco cortado, chapa precisa ser passada de novo")
+	ok(not m.medida_ok and not m.ponta_refilada, "depois do enrosco: refile e medição obrigatórios de novo")
+	m._faz_tampa()
 	m.cmd_emergencia()
 	m.cmd_reset()
 	ok(m.pode_mover() == "", "reset depois do enrosco")
+	# fim de bobina: deixa só 4 m na bobina e produz até acabar
+	m.cmd_modo("manual")
+	m.cmd_jog(true)
+	Relogio.vel_idx = 2
+	while m.fita != "enfiada":
+		await _q()
+	m.cmd_jog(true)
+	while m.peca_m < 0.3:
+		await _q()
+	m.cmd_jog(false)
+	await _q(3)
+	m.cmd_cortar_manual()
+	m.ponta_refilada = true
+	m.medida_ok = true
+	m.teste_feito = true
+	m.bobina.metros = 4.0
+	m.quantidade = 50
+	m.cmd_zerar()
+	m.cmd_modo("auto")
+	m.cmd_liga()
+	var t1 := Time.get_ticks_msec()
+	while m.falha != "fim_bobina" and Time.get_ticks_msec() - t1 < 40000:
+		await _q()
+	while m.v > 0.0:
+		await _q()
+	ok(m.falha == "fim_bobina" and m.v == 0.0, "sensor de fim de chapa parou a máquina")
+	var passou := m._cauda_x() - m.X_SENSOR_FIM
+	ok(passou >= 0.0 and passou <= 0.23, "parou %.0f mm depois do sensor (distância de frenagem a 0,8 m/s²)" % (passou * 1000))
+	m.cmd_reset()
+	m.cmd_liga()
+	ok(not m.rodando, "LIGA recusado em fim de chapa")
+	m.cmd_modo("manual")
+	m.cmd_jog(true)
+	while m.jog and m._cauda_x() < m.X_E1:
+		await _q()
+	m.cmd_jog(false)
+	await _q(30)
+	Relogio.vel_idx = 0
+	ok(m._cauda_x() >= m.X_E1 - 0.001, "AVANÇO LENTO levou a cauda até sair dos rolos")
+	await foto("fim_chapa", Vector3(4.6, 1.8, 2.6), Vector3(4.4, 0.9, 0))
+	var suc0 := m.sucata_m
+	m._faz_retalho()
+	await _seg(2.3)
+	ok(not m.bobina.presente and m.sucata_m > suc0 + 0.9, "retalho de fim de chapa na sucata (%.2f m)" % (m.sucata_m - suc0))
+	var na_pilha := _soma_pilha() + m.estoque_retirado_m
+	ok(absf(m.consumido_m - (na_pilha + m.sucata_m)) < 0.005, "conservação da chapa: saiu da bobina %.3f m = pilha %.3f + sucata %.3f" % [m.consumido_m, na_pilha, m.sucata_m])
+	print("   balanço: formado %.2f m · pilha %.2f m · sucata %.2f m" % [Registro.totais.metros_formados, _soma_pilha(), m.sucata_m])
 	print("== fim. Sucata %.2f m, produzidas na pilha %d" % [m.sucata_m, m.pilha.size()])
+
+func _soma_pilha() -> float:
+	var t := 0.0
+	for p in m.pilha:
+		t += p.L
+	return t

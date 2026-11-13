@@ -55,6 +55,7 @@ func _carregar_visual() -> void:
 		for mi in visual.find_children("*", "MeshInstance3D", true, false):
 			mi.visible = mi.name in usar
 		anim = visual.find_child("AnimationPlayer", true, false)
+		atualizar_epi()
 		# capacete amarelo preso no osso da cabeça
 		var esq := visual.find_child("Skeleton*", true, false) as Skeleton3D
 		if esq == null:
@@ -101,6 +102,15 @@ func _carregar_visual() -> void:
 		cap.position.y = 1.72
 		visual.add_child(cap)
 	add_child(visual)
+
+func atualizar_epi() -> void:
+	if visual == null:
+		return
+	for mi in visual.find_children("*", "MeshInstance3D", true, false):
+		if mi.name == "Glasses_004":
+			mi.visible = Interacoes.epi
+		elif mi.name == "Gloves_014":
+			mi.visible = Interacoes.epi
 
 func _tocar(nome: String) -> void:
 	if anim == null or _anim_atual == nome:

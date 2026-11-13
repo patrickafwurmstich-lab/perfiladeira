@@ -126,6 +126,8 @@ func _process(_d: float) -> void:
 		est = ("PRODUZINDO" if m.rodando else ("AVANÇO LENTO" if m.jog else "PEÇA TESTE")) + "  %.1f m/min" % (m.v * 60.0 / m.FATOR_VISUAL)
 	elif m.sirene_t > 0.0:
 		est = "PARTINDO..."; cor = Color(1, 0.9, 0.3)
+	if est == "PRONTA" or est == "AGUARDA RESET":
+		est = m.fase()
 	lb_estado.text = "%s · %s" % [m.modo.to_upper(), est]
 	lb_estado.add_theme_color_override("font_color", cor)
 	var al := ""
@@ -136,7 +138,14 @@ func _process(_d: float) -> void:
 		"mesa_cheia": al = "⚠ MESA CHEIA — retire a pilha"
 		"lote": al = "✔ LOTE CONCLUÍDO — zere o contador"
 		"energia": al = "⚠ QUEDA DE ENERGIA"
-	if al == "" and m.aviso_10 and m.bobina.presente:
+		"protecao": al = "⚠ PROTEÇÃO ABERTA — feche e aperte RESET"
+	if al == "" and not m.protecao_fechada:
+		al = "! Proteção dos rolos aberta (só AVANÇO LENTO)"
+	elif al == "" and not m.bobina.travada and m.bobina.presente:
+		al = "! Mandril destravado"
+	elif al == "" and m.barriga_m > 0.15:
+		al = "! Barriga de chapa na entrada — ajuste o freio"
+	elif al == "" and m.aviso_10 and m.bobina.presente:
 		al = "! Bobina com menos de 10%"
 	lb_alarme.text = al
 	valores.comprimento[0].text = "%.2f m" % m.comprimento

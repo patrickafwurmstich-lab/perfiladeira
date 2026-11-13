@@ -10,6 +10,7 @@ signal progresso_mudou(texto: String, frac: float)
 signal dica(texto: String)
 
 var modo := "andar"
+var epi := false                       # operador com luva, óculos e protetor auricular
 var foco_alvo: Node3D = null          # Marker3D para onde a câmera vai
 var foco_dono: Object = null            # quem recebe cliques/teclas (precisa de on_foco_clique / on_foco_tecla)
 var _prog_t := 0.0

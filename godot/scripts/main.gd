@@ -36,6 +36,7 @@ func _ready() -> void:
 	quadro.maquina = maquina
 	quadro.position = Vector3(-11.0, 0, 3.2)
 	add_child(quadro)
+	_armario_epi(Vector3(-12.6, 0, 5.6))
 	jogador = Jogador.new()
 	jogador.maquina = maquina
 	jogador.position = Vector3(-9.5, 0.05, 5.0)
@@ -93,3 +94,41 @@ func _textura_piso() -> ImageTexture:
 			img.set_pixel(x, y, Color(c, c * 0.98, c * 0.95))
 	img.generate_mipmaps()
 	return ImageTexture.create_from_image(img)
+
+func _armario_epi(pos: Vector3) -> void:
+	var a := Node3D.new()
+	a.position = pos
+	add_child(a)
+	var corpo := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.9, 1.9, 0.5)
+	corpo.mesh = bm
+	corpo.position.y = 0.95
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.35, 0.45, 0.55)
+	m.metallic = 0.4
+	corpo.material_override = m
+	a.add_child(corpo)
+	var placa := Label3D.new()
+	placa.text = "EPI\nUSO OBRIGATÓRIO"
+	placa.font_size = 40
+	placa.pixel_size = 0.004
+	placa.position = Vector3(0, 1.45, 0.26)
+	placa.modulate = Color(1, 0.85, 0.1)
+	a.add_child(placa)
+	var sb := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = bm.size
+	cs.shape = bs
+	cs.position.y = 0.95
+	sb.add_child(cs)
+	a.add_child(sb)
+	Interagivel.criar(a, Vector3(0, 1.1, 0.6), func() -> String: return "Tirar o EPI" if Interacoes.epi else "Vestir o EPI (luva, óculos, protetor auricular)", _epi, 1.4)
+
+func _epi() -> void:
+	Interacoes.progresso("Vestindo o EPI..." if not Interacoes.epi else "Guardando o EPI...", 2.0, func():
+		Interacoes.epi = not Interacoes.epi
+		jogador.atualizar_epi()
+		AudioServer.set_bus_volume_db(0, -6.0 if Interacoes.epi else 0.0)   # protetor auricular abafa o barulho
+		Bus.aviso.emit("EPI vestido." if Interacoes.epi else "EPI guardado."))
