@@ -21,10 +21,16 @@ var ik_braco: TwoBoneIK3D
 var alvo_mao: Node3D
 var polo_cotovelo: Node3D
 var mao: BoneAttachment3D        # osso RightHandProp: onde a botoeira fica presa
+var dedos: Dedos
+var ik_esq: TwoBoneIK3D
+var alvo_esq: Node3D
+var polo_esq: Node3D
 var segurando := false
 var _ik_peso := 0.0
-const MAO_ALVO := Vector3(-0.13, 1.10, 0.22)    # na frente do peito, lado direito (o boneco olha para +Z)
+const MAO_ALVO := Vector3(-0.11, 1.14, 0.17)    # na frente do peito, lado direito (o boneco olha para +Z)
 const COTOVELO_POLO := Vector3(-0.35, 0.55, -0.45)
+const MAO_ESQ := Vector3(0.25, 0.80, 0.02)       # mão esquerda solta ao lado da coxa
+const COTOVELO_ESQ := Vector3(0.45, 1.0, -0.35)
 var maquina
 var primeira_pessoa := false
 var yaw := 0.0
@@ -191,6 +197,26 @@ func _montar_ik() -> void:
 	ik_braco.set_target_node(0, ik_braco.get_path_to(alvo_mao))
 	ik_braco.set_pole_node(0, ik_braco.get_path_to(polo_cotovelo))
 	ik_braco.influence = 0.0
+	# mão esquerda em posição natural (perto da coxa), sem ficar "morta" e aberta
+	alvo_esq = Node3D.new()
+	visual.add_child(alvo_esq)
+	alvo_esq.position = MAO_ESQ / visual.scale.x
+	polo_esq = Node3D.new()
+	visual.add_child(polo_esq)
+	polo_esq.position = COTOVELO_ESQ / visual.scale.x
+	ik_esq = TwoBoneIK3D.new()
+	esq.add_child(ik_esq)
+	ik_esq.set_setting_count(1)
+	ik_esq.set_root_bone_name(0, "LeftArm")
+	ik_esq.set_middle_bone_name(0, "LeftForeArm")
+	ik_esq.set_end_bone_name(0, "LeftHand")
+	ik_esq.set_target_node(0, ik_esq.get_path_to(alvo_esq))
+	ik_esq.set_pole_node(0, ik_esq.get_path_to(polo_esq))
+	ik_esq.influence = 0.0
+	dedos = Dedos.new()
+	esq.add_child(dedos)
+	dedos.configurar(esq, "Right")
+	dedos.influence = 0.0
 	if esq.find_bone("RightHandProp") >= 0:
 		mao = BoneAttachment3D.new()
 		mao.bone_name = "RightHandProp"
@@ -301,7 +327,10 @@ func _process(delta: float) -> void:
 	# braço sobe/desce suave para segurar a botoeira
 	_ik_peso = move_toward(_ik_peso, 1.0 if segurando else 0.0, delta * 3.0)
 	if ik_braco:
-		ik_braco.influence = smoothstep(0.0, 1.0, _ik_peso)
+		var k := smoothstep(0.0, 1.0, _ik_peso)
+		ik_braco.influence = k
+		ik_esq.influence = k * 0.7
+		dedos.influence = k
 	# segue a posição interpolada do corpo (sem tremido entre física e tela), com leve atraso
 	var corpo := get_global_transform_interpolated().origin + Vector3(0, ALTURA_OLHO, 0)
 	if primeira_pessoa:

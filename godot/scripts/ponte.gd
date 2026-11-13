@@ -26,6 +26,10 @@ const CAPACIDADE_KG := 3000.0
 const OFF_CINTA := 0.95    # do gancho até o centro da bobina pendurada (cinta + moitão)
 const FUNDO_GANCHO := Vector3(0.09, 0.075, 0.0)   # curva do gancho em relação à origem do modelo (origem embaixo)
 const TOPO_MOITAO := 0.70                         # topo do moitão, onde o cabo de aço entra
+const PERNA := 1.15                 # comprimento de cada perna da cinta (m)
+const MEIA_BOCA := 0.60             # metade da largura da bobina (as pernas entram nas duas faces)
+# do centro da bobina até a origem do gancho: topo do furo (0,242) + altura do V − curva do gancho (0,075)
+var OFF_PERNAS := sqrt(PERNA * PERNA - MEIA_BOCA * MEIA_BOCA) + (Perfiladeira.R_FURO - 0.012) - 0.075
 const CABO_BOTOEIRA := 9.0
 const BOTOEIRA_NA_MAO := Vector3(0.0, -0.06, 0.0)    # a pegada (y 0,06 no modelo) fica na palma # alcance horizontal do cabo da botoeira (do carro até a mão)
 
@@ -54,9 +58,11 @@ var carro: Node3D
 var gancho: Node3D
 var cabo: MeshInstance3D
 var cinta: Node3D             # cinta de poliéster de 2 pernas: gancho → furo → gancho
-var fitas: Array = []         # [perna_frente, perna_tras, trecho dentro do furo, laço no gancho]
+var fitas: Array = []
+var olhal: MeshInstance3D         # [perna_frente, perna_tras, trecho dentro do furo, laço no gancho]
 var botoeira: Node3D
 var cabo_bot: MeshInstance3D
+var cabo_bot2: MeshInstance3D
 var foco: Marker3D
 var som_motor: AudioStreamPlayer3D
 
@@ -84,26 +90,39 @@ func _ready() -> void:
 	cinta.visible = false
 	add_child(cinta)
 	var mci := StandardMaterial3D.new()
-	mci.albedo_color = Color(0.82, 0.10, 0.07)
-	mci.roughness = 0.85
+	mci.albedo_color = Color(0.92, 0.07, 0.04)     # vermelho saturado de cinta de poliéster nova
+	mci.roughness = 0.8
 	mci.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var mfx := StandardMaterial3D.new()
 	mfx.albedo_color = Color(0.95, 0.85, 0.1)     # faixa da etiqueta de carga (amarela)
 	for i in 4:
 		var f := MeshInstance3D.new()
 		var bm := BoxMesh.new()
-		bm.size = Vector3(0.09, 1.0, 0.008)
+		bm.size = Vector3(0.10, 1.0, 0.012)        # fita de 100 mm × 12 mm
 		f.mesh = bm
 		f.material_override = mci
 		cinta.add_child(f)
 		fitas.append(f)
 	var etq := MeshInstance3D.new()
 	var be := BoxMesh.new()
-	be.size = Vector3(0.07, 0.10, 0.012)
+	be.size = Vector3(0.085, 0.14, 0.016)
 	etq.mesh = be
 	etq.material_override = mfx
 	fitas[0].add_child(etq)
+	# olhal da cinta abraçando a curva do gancho
+	olhal = MeshInstance3D.new()
+	var tmo := TorusMesh.new()
+	tmo.inner_radius = 0.035
+	tmo.outer_radius = 0.06
+	tmo.rings = 16
+	tmo.ring_segments = 8
+	olhal.mesh = tmo
+	olhal.material_override = mci
+	cinta.add_child(olhal)
 	botoeira = load("res://modelos/botoeira.glb").instantiate()
+	var cabo_modelo := botoeira.find_child("cabo", true, false)
+	if cabo_modelo:
+		cabo_modelo.visible = false      # o cabo de verdade é desenhado até o carro (sem cabo duplicado)
 	add_child(botoeira)
 	cabo_bot = MeshInstance3D.new()
 	var cy2 := CylinderMesh.new()
@@ -115,6 +134,10 @@ func _ready() -> void:
 	mb.albedo_color = Color(0.1, 0.1, 0.1)
 	cabo_bot.material_override = mb
 	add_child(cabo_bot)
+	cabo_bot2 = MeshInstance3D.new()
+	cabo_bot2.mesh = cy2
+	cabo_bot2.material_override = mb
+	add_child(cabo_bot2)
 	foco = Marker3D.new()
 	add_child(foco)
 	som_motor = Som.laco("hidraulica", self)
@@ -301,7 +324,7 @@ func _engatar_ou_soltar() -> void:
 		# a cinta se ajusta: o centro da bobina fica onde está; o gancho guarda essa distância
 		# pernas da cinta com comprimento real: se o gancho estiver baixo, a cinta fica frouxa e a
 		# bobina só sai do apoio quando o gancho sobe e a cinta estica
-		off_carga = maxf(h - b.no.global_position.y, b.r + 0.55)
+		off_carga = OFF_PERNAS          # pernas de comprimento fixo (como a cinta real): ângulo do V ~63°
 		# gancho fora de centro: ao subir, a bobina "puxa" para baixo do gancho e balança (não teleporta)
 		carga["apoiada"] = true
 		carga["repouso"] = carga.no.global_position
@@ -441,6 +464,15 @@ func _encaixar(delta: float) -> void:
 		Bus.aviso.emit("Bobina no mandril. Solte o gancho (suba), trave o mandril e ajuste o freio.")
 
 ## coloca uma fita (caixa fina) de a até b, com a largura virada para "larg"
+func _tubo(no: MeshInstance3D, a: Vector3, b: Vector3) -> void:
+	var d := b - a
+	if d.length() < 0.001:
+		return
+	var yv2 := d.normalized()
+	var ref := Vector3.FORWARD if absf(yv2.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT
+	var xv := yv2.cross(ref).normalized()
+	no.global_transform = Transform3D(Basis(xv, yv2 * d.length(), xv.cross(yv2)), (a + b) * 0.5)
+
 func _fita(no: MeshInstance3D, a: Vector3, b: Vector3, larg: Vector3) -> void:
 	var y := b - a
 	var L := maxf(y.length(), 0.001)
@@ -463,10 +495,11 @@ func _desenhar_cinta() -> void:
 	_fita(fitas[1], g, e2, lado)
 	_fita(fitas[2], e1, e2, lado)                                        # trecho que passa por dentro do furo
 	_fita(fitas[3], g - eixo * 0.06, g + eixo * 0.06, lado)              # laço apoiado na curva do gancho
+	olhal.global_transform = Transform3D(Basis(lado, PI / 2), g + Vector3(0, 0.02, 0))
 	var L0 := maxf((e1 - g).length(), 0.01)
 	var etq := fitas[0].get_child(0) as Node3D
 	etq.scale = Vector3(1, 1.0 / L0, 1)                    # etiqueta não estica junto com a perna
-	etq.position = Vector3(0, 0.5 - 0.3 / L0, 0.006)
+	etq.position = Vector3(0, 0.5 - 0.35 / L0, 0.008)
 
 func _atualizar(_delta: float) -> void:
 	viga.position = Vector3(x, Y_VIGA, 0)
@@ -491,7 +524,7 @@ func _atualizar(_delta: float) -> void:
 		var mp: Vector3 = jogador.mao.global_position
 		bpos = mp + Basis(Vector3.UP, yv) * BOTOEIRA_NA_MAO
 		# painel virado para o rosto do operador, inclinado ~25° para ele ler os botões
-		botoeira.rotation = Vector3(deg_to_rad(-25.0), yv + PI, 0)
+		botoeira.rotation = Vector3(deg_to_rad(-31.0), yv + PI, 0)
 	elif operando and jogador:
 		var yv: float = jogador.visual.rotation.y
 		bpos = jogador.global_position + Basis(Vector3.UP, yv) * Vector3(-0.22, 0.62, 0.32)
@@ -501,15 +534,13 @@ func _atualizar(_delta: float) -> void:
 		botoeira.rotation.y = 0.0
 	botoeira.position = bpos
 	# cabo da botoeira: do carro até o topo da botoeira (fica inclinado quando você se afasta)
-	var topo_b := bpos + Vector3(0, 0.72, 0)
+	# cabo da botoeira: sai do prensa-cabo no topo, faz uma curva suave e sobe até o carro
+	var topo_b := botoeira.global_transform * Vector3(0, 0.34, -0.03)
 	var ancora := Vector3(x + 0.5, Y_CARRO - 0.3, z + 0.5)
-	var dcb := ancora - topo_b
-	cabo_bot.position = (topo_b + ancora) * 0.5
-	if dcb.length() > 0.01:
-		var yv2 := dcb.normalized()
-		var ref := Vector3.FORWARD if absf(yv2.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT
-		var xv := yv2.cross(ref).normalized()
-		cabo_bot.basis = Basis(xv, yv2 * dcb.length(), xv.cross(yv2))
+	var saida := botoeira.global_transform.basis.y.normalized()
+	var curva := topo_b + saida * 0.18 + Vector3(0, 0.12, 0)
+	_tubo(cabo_bot, topo_b, curva)
+	_tubo(cabo_bot2, curva, ancora)
 	# anel guia do mandril
 	var mostra_guia := false
 	if carga and encaixando <= 0.0 and maquina and not maquina.bobina.presente:
