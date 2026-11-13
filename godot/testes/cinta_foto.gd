@@ -56,7 +56,7 @@ func _ready() -> void:
 	var ab: AABB = mg.global_transform * mg.get_aabb()
 	print("gancho aabb ", ab, " g ", g, " gancho_pos ", P.gancho.global_position, " escala ", P.gancho.global_transform.basis.get_scale())
 	print("olhal seg0 ", P.olhais[0][4].global_position)
-	print("V entre pernas: %.1f graus" % rad_to_deg((pc + eixo * 0.52 - g).angle_to(pc - eixo * 0.52 - g)))
+	print("V entre pernas: %.1f graus" % rad_to_deg(P.fitas[0].global_transform.basis.y.angle_to(P.fitas[1].global_transform.basis.y)))
 	# close maior do gancho (perspectiva)
 	cam.projection = Camera3D.PROJECTION_PERSPECTIVE
 	cam.global_position = g + Vector3(0.32, 0.06, 0.30)

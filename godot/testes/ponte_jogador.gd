@@ -41,11 +41,11 @@ func _ready() -> void:
 	ok(b0.no.global_position.distance_to(antes) < 0.02, "engatar não teleporta a bobina")
 	await tecla(KEY_R, 3.0)
 	ok(absf(b0.no.global_position.y - c.y) < 0.01, "cinta ainda frouxa: bobina parada no berço enquanto o gancho sobe")
-	await tecla(KEY_R, 8.0)
+	await tecla(KEY_R, 14.0)      # pernas de 1,55 m: a cinta leva mais tempo para esticar
 	ok(b0.no.global_position.y > c.y + 0.5, "R levantou a bobina (centro %.2f m)" % b0.no.global_position.y)
 	await tecla(KEY_G)
 	ok(P.carga != null, "não solta no ar")
-	await tecla(KEY_F, 12.0)
+	await tecla(KEY_F, 18.0)
 	await get_tree().create_timer(3.0).timeout
 	ok(absf(b0.no.global_position.y - P.Y_BERCO) < 0.01, "descendo, a bobina para no berço (não afunda): centro %.2f" % b0.no.global_position.y)
 	await tecla(KEY_G)

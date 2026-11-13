@@ -126,7 +126,7 @@ func _rodar() -> void:
 	ok(not P.operando and Interacoes.modo == "andar", "E larga a botoeira")
 	P.x = m.to_global(Vector3(m.X_DESB, 0, 0)).x + 0.25
 	P.z = 1.3
-	P.h = m.Y_DESB + P.OFF_CINTA
+	P.h = m.Y_DESB + P.off_carga
 	P.balanco = Vector2.ZERO; P.balanco_v = Vector2.ZERO
 	await _q(2)
 	P._engatar_ou_soltar()
