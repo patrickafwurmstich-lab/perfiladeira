@@ -99,6 +99,21 @@ func _ready() -> void:
 	add_child(foco)
 	som_motor = Som.laco("hidraulica", self)
 	Interagivel.criar(botoeira, Vector3(0, 0.3, 0.2), _txt_botoeira, _pegar, 1.4)
+	# anel guia na ponta do mandril: aparece quando a bobina chega perto (amarelo longe, verde = G funciona)
+	anel_guia = MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.30
+	tm.outer_radius = 0.34
+	tm.rings = 32
+	anel_guia.mesh = tm
+	anel_guia.rotation.x = PI / 2
+	mat_guia = StandardMaterial3D.new()
+	mat_guia.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat_guia.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat_guia.no_depth_test = true
+	anel_guia.material_override = mat_guia
+	anel_guia.visible = false
+	add_child(anel_guia)
 	_atualizar(0.0)
 
 func nova_bobina(pos: Vector3, codigo: String, metros := 247.0) -> void:
@@ -201,8 +216,8 @@ func _alvo_proximo() -> String:
 	var dx: float = m_loc.x - maquina.X_DESB
 	var dy: float = m_loc.y - maquina.Y_DESB
 	if absf(dx) < 0.6 and absf(m_loc.z) < 2.5:
-		if absf(dx) <= 0.03 and absf(dy) <= 0.03 and m_loc.z > 0.55:
-			return "ALINHADA COM O MANDRIL: G = empurrar para dentro"
+		if _pode_guiar(m_loc):
+			return "PERTO DO MANDRIL: G = guiar com a mão e empurrar para dentro"
 		return "Alinhe com o mandril: Δx %+.0f mm · Δaltura %+.0f mm" % [dx * 1000, dy * 1000]
 	return ""
 
@@ -249,7 +264,7 @@ func _engatar_ou_soltar() -> void:
 		return
 	# com carga: encaixar no mandril se coaxial, senão pousar no chão/berço
 	var m_loc: Vector3 = maquina.to_local(_pos_carga())
-	if absf(m_loc.x - maquina.X_DESB) <= 0.03 and absf(m_loc.y - maquina.Y_DESB) <= 0.03 and m_loc.z > 0.55 and m_loc.z < 2.5:
+	if _pode_guiar(m_loc):
 		if maquina.bobina.presente:
 			Bus.aviso.emit("O mandril já tem bobina.")
 			return
@@ -332,13 +347,27 @@ func _physics_process(delta: float) -> void:
 	if operando:
 		_dica()
 
+## a até 15 cm do eixo (lado e altura), na frente do mandril ou já entrando nele: dá para guiar com a mão
+## (é o que o operador faz: desce perto e empurra a bobina para o eixo)
+const GUIA_TOL := 0.15
+func _pode_guiar(m_loc: Vector3) -> bool:
+	return absf(m_loc.x - maquina.X_DESB) <= GUIA_TOL and absf(m_loc.y - maquina.Y_DESB) <= GUIA_TOL and m_loc.z > -0.3 and m_loc.z < 2.5
+
+var _ini_encaixe := Vector3.ZERO
+var anel_guia: MeshInstance3D
+var mat_guia: StandardMaterial3D
 func _encaixar(delta: float) -> void:
-	# a bobina desliza no mandril ao longo do eixo (Z local da máquina) até o batente
-	encaixando += delta / 3.0
-	var m_loc: Vector3 = maquina.to_local(_pos_carga())
-	var alvo_z := lerpf(m_loc.z, 0.0, clampf(encaixando, 0.0, 1.0))
-	carga.no.global_position = maquina.to_global(Vector3(maquina.X_DESB, maquina.Y_DESB, alvo_z))
+	# 1º terço: a mão alinha a bobina com o eixo; depois ela desliza no mandril até o batente
+	if encaixando <= 0.0011:
+		_ini_encaixe = maquina.to_local(_pos_carga())
+	encaixando += delta / 3.5
+	var k := clampf(encaixando, 0.0, 1.0)
+	var ka := smoothstep(0.0, 0.3, k)
+	var kz := smoothstep(0.3, 1.0, k)
+	var p := Vector3(lerpf(_ini_encaixe.x, maquina.X_DESB, ka), lerpf(_ini_encaixe.y, maquina.Y_DESB, ka), lerpf(_ini_encaixe.z, 0.0, kz))
+	carga.no.global_position = maquina.to_global(p)
 	balanco = Vector2.ZERO
+	balanco_v = Vector2.ZERO
 	if encaixando >= 1.0:
 		encaixando = 0.0
 		maquina.receber_bobina(carga.codigo, carga.metros)
@@ -383,4 +412,13 @@ func _atualizar(_delta: float) -> void:
 		var ref := Vector3.FORWARD if absf(yv2.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT
 		var xv := yv2.cross(ref).normalized()
 		cabo_bot.basis = Basis(xv, yv2 * dcb.length(), xv.cross(yv2))
+	# anel guia do mandril
+	var mostra_guia := false
+	if carga and encaixando <= 0.0 and maquina and not maquina.bobina.presente:
+		var ml: Vector3 = maquina.to_local(_pos_carga())
+		if absf(ml.x - maquina.X_DESB) < 1.5 and ml.z > -0.5 and ml.z < 4.0:
+			mostra_guia = true
+			anel_guia.global_position = maquina.to_global(Vector3(maquina.X_DESB, maquina.Y_DESB, 0.8))
+			mat_guia.albedo_color = Color(0.2, 1.0, 0.3, 0.75) if _pode_guiar(ml) else Color(1.0, 0.85, 0.1, 0.55)
+	anel_guia.visible = mostra_guia
 	som_motor.volume_db = -10.0 if (absf(vx) + absf(vz) + absf(vh)) > 0.01 else -80.0

@@ -124,20 +124,21 @@ func _rodar() -> void:
 	P.x = x0
 	Interacoes.sair_foco()
 	ok(not P.operando and Interacoes.modo == "andar", "E larga a botoeira")
-	P.x = m.to_global(Vector3(m.X_DESB, 0, 0)).x + 0.08
+	P.x = m.to_global(Vector3(m.X_DESB, 0, 0)).x + 0.25
 	P.z = 1.3
 	P.h = m.Y_DESB + P.OFF_CINTA
 	P.balanco = Vector2.ZERO; P.balanco_v = Vector2.ZERO
 	await _q(2)
 	P._engatar_ou_soltar()
-	ok(P.encaixando == 0.0 and not m.bobina.presente, "desalinhada 8 cm: não encaixa")
-	P.x -= 0.08
+	ok(P.encaixando == 0.0 and not m.bobina.presente, "desalinhada 25 cm: não encaixa")
+	P.x -= 0.25 - 0.10                # 10 cm fora do eixo e 8 cm alto: dá para guiar com a mão
+	P.h += 0.08
 	P.balanco = Vector2.ZERO; P.balanco_v = Vector2.ZERO
 	await _q(2)
 	await foto("alinhando_mandril", Vector3(-5.6, 1.8, 3.0), Vector3(-7.2, 1.1, 0.8))
 	P._engatar_ou_soltar()
-	ok(P.encaixando > 0.0, "coaxial: bobina começa a deslizar no mandril")
-	await _seg(3.4)
+	ok(P.encaixando > 0.0, "perto do eixo (10 cm): G guia a bobina para o mandril")
+	await _seg(3.9)
 	ok(m.bobina.presente and m.bobina.cinta and P.carga == null and m.bobina.codigo == b0.codigo, "%s no mandril, com cinta, gancho livre" % b0.codigo)
 	P.h = 5.0
 	# bobina: cinta (precisa de EPI e mandril travado)
