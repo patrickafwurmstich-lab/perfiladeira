@@ -381,25 +381,25 @@ func _montar_acesso() -> void:
 	amarelo.albedo_color = Color(0.95, 0.75, 0.1)
 	var deg := MeshInstance3D.new()
 	var bm := BoxMesh.new()
-	bm.size = Vector3(0.32, 0.03, 0.26)
+	bm.size = Vector3(0.38, 0.03, 0.28)   # 38 × 28 cm: cabe o calçado inteiro
 	deg.mesh = bm
 	deg.material_override = preto
-	deg.position = Vector3(0.75, 0.265, -0.30)
+	deg.position = Vector3(0.79, 0.265, -0.33)
 	add_child(deg)
-	for zz in [-0.40, -0.20]:                       # suportes do degrau presos no chassi
+	for zz in [-0.44, -0.22]:                       # suportes do degrau presos no chassi
 		var sp := MeshInstance3D.new()
 		var sb := BoxMesh.new()
-		sb.size = Vector3(0.22, 0.12, 0.025)
+		sb.size = Vector3(0.30, 0.12, 0.025)
 		sp.mesh = sb
 		sp.material_override = preto
-		sp.position = Vector3(0.68, 0.20, zz)
+		sp.position = Vector3(0.72, 0.20, zz)
 		add_child(sp)
 	var faixa := MeshInstance3D.new()               # borda amarela de segurança
 	var fb := BoxMesh.new()
-	fb.size = Vector3(0.012, 0.032, 0.26)
+	fb.size = Vector3(0.012, 0.032, 0.28)
 	faixa.mesh = fb
 	faixa.material_override = amarelo
-	faixa.position = Vector3(0.912, 0.265, -0.30)
+	faixa.position = Vector3(0.982, 0.265, -0.33)
 	add_child(faixa)
 	# alça: tubo preto preso na coluna, voltado para trás, ao alcance de quem está no degrau
 	var a := Vector3(0.475, 1.20, 0.10)
