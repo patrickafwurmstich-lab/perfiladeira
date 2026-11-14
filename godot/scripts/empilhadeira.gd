@@ -40,7 +40,7 @@ var _t_tombo := 0.0
 var _lado_tombo := 1.0
 var comando := Vector3.ZERO
 var _subindo := 1.0
-const ASSENTO := Vector3(0, 0.33, -0.72)
+const ASSENTO := Vector3(0, 0.33, -0.66)
 var _esterco_paleteira := 0.0     # (acelera, vira, sobe) quando ninguém está dirigindo
 var _y_base_carro := 0.0
 var timao: Node3D = null          # paleteira: o timão (drawbar), pivô na base
@@ -136,6 +136,7 @@ func on_foco_saiu() -> void:
 	if jogador:
 		jogador.preso_a = null
 		jogador.maos_externas = []
+		jogador.polo_dir_externo = null
 		jogador.sentado = false
 		if tipo == "paleteira":
 			jogador.global_position = to_global(Vector3(0.0, 0.05, -1.45))
@@ -270,7 +271,7 @@ func _physics_process(delta: float) -> void:
 		_subindo = minf(_subindo + delta, 1.0)
 		var t := _subindo
 		var lado := Vector3(1.0, 0.0, -0.66)
-		var degrau := Vector3(0.70, -0.06, -0.66)   # pé de apoio no chão, o outro no degrau
+		var degrau := Vector3(0.68, -0.08, -0.615)   # quadril projetado sobre o degrau   # pé de apoio no chão, o outro no degrau
 		# 0–0,30 s sobe no degrau; 0,30–0,45 s firma no degrau (3 apoios); 0,45–0,72 s o quadril entra na cabine;
 		# 0,72–1 s senta
 		var dentro := Vector3(0.38, 0.42, -0.68)
@@ -289,19 +290,26 @@ func _physics_process(delta: float) -> void:
 	if tipo == "paleteira":
 		_atualizar_puxada(delta)
 	if jogador and jogador.preso_a == assento:
+		jogador.polo_dir_externo = null
+		jogador.aperto_esq = 65.0
 		if tipo == "paleteira":
 			jogador.maos_externas = maos_timao()
+			if _puxando > 0.5:
+				# puxando: cotovelo direito afastado ~6 cm do tronco, para fora e para trás
+				jogador.polo_dir_externo = assento.global_transform * Vector3(-0.60, 1.0, -0.20)
 		elif _subindo >= 1.0:
 			jogador.maos_externas = maos_volante()
 		elif _subindo < 0.45:
 			# três pontos de apoio: mão esquerda agarrada na coluna do teto, direita no volante, pé no degrau
 			jogador.maos_externas = [maos_volante()[1], to_global(POSTE_ESQ)]
+			jogador.aperto_esq = 88.0     # dedos fechados em volta da alça
 		elif _subindo < 0.78:
 			# passando o quadril: a esquerda corre pela longarina do teto, sempre logo acima do ombro (controla a
 			# descida até o quadril estar sobre o banco); a direita só encosta no volante, sem puxar
 			var a := assento.position
-			var pega := Vector3(TRILHO_TETO.x + 0.03, minf(TRILHO_TETO.y, a.y + 1.30 + 0.36), a.z + 0.26)
+			var pega := Vector3(TRILHO_TETO.x, TRILHO_TETO.y, a.z + 0.22)   # na própria longarina (a mão fecha em volta dela)
 			jogador.maos_externas = [maos_volante()[1], to_global(pega)]
+			jogador.aperto_esq = 88.0     # dedos fechados em volta da longarina
 		else:
 			jogador.maos_externas = maos_volante()     # quadril já no banco: as duas mãos vão para o volante
 
@@ -372,7 +380,7 @@ func _apagar_volante_do_modelo() -> void:
 		nova.surface_set_material(nova.get_surface_count() - 1, m.mesh.surface_get_material(si))
 	m.mesh = nova
 
-## degrau antiderrapante atrás da roda dianteira esquerda (topo a 0,28 m) e alça de apoio na coluna dianteira
+## degrau antiderrapante atrás da roda dianteira esquerda (topo a 0,26 m) e alça de apoio na coluna dianteira
 func _montar_acesso() -> void:
 	var preto := StandardMaterial3D.new()
 	preto.albedo_color = Color(0.09, 0.09, 0.1)
@@ -384,7 +392,7 @@ func _montar_acesso() -> void:
 	bm.size = Vector3(0.38, 0.03, 0.28)   # 38 × 28 cm: cabe o calçado inteiro
 	deg.mesh = bm
 	deg.material_override = preto
-	deg.position = Vector3(0.79, 0.265, -0.33)
+	deg.position = Vector3(0.79, 0.245, -0.33)
 	add_child(deg)
 	for zz in [-0.44, -0.22]:                       # suportes do degrau presos no chassi
 		var sp := MeshInstance3D.new()
@@ -392,14 +400,14 @@ func _montar_acesso() -> void:
 		sb.size = Vector3(0.30, 0.12, 0.025)
 		sp.mesh = sb
 		sp.material_override = preto
-		sp.position = Vector3(0.72, 0.20, zz)
+		sp.position = Vector3(0.72, 0.18, zz)
 		add_child(sp)
 	var faixa := MeshInstance3D.new()               # borda amarela de segurança
 	var fb := BoxMesh.new()
 	fb.size = Vector3(0.012, 0.032, 0.28)
 	faixa.mesh = fb
 	faixa.material_override = amarelo
-	faixa.position = Vector3(0.982, 0.265, -0.33)
+	faixa.position = Vector3(0.982, 0.245, -0.33)
 	add_child(faixa)
 	# alça: tubo preto preso na coluna, voltado para trás, ao alcance de quem está no degrau
 	var a := Vector3(0.475, 1.20, 0.10)
@@ -495,7 +503,7 @@ func maos_volante() -> Array:
 	if volante == null:
 		return [to_global(VOLANTE), to_global(VOLANTE)]
 	var r := 0.162
-	var dir_p := volante.global_transform * Vector3(-r, 0.05, 0.0)              # mão direita no pomo
+	var dir_p := volante.global_transform * Vector3(-r, 0.02, 0.0)              # mão direita no pomo
 	var esq_p := volante.global_transform * Vector3(r * 0.87, 0.0, -r * 0.5)    # esquerda no aro, 10h
 	return [dir_p, esq_p]
 

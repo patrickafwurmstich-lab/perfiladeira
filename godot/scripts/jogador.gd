@@ -51,7 +51,9 @@ var _dist := 2.8                 # distância real da câmera (suavizada; o Spri
 var _ignorar_mouse := 0.0        # ignora o 1º movimento depois de recapturar o mouse (evita o tranco)
 var _modo_ant := "andar"
 var preso_a: Node3D = null       # veículo que está levando o jogador (assento)
-var maos_externas: Array = []    # [mão direita, mão esquerda] em coordenadas do mundo (timão da paleteira)
+var maos_externas: Array = []
+var aperto_esq := 65.0            # quanto a mão esquerda fecha numa pega externa (graus)
+var polo_dir_externo = null       # Vector3 (mundo) para onde aponta o cotovelo direito, ou null = padrão    # [mão direita, mão esquerda] em coordenadas do mundo (timão da paleteira)
 var _cam_xf_jogo: Transform3D
 
 func _ready() -> void:
@@ -363,6 +365,10 @@ func _process(delta: float) -> void:
 	if ik_braco:
 		var k := smoothstep(0.0, 1.0, _ik_peso)
 		var esq_livre := externas and maos_externas[1] == null
+		if polo_dir_externo != null:
+			polo_cotovelo.global_position = polo_dir_externo
+		else:
+			polo_cotovelo.position = COTOVELO_POLO / visual.scale.x
 		if externas:
 			alvo_mao.global_position = maos_externas[0]
 			if not esq_livre:
@@ -375,7 +381,7 @@ func _process(delta: float) -> void:
 		dedos.influence = k
 		dedos_esq.influence = 0.0 if esq_livre else k
 		if externas:
-			dedos_esq.angulo = deg_to_rad(65.0)
+			dedos_esq.angulo = deg_to_rad(aperto_esq)
 		else:
 			dedos_esq.angulo = deg_to_rad(28.0)
 	# segue a posição interpolada do corpo (sem tremido entre física e tela), com leve atraso

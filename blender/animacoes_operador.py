@@ -127,7 +127,7 @@ try:
     usar(act3)
     zerar(); chave(TODOS, 0)
     zerar()   # f7: pé esquerdo no degrau, perna direita de apoio com o joelho dobrado ~20°, mão esquerda no teto de proteção
-    apontar('Spine', U + F * 0.28); apontar('Spine1', U + F * 0.1)
+    apontar('Spine', U + F * 0.45); apontar('Spine1', U + F * 0.15)   # tronco ~25° à frente: peso sobre o pé do degrau
     apontar('LeftUpLeg', F * 0.9 + S * 0.3); apontar('LeftLeg', -U - F * 0.05)     # pé no degrau ~0,40 m acima do chão
     apontar('RightUpLeg', -U + F * 0.12); apontar('RightLeg', -U - F * 0.3)        # apoio no chão, joelho ~20°
     apontar('LeftArm', U * 0.9 + F * 0.35 + S * 0.15); apontar('LeftForeArm', U + F * 0.25)
