@@ -21,11 +21,17 @@ func _ready() -> void:
 	add_child(cam)
 	cam.fov = 50
 	E._faz()
-	for i in 14: await get_tree().physics_frame
+	for i in 12: await get_tree().physics_frame
 	await foto("subindo1", E, Vector3(3.4, 1.4, 0.6), Vector3(0.5, 1.0, -0.8))
-	for i in 18: await get_tree().physics_frame
+	for i in 11: await get_tree().physics_frame
 	await foto("subindo2", E, Vector3(3.4, 1.4, 0.6), Vector3(0.5, 1.0, -0.8))
+	for i in 15: await get_tree().physics_frame
+	await foto("subindo2b", E, Vector3(3.4, 1.4, 0.6), Vector3(0.5, 1.0, -0.8))
+	for i in 9: await get_tree().physics_frame
+	await foto("subindo3", E, Vector3(3.4, 1.4, 0.6), Vector3(0.5, 1.0, -0.8))
 	for i in 60: await get_tree().physics_frame
+	await foto("garfo_perto", E, Vector3(1.1, 0.7, 2.9), Vector3(0.2, 0.05, 1.6))
+	await foto("garfo_cima", E, Vector3(0.0, 2.6, 1.7), Vector3(0.0, 0.0, 1.6))
 	await foto("lado", E, Vector3(3.2, 1.4, -0.6), Vector3(0, 1.1, -0.6))
 	await foto("frente34", E, Vector3(2.2, 2.0, 3.0), Vector3(0, 1.1, -0.6))
 	E.operando = false

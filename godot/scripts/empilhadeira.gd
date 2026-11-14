@@ -40,9 +40,15 @@ var _t_tombo := 0.0
 var _lado_tombo := 1.0
 var comando := Vector3.ZERO
 var _subindo := 1.0
-const ASSENTO := Vector3(0, 0.33, -0.82)
+const ASSENTO := Vector3(0, 0.33, -0.72)
 var _esterco_paleteira := 0.0     # (acelera, vira, sobe) quando ninguém está dirigindo
 var _y_base_carro := 0.0
+var timao: Node3D = null          # paleteira: o timão (drawbar), pivô na base
+var _timao_rot0 := 0.0
+var _pega_local: Array = []       # pontos da pega do timão no espaço do próprio timão
+var _puxando := 0.0               # 0 = empurrando (de frente para a paleteira), 1 = puxando (de costas, mão atrás na pega)
+const TRILHO_TETO := Vector3(0.45, 2.05, -0.55)   # longarina esquerda do teto de proteção, por baixo
+const POSTE_ESQ := Vector3(0.50, 1.12, -0.26)   # alça de apoio presa na coluna dianteira esquerda   # alça/coluna dianteira esquerda do teto de proteção
 
 func _ready() -> void:
 	if tipo == "paleteira":
@@ -60,11 +66,15 @@ func _ready() -> void:
 		add_child(modelo)
 		carro_garfos = modelo.find_child("pallet-jack_body", true, false)
 		_roda("pallet-jack_steer_wheels", 0.09, true)
+		timao = modelo.find_child("pallet-jack_drawbar", true, false)
+		if timao:
+			_timao_rot0 = timao.rotation.z
 	else:
 		modelo = load("res://modelos/forklift-light.glb").instantiate()
 		add_child(modelo)
 		carro_garfos = modelo.find_child("forklift_fork_carriage", true, false)
 		_montar_volante()
+		_montar_acesso()
 		for par in [["forklift_wheel_fl", 0.33, false], ["forklift_wheel_fr", 0.33, false], ["forklift_wheel_rl", 0.25, true], ["forklift_wheel_rr", 0.25, true]]:
 			_roda(par[0], par[1], par[2])
 	if carro_garfos:
@@ -80,7 +90,7 @@ func _ready() -> void:
 	cs.shape = bx
 	add_child(cs)
 	assento = Marker3D.new()
-	assento.position = Vector3(0, 0.33, -0.82) if tipo == "empilhadeira" else Vector3(0, 0.0, -1.18)
+	assento.position = ASSENTO if tipo == "empilhadeira" else Vector3(0, 0.0, -1.18)
 	add_child(assento)
 	Interagivel.criar(self, Vector3(0.9, 1.0, -0.6) if tipo == "empilhadeira" else Vector3(0, 0.9, -1.0), _txt, _faz, 1.6)
 
@@ -259,31 +269,80 @@ func _physics_process(delta: float) -> void:
 		# sobe pelo degrau do lado esquerdo: primeiro sobe (pé no degrau), depois entra e senta
 		_subindo = minf(_subindo + delta, 1.0)
 		var t := _subindo
-		var lado := Vector3(1.0, 0.0, -0.85)
-		var degrau := Vector3(0.75, 0.22, -0.85)
-		var p := lado.lerp(degrau, smoothstep(0.0, 0.5, t)) if t < 0.5 else degrau.lerp(ASSENTO, smoothstep(0.5, 1.0, t))
+		var lado := Vector3(1.0, 0.0, -0.66)
+		var degrau := Vector3(0.70, -0.06, -0.66)   # pé de apoio no chão, o outro no degrau
+		# 0–0,30 s sobe no degrau; 0,30–0,45 s firma no degrau (3 apoios); 0,45–0,72 s o quadril entra na cabine;
+		# 0,72–1 s senta
+		var dentro := Vector3(0.38, 0.42, -0.68)
+		var p: Vector3
+		if t < 0.30:
+			p = lado.lerp(degrau, smoothstep(0.0, 0.30, t))
+		elif t < 0.45:
+			p = degrau
+		elif t < 0.72:
+			p = degrau.lerp(dentro, smoothstep(0.45, 0.72, t))
+		else:
+			p = dentro.lerp(ASSENTO, smoothstep(0.72, 1.0, t))
 		assento.position = p
 	elif tipo == "empilhadeira":
 		assento.position = ASSENTO
+	if tipo == "paleteira":
+		_atualizar_puxada(delta)
 	if jogador and jogador.preso_a == assento:
 		if tipo == "paleteira":
 			jogador.maos_externas = maos_timao()
+		elif _subindo >= 1.0:
+			jogador.maos_externas = maos_volante()
+		elif _subindo < 0.45:
+			# três pontos de apoio: mão esquerda agarrada na coluna do teto, direita no volante, pé no degrau
+			jogador.maos_externas = [maos_volante()[1], to_global(POSTE_ESQ)]
+		elif _subindo < 0.78:
+			# passando o quadril: a esquerda corre pela longarina do teto, sempre logo acima do ombro (controla a
+			# descida até o quadril estar sobre o banco); a direita só encosta no volante, sem puxar
+			var a := assento.position
+			var pega := Vector3(TRILHO_TETO.x + 0.03, minf(TRILHO_TETO.y, a.y + 1.30 + 0.36), a.z + 0.26)
+			jogador.maos_externas = [maos_volante()[1], to_global(pega)]
 		else:
-			jogador.maos_externas = maos_volante() if _subindo >= 1.0 else []
+			jogador.maos_externas = maos_volante()     # quadril já no banco: as duas mãos vão para o volante
 
 ## animação do operador enquanto preso ao equipamento: na paleteira ele ANDA junto (para trás quando puxa)
 func anim_jogador() -> Array:
 	if tipo == "paleteira":
+		if _puxando > 0.5:
+			# puxando: virado para onde vai, andando de frente, mão direita atrás na pega (tronco quase reto)
+			return ["Walk_Forward", absf(v)] if absf(v) > 0.05 else ["Idle_Breathing", 0.0]
 		if absf(v) > 0.05:
-			return ["Push_Cart", v]          # anda inclinado empurrando; puxando, a animação roda de trás para frente
+			return ["Push_Cart", absf(v)]    # empurrando: tronco inclinado, as duas mãos no timão
 		return ["Idle_Breathing", 0.0]
 	if _subindo < 1.0:
 		return ["Climb_Forklift", 0.0]
 	return ["Sit_Forklift", 0.0]
 
-## pontos do punho do timão (as duas mãos)
+## pontos do punho do timão: empurrando, as duas mãos; puxando, só a direita (a esquerda solta, balançando)
 func maos_timao() -> Array:
-	return [to_global(Vector3(-0.09, 1.16, -0.74)), to_global(Vector3(0.09, 1.16, -0.74))]
+	if timao == null:
+		return [to_global(Vector3(-0.09, 1.16, -0.74)), to_global(Vector3(0.09, 1.16, -0.74))]
+	if _pega_local.is_empty():
+		var inv := timao.global_transform.affine_inverse()
+		_pega_local = [inv * to_global(Vector3(-0.09, 1.16, -0.74)), inv * to_global(Vector3(0.09, 1.16, -0.74)), inv * to_global(Vector3(0.0, 1.16, -0.74))]
+	if _puxando > 0.5:
+		return [timao.global_transform * _pega_local[2], assento.global_transform * Vector3(0.24, 0.80, 0.02)]   # esquerda solta ao lado da coxa
+	return [timao.global_transform * _pega_local[0], timao.global_transform * _pega_local[1]]
+
+## paleteira: ao puxar, o operador vira de costas, inclina o timão ~35° para trás e puxa com a mão direita atrás
+func _atualizar_puxada(delta: float) -> void:
+	if timao and _pega_local.is_empty():
+		maos_timao()
+	if v < -0.05:
+		_puxando = move_toward(_puxando, 1.0, delta * 2.5)
+	elif v > 0.05:
+		_puxando = move_toward(_puxando, 0.0, delta * 2.5)
+	var k := smoothstep(0.0, 1.0, _puxando)
+	if timao:
+		timao.rotation.z = _timao_rot0 + deg_to_rad(35.0) * k
+	# empurrando: atrás do timão olhando a paleteira; puxando: à frente da pega, de costas, pega ao lado do quadril direito
+	assento.position = Vector3(0, 0, -1.18).lerp(Vector3(-0.17, 0, -1.30), k)
+	assento.rotation.y = PI * k
 
 ## volante de verdade (aro, 3 raios e pomo), no lugar do volante do modelo, inclinado 24° para o motorista;
 ## gira 2,5 voltas de batente a batente, como numa empilhadeira
@@ -312,6 +371,60 @@ func _apagar_volante_do_modelo() -> void:
 		nova.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 		nova.surface_set_material(nova.get_surface_count() - 1, m.mesh.surface_get_material(si))
 	m.mesh = nova
+
+## degrau antiderrapante atrás da roda dianteira esquerda (topo a 0,28 m) e alça de apoio na coluna dianteira
+func _montar_acesso() -> void:
+	var preto := StandardMaterial3D.new()
+	preto.albedo_color = Color(0.09, 0.09, 0.1)
+	preto.roughness = 0.9
+	var amarelo := StandardMaterial3D.new()
+	amarelo.albedo_color = Color(0.95, 0.75, 0.1)
+	var deg := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.32, 0.03, 0.26)
+	deg.mesh = bm
+	deg.material_override = preto
+	deg.position = Vector3(0.75, 0.265, -0.30)
+	add_child(deg)
+	for zz in [-0.40, -0.20]:                       # suportes do degrau presos no chassi
+		var sp := MeshInstance3D.new()
+		var sb := BoxMesh.new()
+		sb.size = Vector3(0.22, 0.12, 0.025)
+		sp.mesh = sb
+		sp.material_override = preto
+		sp.position = Vector3(0.68, 0.20, zz)
+		add_child(sp)
+	var faixa := MeshInstance3D.new()               # borda amarela de segurança
+	var fb := BoxMesh.new()
+	fb.size = Vector3(0.012, 0.032, 0.26)
+	faixa.mesh = fb
+	faixa.material_override = amarelo
+	faixa.position = Vector3(0.912, 0.265, -0.30)
+	add_child(faixa)
+	# alça: tubo preto preso na coluna, voltado para trás, ao alcance de quem está no degrau
+	var a := Vector3(0.475, 1.20, 0.10)
+	var b := Vector3(0.50, 1.10, -0.32)
+	var tubo := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.016
+	cm.bottom_radius = 0.016
+	cm.height = a.distance_to(b)
+	tubo.mesh = cm
+	tubo.material_override = preto
+	add_child(tubo)
+	tubo.position = (a + b) * 0.5
+	var eixo := (b - a).normalized()
+	tubo.basis = Basis(Quaternion(Vector3.UP, eixo))
+	for p in [b]:                                   # pé da alça descendo até a carroceria
+		var pe := MeshInstance3D.new()
+		var pm := CylinderMesh.new()
+		pm.top_radius = 0.016
+		pm.bottom_radius = 0.016
+		pm.height = 0.14
+		pe.mesh = pm
+		pe.material_override = preto
+		pe.position = p + Vector3(0, -0.07, 0)
+		add_child(pe)
 
 func _montar_volante() -> void:
 	_apagar_volante_do_modelo()

@@ -122,23 +122,30 @@ try:
             apontar(L + 'ForeArm', F + U * 0.05 - S * (s * 0.15))
         lados(bracos2)
         chave(['Spine', 'Spine1', 'Neck', 'LeftArm', 'LeftForeArm', 'RightArm', 'RightForeArm'], f)
-    # ---- Climb_Forklift (1 s): pisa no degrau com a perna esquerda, segura no teto de proteção, senta
+    # ---- Climb_Forklift (1 s): 0,3 s sobe no degrau (joelho de apoio dobrado), 0,35 s passa o quadril para dentro, 0,35 s senta
     act3 = bpy.data.actions.new('Climb_Forklift'); act3.use_fake_user = True
     usar(act3)
     zerar(); chave(TODOS, 0)
-    zerar()
-    apontar('LeftUpLeg', F * 0.8 + U * 0.6); apontar('LeftLeg', -U + F * 0.2)
-    apontar('LeftArm', U * 0.9 + F * 0.3 + S * 0.2); apontar('LeftForeArm', U + F * 0.2)
-    apontar('RightArm', F * 0.6 - U * 0.4 - S * 0.2)
-    apontar('Spine', U + F * 0.2)
-    chave(TODOS, 8)
-    zerar()
-    apontar('LeftUpLeg', F * 0.9 + U * 0.3); apontar('LeftLeg', -U + F * 0.1)
-    apontar('RightUpLeg', F * 0.6 - U * 0.6); apontar('RightLeg', -U + F * 0.3)
-    apontar('LeftArm', U * 0.6 + F * 0.5 + S * 0.2); apontar('LeftForeArm', U * 0.6 + F * 0.6)
-    apontar('RightArm', F * 0.7 - U * 0.4 - S * 0.2); apontar('RightForeArm', F)
+    zerar()   # f7: pé esquerdo no degrau, perna direita de apoio com o joelho dobrado ~20°, mão esquerda no teto de proteção
+    apontar('Spine', U + F * 0.28); apontar('Spine1', U + F * 0.1)
+    apontar('LeftUpLeg', F * 0.9 + S * 0.3); apontar('LeftLeg', -U - F * 0.05)     # pé no degrau ~0,40 m acima do chão
+    apontar('RightUpLeg', -U + F * 0.12); apontar('RightLeg', -U - F * 0.3)        # apoio no chão, joelho ~20°
+    apontar('LeftArm', U * 0.9 + F * 0.35 + S * 0.15); apontar('LeftForeArm', U + F * 0.25)
+    apontar('RightArm', F * 0.55 - U * 0.5 - S * 0.1); apontar('RightForeArm', F * 0.8 - U * 0.2)
+    chave(TODOS, 7)
+    chave(TODOS, 11)   # firma no degrau (mesma pose) até 0,45 s
+    zerar()   # f15: quadril entra na cabine, o pé de apoio sai do chão
     apontar('Spine', U + F * 0.15)
-    chave(TODOS, 16)
+    apontar('LeftUpLeg', F * 0.9 + U * 0.15 - S * 0.05); apontar('LeftLeg', -U * 0.8 + F * 0.45)
+    apontar('RightUpLeg', F * 0.55 - U * 0.65); apontar('RightLeg', -U + F * 0.45)
+    apontar('LeftArm', U * 0.55 + F * 0.55 + S * 0.15); apontar('LeftForeArm', U * 0.5 + F * 0.7)
+    apontar('RightArm', F * 0.7 - U * 0.45 - S * 0.15); apontar('RightForeArm', F + U * 0.1)
+    chave(TODOS, 17)
+    zerar(); pose_sentado()   # f19: as duas pernas já recolhidas para a área dos pedais, quadril ainda descendo
+    apontar('Spine', U + F * 0.05)
+    apontar('LeftUpLeg', F + U * 0.12); apontar('LeftLeg', -U + F * 0.3)
+    apontar('RightUpLeg', F + U * 0.05); apontar('RightLeg', -U + F * 0.25)
+    chave(TODOS, 21)
     zerar(); pose_sentado(); chave(TODOS, 24)
     log['novas'] = ['Sit_Forklift', 'Push_Cart', 'Climb_Forklift']
     usar(act); sc.frame_set(0); bpy.context.view_layer.update()
@@ -167,9 +174,9 @@ try:
     foto('sit_frente', 'Sit_Forklift', 0, F + S * 0.3)
     foto('push_lado', 'Push_Cart', 8, S)
     foto('push_34', 'Push_Cart', 20, F * 0.6 + S)
-    foto('climb_08', 'Climb_Forklift', 8, S + F * 0.4)
-    foto('climb_16', 'Climb_Forklift', 16, S + F * 0.4)
-    foto('climb_04', 'Climb_Forklift', 4, S + F * 0.4)
+    foto('climb_08', 'Climb_Forklift', 7, S + F * 0.4)
+    foto('climb_16', 'Climb_Forklift', 15, S + F * 0.4)
+    foto('climb_04', 'Climb_Forklift', 19, S + F * 0.4)
     foto('push_lado2', 'Push_Cart', 22, S)
     # ---- exporta
     bpy.data.objects.remove(cam, do_unlink=True)

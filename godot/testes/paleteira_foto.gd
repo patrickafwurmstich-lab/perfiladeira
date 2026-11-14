@@ -34,6 +34,23 @@ func _ready() -> void:
 		await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(dir + "/pal_andando.png")
+	cam.global_position = P.to_global(Vector3(1.9, 1.5, -1.0))
+	cam.look_at(P.to_global(Vector3(0, 1.0, -0.9)))
+	for k in 3:
+		cam.make_current()
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(dir + "/pal_maos_empurra.png")
+	P.comando = Vector3(-1, 0, 0)
+	for i in 70: await get_tree().physics_frame
+	cam.global_position = P.to_global(Vector3(1.9, 1.5, -1.2))
+	cam.look_at(P.to_global(Vector3(0, 1.0, -1.1)))
+	for k in 3:
+		cam.make_current()
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(dir + "/pal_maos_puxa.png")
+	print("puxando v ", P.v, " anim ", j.anim.current_animation if j.anim else "-", " scale ", j.anim.speed_scale if j.anim else 0)
 	print("jog fw ", j.visual.global_transform.basis.z, " P fw ", P.global_transform.basis.z, " jog ", j.global_position, " P ", P.global_position)
 	print("v ", P.v, " anim ", j.anim.current_animation if j.anim else "-", " scale ", j.anim.speed_scale if j.anim else 0)
 	get_tree().quit()

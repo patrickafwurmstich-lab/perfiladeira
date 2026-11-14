@@ -362,16 +362,18 @@ func _process(delta: float) -> void:
 	_ik_peso = move_toward(_ik_peso, 1.0 if (segurando or externas) else 0.0, delta * 3.0)
 	if ik_braco:
 		var k := smoothstep(0.0, 1.0, _ik_peso)
+		var esq_livre := externas and maos_externas[1] == null
 		if externas:
 			alvo_mao.global_position = maos_externas[0]
-			alvo_esq.global_position = maos_externas[1]
+			if not esq_livre:
+				alvo_esq.global_position = maos_externas[1]
 		elif _ik_peso <= 0.0 or segurando:
 			alvo_mao.position = MAO_ALVO / visual.scale.x
 			alvo_esq.position = MAO_ESQ / visual.scale.x
 		ik_braco.influence = k
-		ik_esq.influence = k * (1.0 if externas else 0.7)
+		ik_esq.influence = 0.0 if esq_livre else k * (1.0 if externas else 0.7)
 		dedos.influence = k
-		dedos_esq.influence = k
+		dedos_esq.influence = 0.0 if esq_livre else k
 		if externas:
 			dedos_esq.angulo = deg_to_rad(65.0)
 		else:
