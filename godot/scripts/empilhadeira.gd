@@ -39,6 +39,8 @@ var a_tombo := 0.0
 var _t_tombo := 0.0
 var _lado_tombo := 1.0
 var comando := Vector3.ZERO
+var _subindo := 1.0
+const ASSENTO := Vector3(0, 0.33, -0.82)
 var _esterco_paleteira := 0.0     # (acelera, vira, sobe) quando ninguém está dirigindo
 var _y_base_carro := 0.0
 
@@ -113,7 +115,9 @@ func _faz() -> void:
 		jogador.add_collision_exception_with(self)
 		jogador.preso_a = assento
 		jogador.visual.visible = true
-		jogador.sentado = tipo == "empilhadeira"
+		jogador.sentado = false          # pose agora vem da animação Sit_Forklift (feita no Blender)
+		if tipo == "empilhadeira":
+			_subindo = 0.0               # animação de subir pelo degrau (1 s)
 	var dica := "EMPILHADEIRA · W/S acelera/ré · A/D esterça (roda de trás!) · R/F sobe/desce garfos · E desce" if tipo == "empilhadeira" else "PALETEIRA · W/S empurra/puxa · A/D vira · Espaço bombeia (sobe) · Q solta a válvula (desce) · E larga"
 	Interacoes.operar(self, dica)
 
@@ -251,14 +255,31 @@ func _physics_process(delta: float) -> void:
 		sobe = float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))
 	dirigir(acel, vira, sobe, delta)
 	_girar_volante()
+	if tipo == "empilhadeira" and _subindo < 1.0:
+		# sobe pelo degrau do lado esquerdo: primeiro sobe (pé no degrau), depois entra e senta
+		_subindo = minf(_subindo + delta, 1.0)
+		var t := _subindo
+		var lado := Vector3(1.0, 0.0, -0.85)
+		var degrau := Vector3(0.75, 0.22, -0.85)
+		var p := lado.lerp(degrau, smoothstep(0.0, 0.5, t)) if t < 0.5 else degrau.lerp(ASSENTO, smoothstep(0.5, 1.0, t))
+		assento.position = p
+	elif tipo == "empilhadeira":
+		assento.position = ASSENTO
 	if jogador and jogador.preso_a == assento:
-		jogador.maos_externas = maos_timao() if tipo == "paleteira" else maos_volante()
+		if tipo == "paleteira":
+			jogador.maos_externas = maos_timao()
+		else:
+			jogador.maos_externas = maos_volante() if _subindo >= 1.0 else []
 
 ## animação do operador enquanto preso ao equipamento: na paleteira ele ANDA junto (para trás quando puxa)
 func anim_jogador() -> Array:
-	if tipo == "paleteira" and absf(v) > 0.05:
-		return ["Walk_Forward", v]
-	return ["Idle_Breathing", 0.0]
+	if tipo == "paleteira":
+		if absf(v) > 0.05:
+			return ["Push_Cart", v]          # anda inclinado empurrando; puxando, a animação roda de trás para frente
+		return ["Idle_Breathing", 0.0]
+	if _subindo < 1.0:
+		return ["Climb_Forklift", 0.0]
+	return ["Sit_Forklift", 0.0]
 
 ## pontos do punho do timão (as duas mãos)
 func maos_timao() -> Array:
@@ -266,7 +287,34 @@ func maos_timao() -> Array:
 
 ## volante de verdade (aro, 3 raios e pomo), no lugar do volante do modelo, inclinado 24° para o motorista;
 ## gira 2,5 voltas de batente a batente, como numa empilhadeira
+## tira do corpo do modelo o volante e a coluna que vêm "colados" na malha (não giram); no lugar entra
+## o volante de verdade abaixo. Sem isso ficavam dois volantes um dentro do outro.
+func _apagar_volante_do_modelo() -> void:
+	var m := modelo.find_child("forklift_body", true, false) as MeshInstance3D
+	if m == null:
+		return
+	var nova := ArrayMesh.new()
+	for si in m.mesh.get_surface_count():
+		var arr: Array = m.mesh.surface_get_arrays(si)
+		var vs: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] != null else PackedInt32Array(range(vs.size()))
+		var fica := PackedInt32Array()
+		for t in range(0, idx.size(), 3):
+			var dentro := true
+			for k in 3:
+				var v := vs[idx[t + k]]
+				if not (absf(v.x) < 0.215 and v.y > 0.98 and v.y < 1.50 and v.z > -0.32 and v.z < 0.17):
+					dentro = false
+					break
+			if not dentro:
+				fica.append(idx[t]); fica.append(idx[t + 1]); fica.append(idx[t + 2])
+		arr[Mesh.ARRAY_INDEX] = fica
+		nova.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+		nova.surface_set_material(nova.get_surface_count() - 1, m.mesh.surface_get_material(si))
+	m.mesh = nova
+
 func _montar_volante() -> void:
+	_apagar_volante_do_modelo()
 	volante = Node3D.new()
 	volante.position = VOLANTE
 	add_child(volante)

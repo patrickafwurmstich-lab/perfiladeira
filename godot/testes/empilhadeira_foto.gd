@@ -16,11 +16,15 @@ func _ready() -> void:
 	for i in 10: await get_tree().physics_frame
 	main.hud.visible = false
 	var E: Empilhadeira = main.empilhadeira
-	E._faz()
 	dir = OS.get_cmdline_user_args()[0]
 	cam = Camera3D.new()
 	add_child(cam)
 	cam.fov = 50
+	E._faz()
+	for i in 14: await get_tree().physics_frame
+	await foto("subindo1", E, Vector3(3.4, 1.4, 0.6), Vector3(0.5, 1.0, -0.8))
+	for i in 18: await get_tree().physics_frame
+	await foto("subindo2", E, Vector3(3.4, 1.4, 0.6), Vector3(0.5, 1.0, -0.8))
 	for i in 60: await get_tree().physics_frame
 	await foto("lado", E, Vector3(3.2, 1.4, -0.6), Vector3(0, 1.1, -0.6))
 	await foto("frente34", E, Vector3(2.2, 2.0, 3.0), Vector3(0, 1.1, -0.6))

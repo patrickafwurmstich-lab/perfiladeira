@@ -253,7 +253,7 @@ func _tocar(nome: String) -> void:
 		return
 	if anim.has_animation(nome):
 		var a := anim.get_animation(nome)
-		a.loop_mode = Animation.LOOP_LINEAR
+		a.loop_mode = Animation.LOOP_NONE if nome == "Climb_Forklift" else Animation.LOOP_LINEAR
 		anim.play(nome, 0.25)
 		_anim_atual = nome
 

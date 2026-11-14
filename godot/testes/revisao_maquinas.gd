@@ -67,8 +67,9 @@ func _ready() -> void:
 	for i in 60:
 		E.comando = Vector3(0, 0, 1); await _q()
 	E.comando = Vector3.ZERO
+	print("emp: carga=", E.carga, " alvo=", E.carga_alvo(), " garfo=", E.garfo)
 	E._faz()      # motorista sentado
-	await _q(30)
+	await _q(80)
 	await foto("emp_frente_carga", E.to_global(Vector3(0.6, 1.4, 5.5)), E.to_global(Vector3(0, 0.9, 1.0)))
 	await foto("emp_lado_carga", E.to_global(Vector3(4.5, 1.3, 0.2)), E.to_global(Vector3(0, 1.0, 0.2)))
 	Interacoes.sair_foco()
