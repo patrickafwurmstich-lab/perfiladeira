@@ -19,6 +19,9 @@ func _ready() -> void:
 	add_child(cam)
 	for i in 20: await get_tree().physics_frame
 	var j = main.jogador
+	for i in 2: await get_tree().process_frame
+	var p0: Vector3 = j.global_position
+	await foto("sem_epi", p0 + j.visual.global_transform.basis.z.normalized() * 2.6 + Vector3(0, 1.5, 0), p0 + Vector3(0, 1.0, 0))
 	print("sem EPI: ", [j.visual.find_child("SM_Char_Operador_EPI_Capacete", true, false).visible])
 	Interacoes.epi = true
 	j.atualizar_epi()

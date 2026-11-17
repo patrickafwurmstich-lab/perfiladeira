@@ -186,7 +186,7 @@ try:
     M_VERM = mat('MAT_EPI_Abafador_Vermelho', (0.75, 0.06, 0.04), 0.45)
     M_PRETO = mat('MAT_EPI_Plastico_Preto', (0.04, 0.04, 0.045), 0.6)
     M_LENTE = mat('MAT_EPI_Lente', (0.80, 0.88, 0.95), 0.05, 0.0, 0.35)
-    M_LARANJA = mat('MAT_EPI_Colete_Laranja', (1.0, 0.30, 0.0), 0.7)
+    M_LARANJA = mat('MAT_EPI_Colete_Laranja', (0.92, 0.10, 0.0), 0.7)   # laranja de segurança (linear) — 1,0/0,30 virava amarelo no sol
     M_REFL = mat('MAT_EPI_Faixa_Refletiva', (0.82, 0.83, 0.80), 0.25, 0.6)
     def novo(nome, bm, m):
         me = bpy.data.meshes.new(nome); bm.to_mesh(me); bm.free()
@@ -261,7 +261,7 @@ try:
         bpy.context.view_layer.update()
         o.matrix_world = mw
     # colete refletivo: a partir da jaqueta (mesmos pesos de pele), sem mangas, 6 mm por fora, 2 faixas prata
-    jaq = bpy.data.objects['Outerwear_036']
+    jaq = bpy.data.objects['T_Shirt_009']   # uniforme novo: camiseta manga curta + colete por cima
     col = jaq.copy(); col.data = jaq.data.copy(); col.name = 'SM_Char_Operador_EPI_Colete'; col.data.name = col.name
     sc.collection.objects.link(col)
     gi = {g.index: g.name for g in col.vertex_groups}
@@ -301,7 +301,7 @@ try:
     sc.render.image_settings.file_format = 'PNG'
     sc.display.shading.light = 'STUDIO'; sc.display.shading.color_type = 'MATERIAL'
     centro = rig.matrix_world @ (rest('Hips').head_local)
-    VISIVEIS = {'Body_010', 'Male_emotion_usual_001', 'Outerwear_036', 'Pants_014', 'Shoe_Sneakers_009', 'Gloves_014',
+    VISIVEIS = {'Body_010', 'Male_emotion_usual_001', 'T_Shirt_009', 'Pants_014', 'Shoe_Sneakers_009', 'Gloves_014',
                 'SM_Char_Operador_EPI_Capacete', 'SM_Char_Operador_EPI_Abafador', 'SM_Char_Operador_EPI_Oculos', 'SM_Char_Operador_EPI_Colete'}
     for o in bpy.data.objects:
         if o.type == 'MESH': o.hide_render = o.name not in VISIVEIS
@@ -318,6 +318,7 @@ try:
     cam_d.lens = 65
     mostrar_epi(False)
     foto('epi_antes_34', 'Idle_Breathing', 10, F + S * 0.6)
+    log['camiseta'] = [len(bpy.data.objects['T_Shirt_009'].data.polygons), [m.name for m in bpy.data.objects['T_Shirt_009'].data.materials]]
     mostrar_epi(True)
     foto('epi_depois_34', 'Idle_Breathing', 10, F + S * 0.6)
     foto('epi_depois_lado', 'Idle_Breathing', 10, S)

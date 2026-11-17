@@ -90,7 +90,7 @@ func _carregar_visual() -> void:
 	var cam_p := "res://privado/personagens_ithappy.glb"
 	if ResourceLoader.exists(cam_p):
 		visual = load(cam_p).instantiate()
-		var usar := ["Body_010", "Male_emotion_usual_001", "Outerwear_036", "Pants_014", "Shoe_Sneakers_009", "Gloves_014",
+		var usar := ["Body_010", "Male_emotion_usual_001", "T_Shirt_009", "Pants_014", "Shoe_Sneakers_009", "Gloves_014",
 			"SM_Char_Operador_EPI_Capacete", "SM_Char_Operador_EPI_Abafador", "SM_Char_Operador_EPI_Oculos", "SM_Char_Operador_EPI_Colete"]
 		for mi in visual.find_children("*", "MeshInstance3D", true, false):
 			mi.visible = mi.name in usar
@@ -215,8 +215,8 @@ func atualizar_epi() -> void:
 	if visual == null:
 		return
 	for mi in visual.find_children("*", "MeshInstance3D", true, false):
-		# EPI modelado no Blender (capacete, abafador, óculos, colete refletivo) + luvas do pacote
-		if mi.name.begins_with("SM_Char_Operador_EPI") or mi.name == "Gloves_014":
+		# EPI modelado no Blender (capacete, abafador, óculos) + luvas do pacote; o colete faz parte do uniforme (sempre vestido)
+		if (mi.name.begins_with("SM_Char_Operador_EPI") and mi.name != "SM_Char_Operador_EPI_Colete") or mi.name == "Gloves_014":
 			mi.visible = Interacoes.epi
 
 func _tocar(nome: String) -> void:
