@@ -90,44 +90,14 @@ func _carregar_visual() -> void:
 	var cam_p := "res://privado/personagens_ithappy.glb"
 	if ResourceLoader.exists(cam_p):
 		visual = load(cam_p).instantiate()
-		var usar := ["Body_010", "Male_emotion_usual_001", "Outerwear_036", "Pants_014", "Shoe_Sneakers_009", "Gloves_014"]
+		var usar := ["Body_010", "Male_emotion_usual_001", "Outerwear_036", "Pants_014", "Shoe_Sneakers_009", "Gloves_014",
+			"SM_Char_Operador_EPI_Capacete", "SM_Char_Operador_EPI_Abafador", "SM_Char_Operador_EPI_Oculos", "SM_Char_Operador_EPI_Colete"]
 		for mi in visual.find_children("*", "MeshInstance3D", true, false):
 			mi.visible = mi.name in usar
 		anim = visual.find_child("AnimationPlayer", true, false)
 		_tirar_root_motion()
 		_montar_ik()
 		atualizar_epi()
-		# capacete amarelo preso no osso da cabeça
-		var esq := visual.find_child("Skeleton*", true, false) as Skeleton3D
-		if esq == null:
-			for n in visual.find_children("*", "Skeleton3D", true, false):
-				esq = n
-		if esq and esq.find_bone("Head") >= 0:
-			var ba := BoneAttachment3D.new()
-			ba.bone_name = "Head"
-			esq.add_child(ba)
-			# capacete de segurança: casco + aba, apoiado no alto da cabeça (o osso Head fica na nuca)
-			var m := StandardMaterial3D.new()
-			m.albedo_color = Color(0.95, 0.95, 0.93)
-			m.roughness = 0.35
-			var c := MeshInstance3D.new()
-			var sm := SphereMesh.new()
-			sm.radius = 0.165
-			sm.height = 0.15
-			sm.is_hemisphere = true
-			c.mesh = sm
-			c.material_override = m
-			c.position = Vector3(0, ALT_CAPACETE, 0.01)
-			ba.add_child(c)
-			var aba := MeshInstance3D.new()
-			var cy := CylinderMesh.new()
-			cy.top_radius = 0.185
-			cy.bottom_radius = 0.19
-			cy.height = 0.014
-			aba.mesh = cy
-			aba.material_override = m
-			aba.position = Vector3(0, ALT_CAPACETE, 0.03)
-			ba.add_child(aba)
 		var aabb_alt := 1.86
 		visual.scale = Vector3.ONE * (1.80 / aabb_alt)
 	else:
@@ -245,9 +215,8 @@ func atualizar_epi() -> void:
 	if visual == null:
 		return
 	for mi in visual.find_children("*", "MeshInstance3D", true, false):
-		if mi.name == "Glasses_004":
-			mi.visible = Interacoes.epi
-		elif mi.name == "Gloves_014":
+		# EPI modelado no Blender (capacete, abafador, óculos, colete refletivo) + luvas do pacote
+		if mi.name.begins_with("SM_Char_Operador_EPI") or mi.name == "Gloves_014":
 			mi.visible = Interacoes.epi
 
 func _tocar(nome: String) -> void:
